@@ -1,0 +1,93 @@
+version: 2
+image_name: vertexai-configuration
+
+apis:
+- inference
+- agents
+- safety
+- vector_io
+- files
+- tool_runtime
+
+providers:
+  inference:
+  - provider_id: google-vertex
+    provider_type: remote::vertexai
+    config:
+      project: ${env.VERTEX_AI_PROJECT}
+      location: ${env.VERTEX_AI_LOCATION}
+      allowed_models: ["google/gemini-2.5-flash"]
+  agents:
+  - provider_id: meta-reference
+    provider_type: inline::meta-reference
+    config:
+      persistence:
+        agent_state:
+          namespace: agents
+          backend: kv_default
+        responses:
+          table_name: responses
+          backend: sql_default
+          max_write_queue_size: 10000
+          num_writers: 4
+  safety: []
+  vector_io:
+  - provider_id: faiss
+    provider_type: inline::faiss
+    config:
+      persistence:
+        namespace: vector_io::faiss
+        backend: kv_default
+  files:
+  - provider_id: meta-reference-files
+    provider_type: inline::localfs
+    config:
+      storage_dir: /tmp/files
+      metadata_store:
+        table_name: files_metadata
+        backend: sql_default
+  tool_runtime:
+  - provider_id: rag-runtime
+    provider_type: inline::rag-runtime
+  - provider_id: model-context-protocol
+    provider_type: remote::model-context-protocol
+
+server:
+  port: 8321
+
+storage:
+  backends:
+    kv_default:
+      type: kv_sqlite
+      db_path: /tmp/kv_store.db
+    sql_default:
+      type: sql_sqlite
+      db_path: /tmp/sql_store.db
+  stores:
+    metadata:
+      namespace: registry
+      backend: kv_default
+    inference:
+      table_name: inference_store
+      backend: sql_default
+    conversations:
+      table_name: conversations
+      backend: sql_default
+    prompts:
+      namespace: prompts
+      backend: kv_default
+    connectors:
+      namespace: connectors
+      backend: kv_default
+
+registered_resources:
+  models:
+  - model_id: google/gemini-2.5-flash
+    provider_id: google-vertex
+    provider_model_id: google/gemini-2.5-flash
+    model_type: llm
+  tool_groups:
+  - toolgroup_id: mcp::okp-knowledge-portal
+    provider_id: model-context-protocol
+    mcp_endpoint:
+      uri: http://okp-mcp:8001/sse

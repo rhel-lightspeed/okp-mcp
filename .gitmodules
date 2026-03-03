@@ -1,0 +1,3 @@
+[submodule "okp-solr-rag-providers"]
+	path = okp-solr-rag-providers
+	url = git@gitlab.cee.redhat.com:mhayden/okp-solr-rag-providers.git
