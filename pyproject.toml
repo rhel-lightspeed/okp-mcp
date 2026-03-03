@@ -1,0 +1,24 @@
+[project]
+name = "okp-mcp"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Major Hayden", email = "major@redhat.com" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "fastmcp>=2.14.4",
+    "httpx>=0.28",
+    "pydantic>=2.0",
+    "requests>=2.31",
+    "sentence-transformers",
+    "torch",
+]
+
+[project.scripts]
+okp-mcp = "okp_mcp:main"
+
+[build-system]
+requires = ["uv_build>=0.9.28,<0.10.0"]
+build-backend = "uv_build"

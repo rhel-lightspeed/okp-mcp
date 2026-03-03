@@ -1,0 +1,31 @@
+services:
+  okp:
+    image: images.paas.redhat.com/offline-kbase/okp-rag-proto:nov20
+    container_name: okp
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/solr/portal-rag/admin/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  mcp-server:
+    image: okp-mcp:latest
+    container_name: mcp-server
+    ports:
+      - "8001:8001"
+    environment:
+      SOLR_HOST: okp:8080
+    depends_on:
+      okp:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8001/mcp"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
