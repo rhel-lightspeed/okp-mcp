@@ -45,6 +45,8 @@ src/okp_mcp/
 tests/
   conftest.py   # shared fixtures (solr mocks, sample responses)
   test_*.py     # test modules mirror src structure
+docs/
+  SOLR_EXPLORATION.md  # Solr schema map, field inventory, document types, query handler config, and data characteristics
 ```
 
 ## Code Style
