@@ -1,9 +1,9 @@
 services:
-  # RHEL OKP — Offline Knowledge Portal (Solr-based documentation index)
+  # Red Hat OKP — Offline Knowledge Portal (Solr-based documentation index)
   # Requires registry.redhat.io authentication: podman login registry.redhat.io
-  rhel-okp:
+  redhat-okp:
     image: registry.redhat.io/offline-knowledge-portal/rhokp-rhel9:latest
-    container_name: rhel-okp
+    container_name: redhat-okp
     ports:
       - "8983:8983"
     environment:
@@ -14,15 +14,18 @@ services:
     restart: unless-stopped
 
   # OKP MCP Server — Solr bridge for LLM tool calls
-  mcp-server:
+  okp-mcp:
+    build:
+      context: .
+      dockerfile: Containerfile
     image: okp-mcp:latest
     container_name: mcp-server
     ports:
       - "8000:8000"
     environment:
-      MCP_SOLR_URL: http://rhel-okp:8983
+      MCP_SOLR_URL: http://redhat-okp:8983
     depends_on:
-      - rhel-okp
+      - redhat-okp
     restart: unless-stopped
 
 volumes:
