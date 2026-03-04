@@ -13,18 +13,6 @@ services:
       - okp-solr-data:/opt/solr/server/solr/portal/data
       - ./rhel-okp-tar-wrapper.sh:/usr/local/bin/tar:ro,z
     restart: unless-stopped
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "bash",
-          "-c",
-          "exec 3<>/dev/tcp/127.0.0.1/8983 && exec 3>&-",
-        ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
 
   # OKP MCP Server — Solr bridge for LLM tool calls
   mcp-server:
@@ -35,21 +23,8 @@ services:
     environment:
       MCP_SOLR_URL: http://rhel-okp:8983
     depends_on:
-      rhel-okp:
-        condition: service_healthy
+      - rhel-okp
     restart: unless-stopped
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "python3",
-          "-c",
-          "import socket; s = socket.create_connection(('127.0.0.1', 8000), timeout=3); s.close()",
-        ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
 
 volumes:
   okp-solr-data:
