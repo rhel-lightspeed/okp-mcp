@@ -1,24 +1,46 @@
 [project]
 name = "okp-mcp"
 version = "0.1.0"
-description = "Add your description here"
+description = "MCP server for the Offline Knowledge Portal"
 readme = "README.md"
-authors = [
-    { name = "Major Hayden", email = "major@redhat.com" }
-]
-requires-python = ">=3.14"
-dependencies = [
-    "fastmcp>=2.14.4",
-    "httpx>=0.28",
-    "pydantic>=2.0",
-    "requests>=2.31",
-    "sentence-transformers",
-    "torch",
-]
+authors = [{ name = "Major Hayden", email = "major@redhat.com" }]
+requires-python = ">=3.12"
+dependencies = ["fastmcp>=3.0.2", "httpx", "pydantic-settings>=2.13.1", "rank-bm25"]
 
 [project.scripts]
 okp-mcp = "okp_mcp:main"
 
 [build-system]
-requires = ["uv_build>=0.9.28,<0.10.0"]
+requires = ["uv_build>=0.10.5,<0.11.0"]
 build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=7.0.0",
+    "pytest-randomly>=4.0.1",
+    "pytest-sugar>=1.1.1",
+    "pytest-xdist>=3.8.0",
+    "radon>=6.0.1",
+    "respx>=0.22",
+    "ruff>=0.11",
+    "ty>=0.0.20",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "S", "B", "A", "C4", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S104"]
+
+[tool.ty.environment]
+python-version = "3.12"

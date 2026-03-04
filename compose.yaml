@@ -1,31 +1,55 @@
 services:
-  okp:
-    image: images.paas.redhat.com/offline-kbase/okp-rag-proto:nov20
-    container_name: okp
+  # RHEL OKP — Offline Knowledge Portal (Solr-based documentation index)
+  # Requires registry.redhat.io authentication: podman login registry.redhat.io
+  rhel-okp:
+    image: registry.redhat.io/offline-knowledge-portal/rhokp-rhel9:latest
+    container_name: rhel-okp
     ports:
-      - "8080:8080"
+      - "8983:8983"
+    environment:
+      ACCESS_KEY: ${OKP_ACCESS_KEY}
+      SOLR_JETTY_HOST: "0.0.0.0"
+    volumes:
+      - okp-solr-data:/opt/solr/server/solr/portal/data
+      - ./rhel-okp-tar-wrapper.sh:/usr/local/bin/tar:ro,z
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:8080/solr/portal-rag/admin/ping"]
+      test:
+        [
+          "CMD",
+          "bash",
+          "-c",
+          "exec 3<>/dev/tcp/127.0.0.1/8983 && exec 3>&-",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
 
+  # OKP MCP Server — Solr bridge for LLM tool calls
   mcp-server:
     image: okp-mcp:latest
     container_name: mcp-server
     ports:
-      - "8001:8001"
+      - "8000:8000"
     environment:
-      SOLR_HOST: okp:8080
+      MCP_SOLR_URL: http://rhel-okp:8983
     depends_on:
-      okp:
+      rhel-okp:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:8001/mcp"]
+      test:
+        [
+          "CMD",
+          "python3",
+          "-c",
+          "import socket; s = socket.create_connection(('127.0.0.1', 8000), timeout=3); s.close()",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 10s
+
+volumes:
+  okp-solr-data:
