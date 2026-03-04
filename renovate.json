@@ -1,0 +1,42 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":gitSignOff",
+    "config:best-practices"
+  ],
+  "labels": ["dependencies"],
+  "dependencyDashboard": true,
+  "prHourlyLimit": 0,
+  "prConcurrentLimit": 0,
+  "minimumReleaseAge": "7 days",
+  "vulnerabilityAlerts": {
+    "labels": ["security"],
+    "minimumReleaseAge": "0 days"
+  },
+  "tekton": {
+    "enabled": true,
+    "schedule": ["after 5am on monday"]
+  },
+  "packageRules": [
+    {
+      "description": "Bump Python dependency ranges",
+      "matchManagers": ["pep621", "pip_requirements", "pip-compile"],
+      "rangeStrategy": "bump"
+    },
+    {
+      "description": "Disable Python version updates",
+      "matchDatasources": ["python-version"],
+      "enabled": false
+    },
+    {
+      "description": "Batch and auto-merge safe non-major dependency updates",
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "groupName": "all non-major dependencies",
+      "groupSlug": "all-non-major",
+      "schedule": ["before 5am on monday"],
+      "automerge": true,
+      "automergeType": "pr"
+    }
+  ]
+}
