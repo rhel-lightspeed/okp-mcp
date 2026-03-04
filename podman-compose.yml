@@ -11,7 +11,6 @@ services:
       SOLR_JETTY_HOST: "0.0.0.0"
     volumes:
       - okp-solr-data:/opt/solr/server/solr/portal/data
-      - ./rhel-okp-tar-wrapper.sh:/usr/local/bin/tar:ro,z
     restart: unless-stopped
 
   # OKP MCP Server — Solr bridge for LLM tool calls
