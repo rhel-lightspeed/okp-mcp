@@ -31,6 +31,9 @@ LABEL vendor="Red Hat, Inc."
 # Copy the virtual environment from builder
 COPY --from=builder /build/.venv /app/.venv
 
+# License required by Red Hat preflight certification
+COPY LICENSE /licenses/LICENSE
+
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
