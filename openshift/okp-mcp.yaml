@@ -1,0 +1,144 @@
+---
+apiVersion: template.openshift.io/v1
+kind: Template
+labels:
+  template: "${NAME}"
+metadata:
+  name: "${NAME}"
+  annotations:
+    openshift.io/display-name: OKP MCP Server
+    description: >-
+      Deploys the OKP MCP server, providing tools for searching Red Hat
+      documentation, CVEs, errata, and solutions via the Model Context Protocol.
+    tags: mcp,solr,documentation
+    iconClass: icon-shadowman
+objects:
+  # ---------- ServiceAccount ----------
+  - apiVersion: v1
+    kind: ServiceAccount
+    metadata:
+      name: "${NAME}"
+      labels:
+        service: rhel-lightspeed
+        app: "${NAME}"
+
+  # ---------- Deployment ----------
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: "${NAME}"
+      labels:
+        service: rhel-lightspeed
+        app: "${NAME}"
+    spec:
+      replicas: "${{REPLICAS}}"
+      strategy:
+        type: Recreate
+      selector:
+        matchLabels:
+          app: "${NAME}"
+      template:
+        metadata:
+          labels:
+            service: rhel-lightspeed
+            app: "${NAME}"
+        spec:
+          serviceAccountName: "${NAME}"
+          containers:
+            - name: "${NAME}"
+              image: "${IMAGE}:${IMAGE_TAG}"
+              ports:
+                - containerPort: 8000
+                  protocol: TCP
+              env:
+                - name: MCP_TRANSPORT
+                  value: streamable-http
+                - name: MCP_PORT
+                  value: "8000"
+                - name: MCP_LOG_LEVEL
+                  value: "${LOG_LEVEL}"
+                - name: MCP_SOLR_URL
+                  value: "${SOLR_URL}"
+              livenessProbe:
+                tcpSocket:
+                  port: 8000
+                initialDelaySeconds: 5
+                periodSeconds: 10
+                failureThreshold: 3
+              readinessProbe:
+                tcpSocket:
+                  port: 8000
+                initialDelaySeconds: 5
+                periodSeconds: 10
+                failureThreshold: 3
+              resources:
+                requests:
+                  cpu: "${CPU_REQUEST}"
+                  memory: "${MEMORY_REQUEST}"
+                limits:
+                  cpu: "${CPU_LIMIT}"
+                  memory: "${MEMORY_LIMIT}"
+
+  # ---------- Service ----------
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      name: "${NAME}"
+      labels:
+        service: rhel-lightspeed
+        app: "${NAME}"
+    spec:
+      ports:
+        - port: 8000
+          protocol: TCP
+          targetPort: 8000
+      selector:
+        app: "${NAME}"
+
+parameters:
+  - name: NAME
+    displayName: Application Name
+    description: The name assigned to all objects in the template.
+    value: okp-mcp
+    required: true
+  - name: IMAGE
+    displayName: Container Image
+    description: The container image to deploy.
+    value: quay.io/redhat-user-workloads/rhel-lightspeed-tenant/okp-mcp
+    required: true
+  - name: IMAGE_TAG
+    displayName: Image Tag
+    description: The tag of the container image.
+    value: latest
+    required: true
+  - name: REPLICAS
+    displayName: Replicas
+    description: Number of replicas to deploy.
+    value: "1"
+    required: true
+  - name: CPU_REQUEST
+    displayName: CPU Request
+    description: CPU request per pod.
+    value: 250m
+  - name: CPU_LIMIT
+    displayName: CPU Limit
+    description: CPU limit per pod.
+    value: "1"
+  - name: MEMORY_REQUEST
+    displayName: Memory Request
+    description: Memory request per pod.
+    value: 256Mi
+  - name: MEMORY_LIMIT
+    displayName: Memory Limit
+    description: Memory limit per pod.
+    value: 512Mi
+  - name: LOG_LEVEL
+    displayName: Log Level
+    description: >-
+      Log level for the MCP server. Valid values: DEBUG, INFO,
+      WARNING, ERROR, CRITICAL.
+    value: INFO
+  - name: SOLR_URL
+    displayName: Solr Base URL
+    description: Base URL of the OKP Solr instance.
+    value: http://redhat-okp-solr:8983
