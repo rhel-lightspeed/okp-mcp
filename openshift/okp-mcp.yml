@@ -141,4 +141,4 @@ parameters:
   - name: SOLR_URL
     displayName: Solr Base URL
     description: Base URL of the OKP Solr instance.
-    value: http://redhat-okp-solr:8983
+    value: http://redhat-okp:8983
