@@ -222,6 +222,22 @@ def _select_nonoverlapping(
     return selected
 
 
+def _calculate_score_multiplier(para_lower: str, query_lower: str) -> float:
+    """Calculate boost/demote multiplier for BM25 scores.
+
+    Returns 2.0x for deprecation keywords, 0.05x for RHV content when query
+    lacks RHV intent, 1.0 otherwise.
+    """
+    multiplier = 1.0
+    if any(kw in para_lower for kw in _EXTRACTION_BOOST_KEYWORDS):
+        multiplier *= 2.0
+    if any(rhv in para_lower for rhv in _EXTRACTION_DEMOTE_RHV) and not any(
+        rhv in query_lower for rhv in _EXTRACTION_DEMOTE_RHV
+    ):
+        multiplier *= 0.05
+    return multiplier
+
+
 def _collect_scored_paragraphs(
     content: str,
     raw_paragraphs: list[str],
@@ -258,13 +274,7 @@ def _collect_scored_paragraphs(
         if base <= 0:
             continue
         para_lower = para.lower()
-        multiplier = 1.0
-        if any(kw in para_lower for kw in _EXTRACTION_BOOST_KEYWORDS):
-            multiplier *= 2.0
-        if any(rhv in para_lower for rhv in _EXTRACTION_DEMOTE_RHV) and not any(
-            rhv in query_lower for rhv in _EXTRACTION_DEMOTE_RHV
-        ):
-            multiplier *= 0.05
+        multiplier = _calculate_score_multiplier(para_lower, query_lower)
         result.append((base * multiplier, pos, para))
 
     result.sort(reverse=True)

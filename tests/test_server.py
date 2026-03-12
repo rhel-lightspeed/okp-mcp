@@ -21,10 +21,18 @@ def test_mcp_properties(attr, expected):
 
 
 @pytest.mark.asyncio
-async def test_solr_query_tool_registered():
-    """The solr_query demo tool is registered on the MCP server."""
+async def test_production_tools_registered():
+    """Production RAG tools are registered on the MCP server."""
     import okp_mcp  # noqa: F401 — triggers tool registration via __init__
 
     tools = await mcp._list_tools()
     tool_names = {tool.name for tool in tools}
-    assert "solr_query" in tool_names
+    expected_tools = {
+        "search_documentation",
+        "search_solutions",
+        "search_cves",
+        "search_errata",
+        "search_articles",
+        "get_document",
+    }
+    assert expected_tools.issubset(tool_names)

@@ -94,7 +94,7 @@ class ServerConfig(BaseSettings):
         description="Base URL of the Solr instance",
     )
 
-    @computed_field  # type: ignore[prop-decorator]
+    @computed_field
     @property
     def solr_endpoint(self) -> str:
         """Solr select endpoint derived from solr_url."""
