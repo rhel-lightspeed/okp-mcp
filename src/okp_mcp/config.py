@@ -1,9 +1,64 @@
 """Server configuration via MCP_* environment variables and CLI arguments."""
 
+import logging
+import os
 from typing import Literal
 
 from pydantic import Field, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+# Module-level constants for imports by tools and solr modules
+SOLR_URL = os.environ.get("SOLR_URL", "http://localhost:8983")
+SOLR_ENDPOINT = f"{SOLR_URL}/solr/portal/select"
+
+STOP_WORDS = frozenset(
+    [
+        "a",
+        "an",
+        "and",
+        "are",
+        "as",
+        "at",
+        "be",
+        "but",
+        "by",
+        "do",
+        "does",
+        "for",
+        "from",
+        "had",
+        "has",
+        "have",
+        "if",
+        "in",
+        "into",
+        "is",
+        "it",
+        "its",
+        "may",
+        "of",
+        "on",
+        "or",
+        "so",
+        "than",
+        "the",
+        "then",
+        "to",
+        "was",
+        "will",
+        "with",
+        "would",
+    ]
+)
+
+logger.info("SOLR endpoint: %s", SOLR_ENDPOINT)
 
 
 class ServerConfig(BaseSettings):

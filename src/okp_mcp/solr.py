@@ -1,0 +1,320 @@
+"""SOLR client and query utilities."""
+
+import re
+
+import httpx
+from rank_bm25 import BM25Plus  # pyright: ignore[reportMissingImports]
+
+from .config import SOLR_ENDPOINT, STOP_WORDS, logger
+
+
+def _split_quoted_and_plain(text: str) -> list[str]:
+    """Split text into an ordered list of tokens: raw words and quoted phrases.
+
+    Quoted phrases are preserved as-is (including the double-quote delimiters).
+    Empty quoted phrases ('""') are skipped.
+    Unmatched opening quotes cause remaining text to be treated as plain words.
+    """
+    tokens: list[str] = []
+    remainder = text
+    while '"' in remainder:
+        before, _, rest = remainder.partition('"')
+        tokens.extend(before.split())
+        if '"' not in rest:
+            tokens.extend(rest.split())
+            remainder = ""
+            break
+        phrase, _, remainder = rest.partition('"')
+        if phrase:
+            tokens.append(f'"{phrase}"')
+    tokens.extend(remainder.split())
+    return tokens
+
+
+def _quote_hyphenated_compounds(tokens: list[str]) -> list[str]:
+    """Wrap hyphenated compound terms in double quotes for SOLR phrase matching.
+
+    Solr's standard tokenizer splits on hyphens, so ``rpm-ostree`` becomes two
+    independent tokens ``rpm`` and ``ostree``.  Quoting forces Solr to match the
+    full compound as a phrase, preventing generic ``rpm`` matches from drowning
+    out specific ``rpm-ostree`` content.
+
+    Already-quoted tokens and short fragments (≤3 chars) are left untouched.
+    """
+    return [f'"{t}"' if "-" in t and not t.startswith('"') and len(t) > 3 else t for t in tokens]
+
+
+def _clean_query(query: str) -> str:
+    """Strip English stopwords and quote hyphenated compounds for SOLR relevance.
+
+    Preserves quoted phrases intact. Hyphenated tokens like ``rpm-ostree`` are
+    wrapped in double quotes so SOLR matches them as phrases instead of splitting
+    on the hyphen. Falls back to the original query if stripping would remove all
+    terms.
+    """
+    tokens = _split_quoted_and_plain(query)
+    parts = [
+        t if t.startswith('"') else t for t in tokens if t.startswith('"') or t.lower().strip("?.,!") not in STOP_WORDS
+    ]
+    # Solr's tokenizer splits hyphens (rpm-ostree → rpm + ostree), so quote them
+    # to force phrase matching. Without this, "rpm" alone floods results with
+    # generic RPM package docs, burying actual rpm-ostree content.
+    parts = _quote_hyphenated_compounds(parts)
+    return " ".join(parts) if parts else query
+
+
+async def _solr_query(params: dict) -> dict:
+    """Execute a SOLR query and return the parsed JSON response."""
+    base_params = {
+        "wt": "json",
+        "defType": "edismax",
+        "qf": "title^5 main_content heading_h1^3 heading_h2 portal_synopsis allTitle^3 content^2 all_content^1",
+        "pf": "main_content^5 title^8",
+        "ps": "3",
+        "pf2": "main_content^3 title^5",
+        "ps2": "2",
+        "pf3": "main_content^1 title^2",
+        "ps3": "5",
+        "hl": "on",
+        "hl.fl": "main_content",
+        "hl.snippets": "6",
+        "hl.fragsize": "600",
+        "hl.method": "unified",
+        "hl.maxAnalyzedChars": "512000",
+        "hl.bs.type": "SENTENCE",
+        "hl.bs.language": "en",
+        "hl.fragsizeIsMinimum": "true",
+        "hl.defaultSummary": "true",
+        "hl.weightMatches": "true",
+        "hl.fragAlignRatio": "0.33",
+        "hl.score.k1": "1.0",
+        "hl.score.b": "0.65",
+        "hl.score.pivot": "200",
+        "mm": "2<-1 5<75%",
+    }
+    base_params.update(params)
+    logger.info("SOLR query: q=%r, fq=%r", params.get("q"), params.get("fq"))
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(SOLR_ENDPOINT, params=base_params)
+            response.raise_for_status()
+            data = response.json()
+    except httpx.TimeoutException:
+        logger.warning("SOLR query timed out after 30s")
+        raise
+    except httpx.HTTPStatusError as e:
+        logger.error("SOLR returned HTTP %d: %s", e.response.status_code, e.response.text[:200])
+        raise
+    except httpx.RequestError as e:
+        logger.error("SOLR connection error: %s", e)
+        raise
+    except ValueError as e:
+        logger.error("SOLR returned non-JSON response: %s", e)
+        raise
+
+    _empty_response = {"response": {"numFound": 0, "docs": []}, "highlighting": {}}
+
+    if "error" in data:
+        logger.error("SOLR returned error: %s", data["error"])
+        return _empty_response
+    if "response" not in data or not isinstance(data.get("response", {}).get("docs"), list):
+        logger.error("SOLR returned unexpected structure: %s", list(data.keys()))
+        return _empty_response
+
+    num_found = data["response"]["numFound"]
+    logger.info("SOLR returned %d result(s)", num_found)
+    return data
+
+
+_CONTAMINATION_PHRASES = frozenset(
+    [
+        "fully supported",
+        "commonly used",
+    ]
+)
+
+
+def _filter_rhv_sentences(text: str, query: str) -> str:
+    """Remove sentences that contain both RHV keywords and contamination phrases.
+
+    When a query has no RHV intent, sentences like "SPICE is still fully supported
+    in RHV deployments" are misleading for RHEL-focused answers. This filter
+    removes such sentences at the sentence level, preserving the rest of the text.
+    """
+    query_lower = query.lower()
+    if any(rhv in query_lower for rhv in _EXTRACTION_DEMOTE_RHV):
+        return text
+
+    sentences = re.split(r"(?<=[.!?])\s+|\n", text)
+    filtered: list[str] = []
+    for sentence in sentences:
+        sentence = sentence.strip()
+        if not sentence:
+            continue
+        sentence_lower = sentence.lower()
+        has_rhv = any(rhv in sentence_lower for rhv in _EXTRACTION_DEMOTE_RHV)
+        has_contamination = any(phrase in sentence_lower for phrase in _CONTAMINATION_PHRASES)
+        if has_rhv and has_contamination:
+            continue
+        filtered.append(sentence)
+    return " ".join(filtered)
+
+
+def _get_highlights(data: dict, *keys: str, query: str = "") -> str:
+    """Extract highlight snippets for a document, trying multiple ID keys."""
+    hl = data.get("highlighting", {})
+    for key in keys:
+        if key and key in hl:
+            snippets = hl[key].get("main_content", [])
+            if snippets:
+                clean = [re.sub(r"<[^>]+>", "", s).strip() for s in snippets]
+                joined = " ... ".join(clean)
+                return _filter_rhv_sentences(joined, query) if query else joined
+    return ""
+
+
+_EXTRACTION_BOOST_KEYWORDS = frozenset(
+    [
+        "deprecated",
+        "removed",
+        "no longer",
+        "not available",
+        "end of life",
+        "unsupported",
+        "required",
+        "must",
+        "warning",
+        "important",
+        "recommended",
+        "cockpit",
+        "virsh",
+        "cockpit-machines",
+    ]
+)
+
+_EXTRACTION_DEMOTE_RHV = frozenset(
+    [
+        "red hat virtualization",
+        "rhv",
+        "rhev",
+        "red hat hyperconverged",
+    ]
+)
+
+
+def _select_nonoverlapping(
+    paragraphs: list[tuple[float, int, str]],
+    max_count: int = 3,
+    min_gap: int = 500,
+) -> list[tuple[int, str]]:
+    """Select the top scoring non-overlapping paragraphs.
+
+    Paragraphs must be sorted by score (descending). Returns (position, text)
+    pairs sorted by position (ascending) for natural reading order.
+    """
+    selected: list[tuple[int, str]] = []
+    for _score, pos, para in paragraphs:
+        if len(selected) >= max_count:
+            break
+        if all(abs(pos - s) >= min_gap for s, _ in selected):
+            selected.append((pos, para))
+    selected.sort(key=lambda x: x[0])
+    return selected
+
+
+def _collect_scored_paragraphs(
+    content: str,
+    raw_paragraphs: list[str],
+    terms: list[str],
+    query_lower: str,
+    search_start: int,
+) -> list[tuple[float, int, str]]:
+    """Score paragraphs with BM25 and return those with positive scores.
+
+    Skips paragraphs that start before search_start (e.g. table of contents)
+    and filters empty paragraphs before building the BM25 corpus.
+    Applies boost/demote multipliers post-scoring: 2x for deprecation keywords,
+    0.05x for RHV content when the query has no RHV intent.
+    Returns (score, position, text) triples sorted descending by score.
+    """
+    valid: list[tuple[int, str]] = []
+    offset = 0
+    for para in raw_paragraphs:
+        para_offset = content.find(para, offset)
+        offset = para_offset + len(para)
+        if para.strip() and para_offset >= search_start:
+            valid.append((para_offset, para))
+
+    if not valid:
+        return []
+
+    tokenized_corpus = [para.lower().split() for _, para in valid]
+    bm25 = BM25Plus(tokenized_corpus)
+    scores = bm25.get_scores(terms)
+
+    result: list[tuple[float, int, str]] = []
+    for idx, (pos, para) in enumerate(valid):
+        base = float(scores[idx])
+        if base <= 0:
+            continue
+        para_lower = para.lower()
+        multiplier = 1.0
+        if any(kw in para_lower for kw in _EXTRACTION_BOOST_KEYWORDS):
+            multiplier *= 2.0
+        if any(rhv in para_lower for rhv in _EXTRACTION_DEMOTE_RHV) and not any(
+            rhv in query_lower for rhv in _EXTRACTION_DEMOTE_RHV
+        ):
+            multiplier *= 0.05
+        result.append((base * multiplier, pos, para))
+
+    result.sort(reverse=True)
+    return result
+
+
+def _format_excerpts(
+    selected: list[tuple[int, str]],
+    search_start: int,
+    per_section: int,
+) -> str:
+    """Format selected paragraphs into a joined excerpt string.
+
+    Truncates long paragraphs to per_section chars and adds positional markers.
+    """
+    parts: list[str] = []
+    for pos, para in selected:
+        excerpt = para[:per_section] + " [...]" if len(para) > per_section else para
+        if pos > search_start:
+            excerpt = "[...] " + excerpt
+        parts.append(excerpt)
+    return "\n\n---\n\n".join(parts)
+
+
+def _extract_relevant_section(content: str, query: str, per_section: int = 1500) -> str:
+    """Extract the most relevant sections using BM25 paragraph scoring.
+
+    Splits content on blank lines (paragraphs), scores each paragraph using
+    BM25 (Okapi BM25 via rank-bm25), and returns the top 3 non-overlapping
+    paragraphs joined with separator markers. For book-sized documents (>10KB),
+    skips the first 5% to avoid matching on the table of contents.
+
+    Paragraphs containing deprecation/critical keywords get a 2x boost, while
+    paragraphs about RHV/RHEV are demoted 20x when the query has no RHV intent.
+    """
+    terms = [t.lower() for t in query.split() if len(t) > 3 or t.isupper()]
+    if not terms:
+        return content[:per_section]
+
+    search_start = len(content) // 20 if len(content) > 10_000 else 0
+    query_lower = query.lower()
+
+    raw_paragraphs = content.split("\n\n")
+    if len(raw_paragraphs) < 3:
+        raw_paragraphs = content.split("\n")
+
+    scored = _collect_scored_paragraphs(content, raw_paragraphs, terms, query_lower, search_start)
+    selected = _select_nonoverlapping(scored)
+
+    if not selected:
+        return content[search_start : search_start + per_section]
+
+    return _format_excerpts(selected, search_start, per_section)
