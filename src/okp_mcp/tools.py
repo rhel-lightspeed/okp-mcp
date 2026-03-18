@@ -6,6 +6,7 @@ import re
 import httpx
 
 from .config import SOLR_ENDPOINT, logger
+from .content import strip_boilerplate
 from .formatting import SORT_DEPRECATION, _format_result
 from .server import mcp
 from .solr import _clean_query, _extract_relevant_section, _get_highlights, _solr_query
@@ -537,7 +538,7 @@ async def _format_document(doc: dict, data: dict, doc_id: str, query: str) -> st
     if doc.get("cve_details"):
         result += f"\n\nCVE Details: {doc['cve_details']}"
     if doc.get("main_content"):
-        content = doc["main_content"]
+        content = strip_boilerplate(doc["main_content"])
         if query:
             highlights = _get_highlights(data, view_uri, doc_id, query=query)
             if highlights:

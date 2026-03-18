@@ -2,6 +2,7 @@
 
 import re
 
+from .content import strip_boilerplate
 from .solr import _extract_relevant_section, _get_highlights
 
 EOL_PRODUCT_MENTIONS = [
@@ -104,7 +105,8 @@ async def _resolve_content_text(highlights: str, include_content: bool, doc: dic
     if highlights:
         return highlights
     if include_content and doc.get("main_content"):
-        return _extract_relevant_section(doc["main_content"], query) if query else doc["main_content"][:2000]
+        content = strip_boilerplate(doc["main_content"])
+        return _extract_relevant_section(content, query) if query else content[:2000]
     return ""
 
 
