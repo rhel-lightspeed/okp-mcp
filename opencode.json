@@ -2,8 +2,21 @@
     "$schema": "https://opencode.ai/config.json",
     "mcp": {
         "okp-mcp": {
-            "type": "remote",
-            "url": "http://localhost:8000/mcp",
+            "type": "local",
+            "command": [
+                "uv",
+                "run",
+                "fastmcp",
+                "run",
+                "src/okp_mcp/__init__.py:mcp",
+                "--transport",
+                "streamable-http",
+                "--port",
+                "8000",
+                "--reload",
+                "--reload-dir",
+                "src/"
+            ],
             "enabled": true
         }
     }
