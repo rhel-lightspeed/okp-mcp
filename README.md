@@ -76,6 +76,31 @@ make radon       # cyclomatic complexity gate (A/B only)
 make test        # pytest with coverage
 ```
 
+## Functional Tests
+
+Functional tests run real queries against a live Solr instance and Vertex AI Gemini to verify the MCP server returns accurate RHEL knowledge. They are gated behind the `functional` pytest marker and skipped by default.
+
+Prerequisites:
+
+- OKP Solr container running on `localhost:8983`
+- Google Cloud service account JSON with Vertex AI access
+- GCP project ID
+
+Set up credentials:
+
+```bash
+cp .env.example .env
+# Edit .env with your real values
+```
+
+Run them:
+
+```bash
+uv run pytest -m functional -v
+```
+
+Credentials load automatically from `.env`. The tests skip gracefully if credentials or Solr are unavailable.
+
 ## License
 
 See [LICENSE](LICENSE) for details.
