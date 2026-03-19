@@ -1,0 +1,71 @@
+name: Integration
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  integration-test:
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.pull_request.head.repo.fork }}
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Log in to registry.redhat.io
+        env:
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_REDHAT_IO_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_REDHAT_IO_PASSWORD }}
+        run: |
+          echo "$REGISTRY_PASSWORD" | podman login -u="$REGISTRY_USERNAME" --password-stdin registry.redhat.io
+
+      - name: Start OKP Solr container
+        env:
+          OKP_ACCESS_KEY: ${{ secrets.OKP_ACCESS_KEY }}
+        run: |
+          podman run -d \
+            --name redhat-okp \
+            -p 8983:8983 \
+            -e ACCESS_KEY="$OKP_ACCESS_KEY" \
+            -e SOLR_JETTY_HOST=0.0.0.0 \
+            registry.redhat.io/offline-knowledge-portal/rhokp-rhel9:latest
+
+      - name: Wait for Solr readiness
+        timeout-minutes: 5
+        run: |
+          echo "Waiting for Solr to be ready..."
+          for i in $(seq 1 30); do
+            if ! podman inspect --format='{{.State.Running}}' redhat-okp 2>/dev/null | grep -q true; then
+              echo "Container is not running! Dumping logs:"
+              podman logs redhat-okp
+              exit 1
+            fi
+            if curl -sf "http://localhost:8983/solr/portal/select?q=*:*&rows=0" > /dev/null 2>&1; then
+              echo "Solr is ready! (attempt $i)"
+              exit 0
+            fi
+            echo "Attempt $i/30 — Solr not ready yet, retrying in 10s..."
+            sleep 10
+          done
+          echo "Solr failed to become ready within timeout"
+          exit 1
+
+      - name: Verify Solr responds
+        run: |
+          response=$(curl -sf "http://localhost:8983/solr/portal/select?q=*:*&rows=0")
+          echo "$response" | python3 -c "import sys,json; r=json.load(sys.stdin); found=r['response']['numFound']; print(f'Documents found: {found}'); sys.exit(0 if found > 0 else 1)"
+
+      - name: Dump container logs
+        if: failure()
+        run: podman logs redhat-okp
+
+      - name: Cleanup
+        if: always()
+        run: |
+          podman stop redhat-okp || true
+          podman rm redhat-okp || true
+          podman logout registry.redhat.io || true
