@@ -63,8 +63,11 @@ def _clean_query(query: str) -> str:
     return " ".join(parts) if parts else query
 
 
-async def _solr_query(params: dict) -> dict:
+async def _solr_query(params: dict, client: httpx.AsyncClient | None = None) -> dict:
     """Execute a SOLR query and return the parsed JSON response."""
+    close_client = client is None
+    if client is None:
+        client = httpx.AsyncClient(timeout=30.0)
     base_params = {
         "wt": "json",
         "defType": "edismax",
@@ -95,10 +98,9 @@ async def _solr_query(params: dict) -> dict:
     base_params.update(params)
     logger.info("SOLR query: q=%r, fq=%r", params.get("q"), params.get("fq"))
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(SOLR_ENDPOINT, params=base_params)
-            response.raise_for_status()
-            data = response.json()
+        response = await client.get(SOLR_ENDPOINT, params=base_params)
+        response.raise_for_status()
+        data = response.json()
     except httpx.TimeoutException:
         logger.warning("SOLR query timed out after 30s")
         raise
@@ -111,6 +113,9 @@ async def _solr_query(params: dict) -> dict:
     except ValueError as e:
         logger.error("SOLR returned non-JSON response: %s", e)
         raise
+    finally:
+        if close_client:
+            await client.aclose()
 
     _empty_response = {"response": {"numFound": 0, "docs": []}, "highlighting": {}}
 
