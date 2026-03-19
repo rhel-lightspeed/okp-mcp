@@ -1,0 +1,114 @@
+# CodeRabbit Configuration for okp-mcp
+# Docs: https://docs.coderabbit.ai/configuration/
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+
+language: en-US
+tone_instructions: >
+  You are a brilliant but world-weary senior developer who has seen too much.
+  Deliver feedback with dry wit and gentle sarcasm, but always be helpful.
+  Use programming puns when the opportunity arises.
+
+reviews:
+  profile: chill
+  collapse_walkthrough: true
+  poem: false
+  request_changes_workflow: true
+  high_level_summary: false
+  high_level_summary_placeholder: "@coderabbitai summary"
+  abort_on_close: true
+  review_status: false
+
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - main
+    ignore_title_keywords:
+      - "WIP"
+      - "[WIP]"
+      - "DO NOT MERGE"
+
+  path_filters:
+    - "!**/__pycache__/**"
+    - "!**/.venv/**"
+    - "!**/.pytest_cache/**"
+    - "!**/.ruff_cache/**"
+    - "!**/dist/**"
+    - "!**/*.egg-info/**"
+    - "!**/htmlcov/**"
+    - "!**/.coverage"
+    - "!**/uv.lock"
+
+  path_instructions:
+    - path: "src/**/*.py"
+      instructions: |
+        Focus on security and correctness:
+        - All Solr queries must use parameterized values, not string interpolation
+        - Verify async/await patterns (no blocking calls in async functions)
+        - httpx calls must use AsyncClient as context manager with timeouts
+        - Ensure proper exception handling: httpx.TimeoutException and httpx.HTTPError separately
+        - Error messages must be clear enough for LLMs to understand and act on
+        - Return user-friendly strings on failure (not exceptions) for MCP tools
+        - Verify MCP tool functions are async
+        - Check pydantic model usage (BaseSettings, Field with descriptions)
+        - All functions must have cyclomatic complexity A or B (C+ fails CI)
+        - Don't nitpick style (ruff handles) or types (ty validates)
+
+    - path: "src/**/config.py"
+      instructions: |
+        Configuration validation:
+        - Centralize derived config logic (defaults, path resolution) in config class
+        - Use pydantic BaseSettings with MCP_ env prefix
+        - Validate environment variables at startup, not lazily
+        - Use @computed_field for derived values
+        - Check for secure defaults
+
+    - path: "src/**/tools.py"
+      instructions: |
+        MCP tool definitions:
+        - All tool functions must be async
+        - Return user-friendly strings on failure, not exceptions
+        - Use specific exception types (httpx.TimeoutException, not bare Exception)
+        - Log exceptions with logger.exception() for stack traces
+        - Log warnings with logger.warning() for expected failures (timeouts)
+        - Verify input validation before constructing Solr queries
+
+    - path: "tests/**/*.py"
+      instructions: |
+        Focus on test quality and meaningfulness:
+        - Tests should verify behavior, not just chase coverage
+        - Use respx for HTTP mocking (not responses or aioresponses)
+        - Prefer parameterized tests over duplicate test functions
+        - Mock specs should be provided where applicable
+        - Use pytest.raises with nullcontext() pattern, not boolean flags
+        - Use fixtures for reusable test components, not helper functions
+        - Async tests run without @pytest.mark.asyncio (asyncio_mode = "auto")
+        - Don't nitpick coverage percentages
+
+    - path: "pyproject.toml"
+      instructions: |
+        Check dependency versions and configuration consistency.
+        Dev tools: uv (package manager), ruff (linting/formatting), ty (type checking), pytest (testing), radon (complexity).
+
+    - path: ".github/workflows/**"
+      instructions: "Validate workflow syntax and security (no secrets in logs)"
+
+    - path: "Makefile"
+      instructions: |
+        Makefile validation:
+        - .PHONY declarations for all non-file targets
+        - Avoid flags that are already defaults
+
+    - path: "Containerfile"
+      instructions: "Use Podman + Containerfile conventions (not Docker + Dockerfile)"
+
+chat:
+  auto_reply: true
+
+knowledge_base:
+  learnings:
+    scope: global
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "**/AGENTS.md"
