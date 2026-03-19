@@ -5,7 +5,13 @@ description = "MCP server for the Offline Knowledge Portal"
 readme = "README.md"
 authors = [{ name = "Major Hayden", email = "major@redhat.com" }]
 requires-python = ">=3.12"
-dependencies = ["fastmcp>=3.0.2", "httpx", "pydantic-settings>=2.13.1", "rank-bm25"]
+dependencies = [
+    "fastmcp>=3.0.2",
+    "httpx",
+    "pydantic-settings>=2.13.1",
+    "rank-bm25",
+    "stop-words>=2025.11.4",
+]
 
 [project.scripts]
 okp-mcp = "okp_mcp:main"

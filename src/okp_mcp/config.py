@@ -6,6 +6,7 @@ from typing import Literal
 
 from pydantic import Field, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from stop_words import get_stop_words
 
 # Configure logging
 logging.basicConfig(
@@ -18,45 +19,7 @@ logger = logging.getLogger(__name__)
 SOLR_URL = os.environ.get("SOLR_URL", "http://localhost:8983")
 SOLR_ENDPOINT = f"{SOLR_URL}/solr/portal/select"
 
-STOP_WORDS = frozenset(
-    [
-        "a",
-        "an",
-        "and",
-        "are",
-        "as",
-        "at",
-        "be",
-        "but",
-        "by",
-        "do",
-        "does",
-        "for",
-        "from",
-        "had",
-        "has",
-        "have",
-        "if",
-        "in",
-        "into",
-        "is",
-        "it",
-        "its",
-        "may",
-        "of",
-        "on",
-        "or",
-        "so",
-        "than",
-        "the",
-        "then",
-        "to",
-        "was",
-        "will",
-        "with",
-        "would",
-    ]
-)
+STOP_WORDS: frozenset[str] = frozenset(get_stop_words("en"))
 
 logger.info("SOLR endpoint: %s", SOLR_ENDPOINT)
 
