@@ -16,11 +16,12 @@ reviews:
   high_level_summary: false
   high_level_summary_placeholder: "@coderabbitai summary"
   abort_on_close: true
-  review_status: false
+  review_status: true
 
   auto_review:
     enabled: true
     drafts: false
+    auto_pause_after_reviewed_commits: 0
     base_branches:
       - main
     ignore_title_keywords:
