@@ -5,6 +5,7 @@ from pathlib import Path
 
 import httpx
 import pytest
+from dotenv import load_dotenv
 from functional_cases import FUNCTIONAL_TEST_CASES, FunctionalCase
 from pydantic_ai import Agent, capture_run_messages
 from pydantic_ai.mcp import MCPServerStdio
@@ -29,6 +30,7 @@ SYSTEM_PROMPT = (_FIXTURES_DIR / "functional_system_prompt.txt").read_text(encod
 @pytest.fixture(scope="module", autouse=True)
 def _require_functional_stack() -> None:
     """Skip all tests in this module if Vertex AI credentials or SOLR are unavailable."""
+    load_dotenv()
     creds = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "")
     if not creds or not Path(creds).exists():
         pytest.skip(
