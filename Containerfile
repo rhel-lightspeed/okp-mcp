@@ -1,5 +1,5 @@
 # Stage 1: Builder — UBI 10 full image has Python 3.12 + pip
-FROM registry.access.redhat.com/ubi10:latest@sha256:f573194e8e5231f1c9340c497e1f8d9aa9dbb42b2849e60341e34f50eec9477e AS builder
+FROM registry.access.redhat.com/ubi10:latest@sha256:17296ded9ab581e9a9019a71e15576c0a99813d8870eb6758e32b5bf93c5ff71 AS builder
 
 WORKDIR /build
 
@@ -18,7 +18,7 @@ RUN uv pip install . --no-deps && \
     sed -i 's|^#!.*python.*|#!/app/.venv/bin/python3|' /build/.venv/bin/okp-mcp
 
 # Stage 2: Runtime — minimal UBI 10 Python 3.12 image
-FROM registry.access.redhat.com/ubi10/python-312-minimal:latest@sha256:2410ba7ba1de5aabbed098e054aa3ee5f3f21ae461ad3fa01147d34970df1a3e
+FROM registry.access.redhat.com/ubi10/python-312-minimal:latest@sha256:54c9243cd7219fc01aec1f610f5d02c084736a5e0feffb09f6b5f16d9f291f68
 
 WORKDIR /app
 
