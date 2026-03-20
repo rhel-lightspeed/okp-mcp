@@ -4,11 +4,12 @@ import asyncio
 import re
 
 import httpx
+from fastmcp import Context
 
 from .config import SOLR_ENDPOINT, logger
 from .content import strip_boilerplate
 from .formatting import SORT_DEPRECATION, _format_result
-from .server import mcp
+from .server import get_app_context, mcp
 from .solr import _clean_query, _extract_relevant_section, _get_highlights, _solr_query
 
 _PRODUCT_ALIASES: dict[str, str] = {
@@ -245,6 +246,7 @@ def _format_errata_doc(doc: dict) -> str:
 
 @mcp.tool
 async def search_documentation(
+    ctx: Context,
     query: str,
     product: str = "",
     version: str = "",
@@ -273,6 +275,7 @@ async def search_documentation(
         "search_documentation: query=%r product=%r version=%r max_results=%d", query, product, version, max_results
     )
     try:
+        app = get_app_context(ctx)
         product = _PRODUCT_ALIASES.get(product, product) or "Red Hat Enterprise Linux"
         query_lower = query.lower()
         vm_intent = _detect_vm_intent(query_lower)
@@ -281,9 +284,9 @@ async def search_documentation(
             cleaned, query, product, version, max_results, vm_intent
         )
         doc_data, sol_data, dep_data = await asyncio.gather(
-            _solr_query(doc_params),
-            _solr_query(sol_params),
-            _solr_query(dep_params),
+            _solr_query(doc_params, client=app.http_client),
+            _solr_query(sol_params, client=app.http_client),
+            _solr_query(dep_params, client=app.http_client),
         )
         doc_results, sol_results, has_deprecation = await _deduplicate_and_sort_results(
             doc_data, sol_data, dep_data, query
@@ -299,6 +302,7 @@ async def search_documentation(
 
 @mcp.tool
 async def search_solutions(
+    ctx: Context,
     query: str,
     product: str = "",
     max_results: int = 5,
@@ -309,6 +313,7 @@ async def search_solutions(
     max_results = max(1, min(max_results, 20))
     logger.info("search_solutions: query=%r product=%r max_results=%d", query, product, max_results)
     try:
+        app = get_app_context(ctx)
         filters = ["documentKind:solution"]
         if product:
             filters.append(f"product:{product}")
@@ -319,7 +324,8 @@ async def search_solutions(
                 "fq": filters,
                 "fl": "id,allTitle,heading_h1,title,view_uri,url_slug,score",
                 "rows": max_results,
-            }
+            },
+            client=app.http_client,
         )
 
         docs = data["response"]["docs"]
@@ -338,6 +344,7 @@ async def search_solutions(
 
 @mcp.tool
 async def search_cves(
+    ctx: Context,
     query: str,
     severity: str = "",
     max_results: int = 5,
@@ -352,6 +359,7 @@ async def search_cves(
     max_results = max(1, min(max_results, 20))
     logger.info("search_cves: query=%r severity=%r max_results=%d", query, severity, max_results)
     try:
+        app = get_app_context(ctx)
         filters = ["documentKind:Cve"]
         if severity:
             filters.append(f"cve_threatSeverity:{severity}")
@@ -362,7 +370,8 @@ async def search_cves(
                 "fq": filters,
                 "fl": "allTitle,view_uri,cve_details,cve_threatSeverity,score",
                 "rows": max_results,
-            }
+            },
+            client=app.http_client,
         )
 
         docs = data["response"]["docs"]
@@ -391,6 +400,7 @@ async def search_cves(
 
 @mcp.tool
 async def search_errata(
+    ctx: Context,
     query: str,
     severity: str = "",
     advisory_type: str = "",
@@ -407,6 +417,7 @@ async def search_errata(
         "search_errata: query=%r severity=%r type=%r max_results=%d", query, severity, advisory_type, max_results
     )
     try:
+        app = get_app_context(ctx)
         filters = ["documentKind:Errata"]
         if severity:
             filters.append(f"portal_severity:{severity}")
@@ -419,7 +430,8 @@ async def search_errata(
                 "fq": filters,
                 "fl": "allTitle,view_uri,portal_severity,portal_advisory_type,portal_synopsis,score",
                 "rows": max_results,
-            }
+            },
+            client=app.http_client,
         )
 
         docs = data["response"]["docs"]
@@ -438,6 +450,7 @@ async def search_errata(
 
 @mcp.tool
 async def search_articles(
+    ctx: Context,
     query: str,
     max_results: int = 5,
 ) -> str:
@@ -447,13 +460,15 @@ async def search_articles(
     max_results = max(1, min(max_results, 20))
     logger.info("search_articles: query=%r max_results=%d", query, max_results)
     try:
+        app = get_app_context(ctx)
         data = await _solr_query(
             {
                 "q": query,
                 "fq": "documentKind:article",
                 "fl": "id,allTitle,heading_h1,title,view_uri,url_slug,score",
                 "rows": max_results,
-            }
+            },
+            client=app.http_client,
         )
 
         docs = data["response"]["docs"]
@@ -477,7 +492,7 @@ _DOCUMENT_FL = (
 )
 
 
-async def _fetch_document_with_query(doc_id: str, query: str) -> dict:
+async def _fetch_document_with_query(doc_id: str, query: str, client: httpx.AsyncClient | None = None) -> dict:
     """Fetch a document by ID using edismax query mode with highlighting.
 
     Uses _solr_query so edismax and highlight parameters are applied.
@@ -491,18 +506,22 @@ async def _fetch_document_with_query(doc_id: str, query: str) -> dict:
             "rows": 1,
             "hl.snippets": "10",
             "hl.fragsize": "600",
-        }
+        },
+        client=client,
     )
 
 
-async def _fetch_document_raw(doc_id: str) -> dict:
+async def _fetch_document_raw(doc_id: str, client: httpx.AsyncClient | None = None) -> dict:
     """Fetch a document by ID using a plain HTTP request, bypassing edismax defaults.
 
     Uses httpx directly rather than _solr_query to avoid injecting edismax
     and highlight parameters that are not appropriate for raw document retrieval.
     Returns the raw Solr response dict.
     """
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    close_client = client is None
+    if client is None:
+        client = httpx.AsyncClient(timeout=30.0)
+    try:
         response = await client.get(
             SOLR_ENDPOINT,
             params={
@@ -514,6 +533,9 @@ async def _fetch_document_raw(doc_id: str) -> dict:
         )
         response.raise_for_status()
         return response.json()
+    finally:
+        if close_client:
+            await client.aclose()
 
 
 async def _format_document(doc: dict, data: dict, doc_id: str, query: str) -> str:
@@ -551,7 +573,7 @@ async def _format_document(doc: dict, data: dict, doc_id: str, query: str) -> st
 
 
 @mcp.tool
-async def get_document(doc_id: str, query: str = "") -> str:
+async def get_document(ctx: Context, doc_id: str, query: str = "") -> str:
     """Fetch full content of a specific document by its ID.
 
     Use view_uri values from search results as doc_id. Pass query (the original
@@ -559,10 +581,11 @@ async def get_document(doc_id: str, query: str = "") -> str:
     """
     logger.info("get_document: doc_id=%r query=%r", doc_id, query)
     try:
+        app = get_app_context(ctx)
         if query:
-            data = await _fetch_document_with_query(doc_id, query)
+            data = await _fetch_document_with_query(doc_id, query, client=app.http_client)
         else:
-            data = await _fetch_document_raw(doc_id)
+            data = await _fetch_document_raw(doc_id, client=app.http_client)
 
         docs = data["response"]["docs"]
         if not docs:
@@ -589,7 +612,7 @@ async def get_document(doc_id: str, query: str = "") -> str:
 #
 # Related issue: https://discuss.ai.google.dev/t/gemini-live-api-unexpectedly-invokes-execute-code-and-other-built-in-tools-even-when-not-configured/87603
 @mcp.tool
-async def run_code(language: str, code: str) -> str:
+async def run_code(ctx: Context, language: str, code: str) -> str:
     """Execute code in the specified language.
 
     NOTE: This is a placeholder tool. Code execution is not available in this environment.

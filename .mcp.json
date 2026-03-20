@@ -1,8 +1,20 @@
 {
-  "mcpServers": {
-    "okp-mcp": {
-      "type": "http",
-      "url": "http://localhost:8000/mcp"
+    "mcpServers": {
+        "okp-mcp": {
+            "command": "uv",
+            "args": [
+                "run",
+                "fastmcp",
+                "run",
+                "src/okp_mcp/__init__.py:mcp",
+                "--transport",
+                "streamable-http",
+                "--port",
+                "8000",
+                "--reload",
+                "--reload-dir",
+                "src/"
+            ]
+        }
     }
-  }
 }
