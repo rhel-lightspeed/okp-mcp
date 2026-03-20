@@ -34,6 +34,36 @@ uv run pytest -v --cov=okp_mcp --cov-report=term-missing  # with coverage (same 
 
 pytest is configured with `asyncio_mode = "auto"` so async tests run without explicit event loop setup. Tests are randomized via pytest-randomly.
 
+### Functional Tests
+
+Functional tests use Pydantic AI + Vertex AI Gemini to verify MCP tools return correct answers for known-incorrect CLA scenarios (RSPEED Jira tickets). They spawn a real MCP server subprocess via `MCPServerStdio`, send questions through Gemini, and assert response quality.
+
+```bash
+uv run pytest -m functional -v           # run functional tests (requires live Solr + Vertex AI)
+uv run pytest -m functional -k "2482"    # run a single case
+```
+
+Functional tests are **deselected by default** via `pytest_collection_modifyitems` in `tests/conftest.py`. They only run when explicitly requested with `-m functional`. Credentials load from `.env` via `python-dotenv`.
+
+**Required environment variables** (set in `.env`):
+- `GOOGLE_APPLICATION_CREDENTIALS`: path to service account JSON (e.g., `./secrets/your-sa.json`)
+- `GOOGLE_CLOUD_PROJECT`: GCP project ID
+
+**Optional**:
+- `OKP_FUNCTIONAL_MODEL`: Gemini model override (default: `gemini-2.5-flash`)
+
+**Key files**:
+- `tests/test_functional.py`: test runner with MCPServerStdio + GoogleProvider
+- `tests/functional_cases.py`: `FunctionalCase` dataclass + parametrized test data
+- `tests/fixtures/functional_system_prompt.txt`: LLM system prompt adapted for this project's tools
+
+**Architecture notes**:
+- Each test spawns a fresh MCP server subprocess with `--transport stdio` (the project defaults to `streamable-http`, so this flag is critical)
+- Region is hardcoded to `us-central1`
+- `temperature=0` for reproducibility
+- Assertions check: tool call count, expected document references in tool returns/response, required facts (with tuple alternatives for "or" logic), and forbidden claims
+- Tests skip gracefully when credentials or Solr are unavailable
+
 ## Project Layout
 
 ```
@@ -43,8 +73,12 @@ src/okp_mcp/
   server.py     # FastMCP instance (single `mcp` object)
   tools.py      # @mcp.tool definitions (solr_query, etc.)
 tests/
-  conftest.py   # shared fixtures (solr mocks, sample responses)
-  test_*.py     # test modules mirror src structure
+  conftest.py          # shared fixtures (solr mocks, sample responses) + functional marker deselection
+  functional_cases.py  # FunctionalCase dataclass + parametrized RSPEED test data
+  test_functional.py   # Vertex AI functional tests (gated behind -m functional)
+  test_*.py            # unit test modules mirror src structure
+  fixtures/
+    functional_system_prompt.txt  # LLM system prompt for functional tests
 docs/
   SOLR_EXPLORATION.md  # Solr schema map, field inventory, document types, query handler config, and data characteristics
 ```

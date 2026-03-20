@@ -44,3 +44,11 @@ def solr_mock(sample_solr_response):
     with respx.mock:
         route = respx.get(config.solr_endpoint).mock(return_value=httpx.Response(200, json=sample_solr_response))
         yield route
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    """Deselect functional tests unless explicitly requested with -m functional."""
+    if "functional" not in (config.getoption("-m") or ""):
+        functional = [item for item in items if "functional" in item.keywords]
+        config.hook.pytest_deselected(items=functional)
+        items[:] = [item for item in items if "functional" not in item.keywords]
