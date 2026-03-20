@@ -43,14 +43,14 @@ uv run pytest -m functional -v           # run functional tests (requires live S
 uv run pytest -m functional -k "2482"    # run a single case
 ```
 
-Functional tests are **deselected by default** via `pytest_collection_modifyitems` in `tests/conftest.py`. They only run when explicitly requested with `-m functional`. Credentials load from `.env` via `python-dotenv`.
+Functional tests are **deselected by default** via `pytest_collection_modifyitems` in `tests/conftest.py`. They only run when explicitly requested with `-m functional`. Credentials are loaded exclusively from `.env` via `python-dotenv` — bare environment variables are not sufficient.
 
-**Required environment variables** (set in `.env`):
+**Required** (in `.env`):
 - `GOOGLE_APPLICATION_CREDENTIALS`: path to service account JSON (e.g., `./secrets/your-sa.json`)
 - `GOOGLE_CLOUD_PROJECT`: GCP project ID
 
-**Optional**:
-- `OKP_FUNCTIONAL_MODEL`: Gemini model override (default: `gemini-2.5-flash`)
+**Optional** (in `.env`):
+- `OKP_FUNCTIONAL_MODEL`: Gemini model override (default: `gemini-2.5-flash`). Read exclusively from `.env`, not from environment variables.
 
 **Key files**:
 - `tests/test_functional.py`: test runner with MCPServerStdio + GoogleProvider
@@ -62,7 +62,7 @@ Functional tests are **deselected by default** via `pytest_collection_modifyitem
 - Region is hardcoded to `us-central1`
 - `temperature=0` for reproducibility
 - Assertions check: tool call count, expected document references in tool returns/response, required facts (with tuple alternatives for "or" logic), and forbidden claims
-- Tests skip gracefully when credentials or Solr are unavailable
+- Tests skip gracefully when `.env` is missing, credentials are invalid, or Solr is unavailable
 
 ## Project Layout
 

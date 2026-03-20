@@ -85,6 +85,7 @@ Prerequisites:
 - OKP Solr container running on `localhost:8983`
 - Google Cloud service account JSON with Vertex AI access
 - GCP project ID
+- (Optional) `OKP_FUNCTIONAL_MODEL` in `.env` to override the Gemini model (default: `gemini-2.5-flash`)
 
 Set up credentials:
 
@@ -99,7 +100,7 @@ Run them:
 uv run pytest -m functional -v
 ```
 
-Credentials load automatically from `.env`. The tests skip gracefully if credentials or Solr are unavailable.
+Credentials are loaded exclusively from `.env` — bare environment variables are not sufficient. The tests skip gracefully if `.env` is missing, credentials are invalid, or Solr is unavailable.
 
 ## License
 

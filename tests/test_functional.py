@@ -5,7 +5,7 @@ from pathlib import Path
 
 import httpx
 import pytest
-from dotenv import load_dotenv
+from dotenv import dotenv_values, load_dotenv
 from functional_cases import FUNCTIONAL_TEST_CASES, FunctionalCase
 from pydantic_ai import Agent, capture_run_messages
 from pydantic_ai.mcp import MCPServerStdio
@@ -15,10 +15,13 @@ from pydantic_ai.providers.google import GoogleProvider
 
 _VERTEX_REGION = "us-central1"
 
+_ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
+_DOTENV = dotenv_values(_ENV_PATH)
+
 
 def _model_name() -> str:
-    """Return the Gemini model name, reading from env at runtime so .env overrides apply."""
-    return os.environ.get("OKP_FUNCTIONAL_MODEL", "gemini-2.5-flash")
+    """Return the Gemini model name from .env, defaulting to gemini-2.5-flash."""
+    return _DOTENV.get("OKP_FUNCTIONAL_MODEL") or "gemini-2.5-flash"
 
 
 pytestmark = pytest.mark.functional
@@ -29,16 +32,21 @@ SYSTEM_PROMPT = (_FIXTURES_DIR / "functional_system_prompt.txt").read_text(encod
 
 @pytest.fixture(scope="module", autouse=True)
 def _require_functional_stack() -> None:
-    """Skip all tests in this module if Vertex AI credentials or SOLR are unavailable."""
-    load_dotenv()
-    creds = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "")
-    if not creds or not Path(creds).exists():
-        pytest.skip(
-            "GOOGLE_APPLICATION_CREDENTIALS not set or file not found - "
-            "export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json"
-        )
-    if not os.environ.get("GOOGLE_CLOUD_PROJECT"):
-        pytest.skip("GOOGLE_CLOUD_PROJECT not set - export GOOGLE_CLOUD_PROJECT=rhel-lightspeed-650189")
+    """Skip all tests in this module if .env credentials or Solr are unavailable."""
+    if not _DOTENV:
+        pytest.skip(".env file not found or empty — cp .env.example .env and fill in values")
+    creds_path = _DOTENV.get("GOOGLE_APPLICATION_CREDENTIALS")
+    if not creds_path:
+        pytest.skip("GOOGLE_APPLICATION_CREDENTIALS not set in .env — see .env.example")
+    creds = Path(creds_path).expanduser()
+    if not creds.is_absolute():
+        creds = (_ENV_PATH.parent / creds).resolve()
+    if not creds.exists():
+        pytest.skip(f"Credentials file not found: {creds} — check GOOGLE_APPLICATION_CREDENTIALS in .env")
+    if not _DOTENV.get("GOOGLE_CLOUD_PROJECT"):
+        pytest.skip("GOOGLE_CLOUD_PROJECT not set in .env — see .env.example")
+    load_dotenv(_ENV_PATH, override=True)
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(creds)
     try:
         with httpx.Client(timeout=5) as client:
             resp = client.get("http://localhost:8983/solr/portal/admin/ping")
