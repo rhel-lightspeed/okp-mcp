@@ -55,4 +55,17 @@ FUNCTIONAL_TEST_CASES = [
         ),
         id="RSPEED_2480",
     ),
+    pytest.param(
+        FunctionalCase(
+            question="How long is an EUS release supported for?",
+            expected_doc_refs=["rhel9-eus-faq", "rhel-eus", "updates/errata"],
+            required_facts=[
+                "24 months",
+                ("enhanced eus", "enhanced extended update support"),
+                ("48 months", "4 years"),
+            ],
+            forbidden_claims=["30 months"],
+        ),
+        id="RSPEED_2479",
+    ),
 ]
