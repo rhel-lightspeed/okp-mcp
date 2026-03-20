@@ -34,7 +34,6 @@
       "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
       "groupName": "all non-major dependencies",
       "groupSlug": "all-non-major",
-      "schedule": ["before 5am on monday"],
       "automerge": true,
       "automergeType": "pr"
     }
