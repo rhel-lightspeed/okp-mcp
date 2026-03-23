@@ -9,7 +9,10 @@ import httpx
 
 import okp_mcp  # noqa: F401 -- triggers @mcp.tool registration
 from okp_mcp import tools
+from okp_mcp.config import ServerConfig
 from okp_mcp.server import mcp
+
+_SOLR_ENDPOINT = ServerConfig().solr_endpoint
 
 
 def test_all_mcp_tools_accept_ctx_parameter():
@@ -40,7 +43,7 @@ async def test_fetch_document_raw_uses_provided_client_without_constructing_or_c
     mock_client.aclose = AsyncMock()
 
     with patch("okp_mcp.tools.httpx.AsyncClient", side_effect=AssertionError("constructor should not be called")):
-        data = await tools._fetch_document_raw("/solutions/123", client=mock_client)
+        data = await tools._fetch_document_raw("/solutions/123", client=mock_client, solr_endpoint=_SOLR_ENDPOINT)
 
     mock_client.get.assert_awaited_once()
     mock_client.aclose.assert_not_awaited()
@@ -58,7 +61,7 @@ async def test_fetch_document_raw_creates_and_closes_client_when_not_provided():
     created_client.aclose = AsyncMock()
 
     with patch("okp_mcp.tools.httpx.AsyncClient", return_value=created_client) as client_ctor:
-        data = await tools._fetch_document_raw("/solutions/123")
+        data = await tools._fetch_document_raw("/solutions/123", solr_endpoint=_SOLR_ENDPOINT)
 
     client_ctor.assert_called_once_with(timeout=30.0)
     created_client.get.assert_awaited_once()
@@ -72,12 +75,15 @@ async def test_fetch_document_with_query_passes_client_to_solr_query():
     expected = {"response": {"numFound": 1, "docs": [{"id": "123"}]}}
 
     with patch("okp_mcp.tools._solr_query", AsyncMock(return_value=expected)) as solr_query_mock:
-        data = await tools._fetch_document_with_query("/solutions/123", "kernel panic", client=mock_client)
+        data = await tools._fetch_document_with_query(
+            "/solutions/123", "kernel panic", client=mock_client, solr_endpoint=_SOLR_ENDPOINT
+        )
 
     solr_query_mock.assert_awaited_once()
     assert solr_query_mock.await_args is not None
     kwargs = solr_query_mock.await_args.kwargs
     assert kwargs["client"] is mock_client
+    assert kwargs["solr_endpoint"] == _SOLR_ENDPOINT
     assert data == expected
 
 
