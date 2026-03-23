@@ -6,8 +6,9 @@ MCP server bridging LLM tool calls to a Solr-indexed Red Hat knowledge base (doc
 
 ```bash
 uv sync                          # install all deps (including dev)
-uv run okp-mcp                   # run server (stdio, default)
-uv run okp-mcp --transport streamable-http --port 8000  # HTTP mode
+uv run okp-mcp                   # run server (streamable-http, default)
+uv run okp-mcp --transport stdio                        # stdio mode
+uv run okp-mcp --transport streamable-http --port 8000  # explicit HTTP mode
 ```
 
 ## CI Commands (Makefile)
@@ -25,8 +26,8 @@ make test        # pytest with coverage
 
 ```bash
 uv run pytest                              # all tests
-uv run pytest tests/test_tools.py          # single file
-uv run pytest tests/test_tools.py::test_solr_query_returns_results  # single test
+uv run pytest tests/test_solr.py           # single file
+uv run pytest tests/test_solr.py::test_solr_query_uses_provided_shared_client  # single test
 uv run pytest -k "timeout"                 # by keyword
 uv run pytest -x                           # stop on first failure
 uv run pytest -v --cov=okp_mcp --cov-report=term-missing  # with coverage (same as `make test`)
@@ -64,14 +65,19 @@ Functional tests are **deselected by default** via `pytest_collection_modifyitem
 - Assertions check: tool call count, expected document references in tool returns/response, required facts (with tuple alternatives for "or" logic), and forbidden claims
 - Tests skip gracefully when `.env` is missing, credentials are invalid, or Solr is unavailable
 
+**Workflow**: See `INCORRECT_ANSWER_LOOP.md` for the full process of turning RSPEED "incorrect answer" tickets into functional test cases and fixing the MCP server until all tests pass.
+
 ## Project Layout
 
-```
+```text
 src/okp_mcp/
-  __init__.py   # entry point, main(), logging config, re-exports mcp
-  config.py     # ServerConfig (pydantic BaseSettings, MCP_* env vars)
-  server.py     # FastMCP instance (single `mcp` object)
-  tools.py      # @mcp.tool definitions (solr_query, etc.)
+  __init__.py    # entry point, main(), logging config, re-exports mcp
+  config.py      # ServerConfig (pydantic BaseSettings, MCP_* env vars)
+  server.py      # FastMCP instance (single `mcp` object), AppContext, lifespan
+  tools.py       # @mcp.tool definitions (search_*, get_document, run_code)
+  solr.py        # Solr query builder, BM25 paragraph extraction, RHV filtering
+  content.py     # Boilerplate stripping, content truncation, text cleaning
+  formatting.py  # Result annotation, deprecation/replacement detection, sort keys
 tests/
   conftest.py          # shared fixtures (solr mocks, sample responses) + functional marker deselection
   functional_cases.py  # FunctionalCase dataclass + parametrized RSPEED test data
@@ -81,7 +87,49 @@ tests/
     functional_system_prompt.txt  # LLM system prompt for functional tests
 docs/
   SOLR_EXPLORATION.md  # Solr schema map, field inventory, document types, query handler config, and data characteristics
+openshift/
+  okp-mcp.yml   # OpenShift deployment template (Deployment, Service, ServiceAccount)
+INCORRECT_ANSWER_LOOP.md  # step-by-step workflow for turning RSPEED "incorrect answer" tickets into functional tests and fixes
 ```
+
+## Where to Look
+
+| Task | Location | Notes |
+|------|----------|-------|
+| Add a new MCP tool | `src/okp_mcp/tools.py` | Add `@mcp.tool` async function; follows error handling pattern |
+| Change Solr query logic | `src/okp_mcp/solr.py` | `_solr_query()` builds edismax params; `_clean_query()` for tokenization |
+| Modify result formatting | `src/okp_mcp/formatting.py` | `_format_result()` + `_annotate_result()` for deprecation/EOL |
+| Change content cleaning | `src/okp_mcp/content.py` | `strip_boilerplate()` regex, `truncate_content()` |
+| Modify config/CLI args | `src/okp_mcp/config.py` | Add field to `ServerConfig`; auto-generates CLI arg via `MCP_` prefix |
+| Add functional test case | `tests/functional_cases.py` | Add `FunctionalCase` to `FUNCTIONAL_TEST_CASES` list |
+| Mock Solr responses | `tests/conftest.py` | `solr_mock` fixture uses respx |
+| Deploy to OpenShift | `openshift/okp-mcp.yml` | Template with params: IMAGE, IMAGE_TAG, REPLICAS, etc. |
+| Solr schema reference | `docs/SOLR_EXPLORATION.md` | Field inventory, document types, query handler config |
+
+## Boot Sequence
+
+```text
+uv run okp-mcp [--transport ...] [--port ...]
+  → pyproject.toml: okp-mcp = "okp_mcp:main"
+  → __init__.py: main()
+      ├─ CliApp.run(ServerConfig)     # parse CLI + MCP_* env vars
+      ├─ _configure_logging()
+      └─ mcp.run(transport=...)       # start FastMCP server
+          → server.py: _app_lifespan()  # creates shared httpx.AsyncClient
+          → tools.py: @mcp.tool funcs  # registered via side-effect import
+```
+
+## Module Dependencies
+
+```text
+__init__.py → config, server, tools (side-effect import)
+tools.py    → config, server, solr, content, formatting
+formatting.py → content, solr
+solr.py     → config
+content.py  → (standalone)
+```
+
+No circular imports. `content.py` has zero internal dependencies.
 
 ## Code Style
 
@@ -149,6 +197,8 @@ docs/
 
 Config uses `pydantic_settings.BaseSettings` with `MCP_` env prefix. CLI via `CliApp.run()`. Precedence: CLI > env vars > defaults. Derived values use `@computed_field`.
 
+Module-level constants `SOLR_URL`, `SOLR_ENDPOINT`, `STOP_WORDS` live in `config.py` outside the class to avoid circular dependencies when imported by `solr.py` and `tools.py`.
+
 ## Testing Patterns
 
 - **HTTP mocking**: `respx` library (not `responses` or `aioresponses`)
@@ -167,3 +217,7 @@ Config uses `pydantic_settings.BaseSettings` with `MCP_` env prefix. CLI via `Cl
 ## Complexity
 
 All functions must be rated A or B by radon. C or higher fails the CI gate. Refactor until compliant.
+
+## Workarounds
+
+- `run_code()` in tools.py is a KLUDGE: placeholder tool that prevents Gemini 2.5 Flash from crashing when it tries to use its built-in code execution tool. Returns a polite "not supported" message. Do not remove without verifying Gemini behavior first.
