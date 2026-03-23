@@ -87,15 +87,18 @@ FUNCTIONAL_TEST_CASES = [
             question="How long is RHEL 10 supported?",
             expected_doc_refs=[
                 "updates/errata",
-                "7126291",
-                "life cycle",
+                "Life Cycle",
             ],
             required_facts=[
                 ("ten year", "ten-year", "10 year", "10-year"),
-                "Full Support",
-                "Maintenance Support",
+                "full support",
+                "maintenance support",
+                ("extended life", "extended life phase"),
             ],
-            forbidden_claims=[],
+            forbidden_claims=[
+                "unable to retrieve",
+                "has not been released",
+            ],
         ),
         id="RSPEED_2698",
     ),
