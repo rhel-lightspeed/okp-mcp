@@ -2,7 +2,7 @@
 
 import pytest
 
-from okp_mcp.content import clean_content, strip_boilerplate, truncate_content
+from okp_mcp.content import clean_content, strip_boilerplate, strip_index_suffix, truncate_content
 
 
 @pytest.mark.parametrize(
@@ -66,6 +66,32 @@ def test_strip_boilerplate_preserves_clean_text():
 def test_clean_content_edge_cases(text, max_chars, expected):
     """Edge cases: None, empty string, and clean text pass through correctly."""
     assert clean_content(text, max_chars=max_chars) == expected
+
+
+@pytest.mark.parametrize(
+    "path,expected",
+    [
+        ("/solutions/3257611/index.html", "/solutions/3257611"),
+        ("/articles/2585/index.html", "/articles/2585"),
+        ("/documentation/en-us/rhel/9/html-single/guide/index.html", "/documentation/en-us/rhel/9/html-single/guide"),
+        ("/security/cve/CVE-2024-9823/", "/security/cve/CVE-2024-9823/"),
+        ("/errata/RHSA-2022:4915/", "/errata/RHSA-2022:4915/"),
+        ("", ""),
+        ("/solutions/123", "/solutions/123"),
+    ],
+    ids=[
+        "solution-id",
+        "article-id",
+        "documentation-id",
+        "cve-view-uri-unchanged",
+        "errata-view-uri-unchanged",
+        "empty-string",
+        "no-suffix",
+    ],
+)
+def test_strip_index_suffix(path, expected):
+    """Trailing /index.html is stripped from Solr document ID paths."""
+    assert strip_index_suffix(path) == expected
 
 
 def test_clean_content_strips_then_truncates():

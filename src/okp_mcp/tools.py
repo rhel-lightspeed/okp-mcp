@@ -7,7 +7,7 @@ import httpx
 from fastmcp import Context
 
 from .config import logger
-from .content import strip_boilerplate
+from .content import strip_boilerplate, strip_index_suffix
 from .formatting import SORT_DEPRECATION, _format_result
 from .server import get_app_context, mcp
 from .solr import _clean_query, _extract_relevant_section, _get_highlights, _solr_query
@@ -143,7 +143,8 @@ def _build_search_queries(
 
 def _doc_uri(doc: dict) -> str | None:
     """Return the canonical URI for a Solr document."""
-    return doc.get("view_uri") or doc.get("id")
+    uri = doc.get("view_uri") or doc.get("id")
+    return strip_index_suffix(uri) if uri else None
 
 
 async def _format_docs(docs: list[dict], data: dict, query: str) -> list[tuple[str, int]]:
@@ -230,7 +231,7 @@ def _format_solution_article_doc(doc: dict, data: dict, query: str) -> str:
     doc_id = doc.get("id", "")
     view_uri = doc.get("view_uri", "")
     title = doc.get("allTitle") or doc.get("heading_h1") or doc.get("title", "").split("|")[0].strip() or "Untitled"
-    url_path = view_uri or doc_id
+    url_path = strip_index_suffix(view_uri or doc_id)
     highlights = _get_highlights(data, view_uri, doc_id, query=query)
     result = f"**{title}**"
     result += f"\nURL: https://access.redhat.com{url_path}"
@@ -248,7 +249,7 @@ def _format_errata_doc(doc: dict) -> str:
         result += f" | Severity: {doc['portal_severity']}"
     if doc.get("portal_synopsis"):
         result += f"\nSynopsis: {doc['portal_synopsis']}"
-    result += f"\nURL: https://access.redhat.com{doc.get('view_uri', '')}"
+    result += f"\nURL: https://access.redhat.com{strip_index_suffix(doc.get('view_uri', ''))}"
     return result
 
 
@@ -397,7 +398,7 @@ async def search_cves(
             if doc.get("cve_details"):
                 detail = doc["cve_details"][:300]
                 result += f"\nDetails: {detail}"
-            result += f"\nURL: https://access.redhat.com{doc.get('view_uri', '')}"
+            result += f"\nURL: https://access.redhat.com{strip_index_suffix(doc.get('view_uri', ''))}"
             results.append(result)
 
         return f"Found {len(docs)} CVEs for '{query}':\n\n" + "\n\n---\n\n".join(results)
@@ -561,13 +562,14 @@ async def _format_document(doc: dict, data: dict, doc_id: str, query: str) -> st
     and content (highlights if available, otherwise extracted relevant section).
     """
     view_uri = doc.get("view_uri", "")
+    url_path = strip_index_suffix(view_uri or doc_id)
     result = f"**{doc.get('allTitle', 'Untitled')}**"
     result += f"\nType: {doc.get('documentKind', 'Unknown')}"
     if doc.get("product"):
         result += f"\nProduct: {doc['product']}"
     if doc.get("documentation_version"):
         result += f" {doc['documentation_version']}"
-    result += f"\nURL: https://access.redhat.com{view_uri}"
+    result += f"\nURL: https://access.redhat.com{url_path}"
 
     if doc.get("portal_synopsis"):
         result += f"\n\nSynopsis: {doc['portal_synopsis']}"
