@@ -1,7 +1,6 @@
 """Server configuration via MCP_* environment variables and CLI arguments."""
 
 import logging
-import os
 from typing import Literal
 
 from pydantic import Field, computed_field
@@ -15,13 +14,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Module-level constants for imports by tools and solr modules
-SOLR_URL = os.environ.get("SOLR_URL", "http://localhost:8983")
-SOLR_ENDPOINT = f"{SOLR_URL}/solr/portal/select"
-
 STOP_WORDS: frozenset[str] = frozenset(get_stop_words("en"))
-
-logger.info("SOLR endpoint: %s", SOLR_ENDPOINT)
 
 
 class ServerConfig(BaseSettings):
