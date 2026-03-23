@@ -68,4 +68,18 @@ FUNCTIONAL_TEST_CASES = [
         ),
         id="RSPEED_2479",
     ),
+    pytest.param(
+        FunctionalCase(
+            question="Which RHEL 9 releases have EUS available?",
+            expected_doc_refs=["rhel9-eus-faq", "rhel-eus", "updates/errata"],
+            required_facts=[
+                "9.0",
+                "9.2",
+                "9.4",
+                "9.6",
+            ],
+            forbidden_claims=["9.0 did not have EUS"],
+        ),
+        id="RSPEED_2478",
+    ),
 ]
