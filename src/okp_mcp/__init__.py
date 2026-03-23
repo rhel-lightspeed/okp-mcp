@@ -4,6 +4,7 @@ import logging
 
 from pydantic_settings import CliApp
 
+from okp_mcp import server as _server
 from okp_mcp import tools as _tools  # noqa: F401 — import triggers @mcp.tool registration
 from okp_mcp.config import ServerConfig
 from okp_mcp.server import mcp
@@ -29,6 +30,7 @@ def main() -> None:
     Run ``okp-mcp --help`` for available options.
     """
     config = CliApp.run(ServerConfig)
+    _server._server_config = config
     _configure_logging(config.log_level)
 
     logger.info("Starting MCP server with transport=%s", config.transport)
