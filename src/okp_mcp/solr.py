@@ -5,7 +5,7 @@ import re
 import httpx
 from rank_bm25 import BM25Plus  # pyright: ignore[reportMissingImports]
 
-from .config import SOLR_ENDPOINT, STOP_WORDS, logger
+from .config import STOP_WORDS, logger
 
 
 def _split_quoted_and_plain(text: str) -> list[str]:
@@ -75,7 +75,7 @@ def _clean_query(query: str) -> str:
     return " ".join(parts) if parts else query
 
 
-async def _solr_query(params: dict, client: httpx.AsyncClient | None = None) -> dict:
+async def _solr_query(params: dict, client: httpx.AsyncClient | None = None, *, solr_endpoint: str) -> dict:
     """Execute a SOLR query and return the parsed JSON response."""
     close_client = client is None
     if client is None:
@@ -110,7 +110,7 @@ async def _solr_query(params: dict, client: httpx.AsyncClient | None = None) -> 
     base_params.update(params)
     logger.info("SOLR query: q=%r, fq=%r", params.get("q"), params.get("fq"))
     try:
-        response = await client.get(SOLR_ENDPOINT, params=base_params)
+        response = await client.get(solr_endpoint, params=base_params)
         response.raise_for_status()
         data = response.json()
     except httpx.TimeoutException:

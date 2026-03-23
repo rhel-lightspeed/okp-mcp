@@ -6,7 +6,7 @@ import re
 import httpx
 from fastmcp import Context
 
-from .config import SOLR_ENDPOINT, logger
+from .config import logger
 from .content import strip_boilerplate
 from .formatting import SORT_DEPRECATION, _format_result
 from .server import get_app_context, mcp
@@ -293,9 +293,9 @@ async def search_documentation(
             cleaned, query, product, version, max_results, vm_intent, release_date_intent
         )
         doc_data, sol_data, dep_data = await asyncio.gather(
-            _solr_query(doc_params, client=app.http_client),
-            _solr_query(sol_params, client=app.http_client),
-            _solr_query(dep_params, client=app.http_client),
+            _solr_query(doc_params, client=app.http_client, solr_endpoint=app.solr_endpoint),
+            _solr_query(sol_params, client=app.http_client, solr_endpoint=app.solr_endpoint),
+            _solr_query(dep_params, client=app.http_client, solr_endpoint=app.solr_endpoint),
         )
         doc_results, sol_results, has_deprecation = await _deduplicate_and_sort_results(
             doc_data, sol_data, dep_data, query
@@ -335,6 +335,7 @@ async def search_solutions(
                 "rows": max_results,
             },
             client=app.http_client,
+            solr_endpoint=app.solr_endpoint,
         )
 
         docs = data["response"]["docs"]
@@ -381,6 +382,7 @@ async def search_cves(
                 "rows": max_results,
             },
             client=app.http_client,
+            solr_endpoint=app.solr_endpoint,
         )
 
         docs = data["response"]["docs"]
@@ -441,6 +443,7 @@ async def search_errata(
                 "rows": max_results,
             },
             client=app.http_client,
+            solr_endpoint=app.solr_endpoint,
         )
 
         docs = data["response"]["docs"]
@@ -478,6 +481,7 @@ async def search_articles(
                 "rows": max_results,
             },
             client=app.http_client,
+            solr_endpoint=app.solr_endpoint,
         )
 
         docs = data["response"]["docs"]
@@ -501,7 +505,9 @@ _DOCUMENT_FL = (
 )
 
 
-async def _fetch_document_with_query(doc_id: str, query: str, client: httpx.AsyncClient | None = None) -> dict:
+async def _fetch_document_with_query(
+    doc_id: str, query: str, client: httpx.AsyncClient | None = None, *, solr_endpoint: str
+) -> dict:
     """Fetch a document by ID using edismax query mode with highlighting.
 
     Uses _solr_query so edismax and highlight parameters are applied.
@@ -517,10 +523,11 @@ async def _fetch_document_with_query(doc_id: str, query: str, client: httpx.Asyn
             "hl.fragsize": "600",
         },
         client=client,
+        solr_endpoint=solr_endpoint,
     )
 
 
-async def _fetch_document_raw(doc_id: str, client: httpx.AsyncClient | None = None) -> dict:
+async def _fetch_document_raw(doc_id: str, client: httpx.AsyncClient | None = None, *, solr_endpoint: str) -> dict:
     """Fetch a document by ID using a plain HTTP request, bypassing edismax defaults.
 
     Uses httpx directly rather than _solr_query to avoid injecting edismax
@@ -532,7 +539,7 @@ async def _fetch_document_raw(doc_id: str, client: httpx.AsyncClient | None = No
         client = httpx.AsyncClient(timeout=30.0)
     try:
         response = await client.get(
-            SOLR_ENDPOINT,
+            solr_endpoint,
             params={
                 "q": f'id:"{doc_id}"',
                 "wt": "json",
@@ -592,9 +599,11 @@ async def get_document(ctx: Context, doc_id: str, query: str = "") -> str:
     try:
         app = get_app_context(ctx)
         if query:
-            data = await _fetch_document_with_query(doc_id, query, client=app.http_client)
+            data = await _fetch_document_with_query(
+                doc_id, query, client=app.http_client, solr_endpoint=app.solr_endpoint
+            )
         else:
-            data = await _fetch_document_raw(doc_id, client=app.http_client)
+            data = await _fetch_document_raw(doc_id, client=app.http_client, solr_endpoint=app.solr_endpoint)
 
         docs = data["response"]["docs"]
         if not docs:
