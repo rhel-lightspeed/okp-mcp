@@ -82,4 +82,21 @@ FUNCTIONAL_TEST_CASES = [
         ),
         id="RSPEED_2478",
     ),
+    pytest.param(
+        FunctionalCase(
+            question="How long is RHEL 10 supported?",
+            expected_doc_refs=[
+                "updates/errata",
+                "7126291",
+                "life cycle",
+            ],
+            required_facts=[
+                ("ten year", "ten-year", "10 year", "10-year"),
+                "Full Support",
+                "Maintenance Support",
+            ],
+            forbidden_claims=[],
+        ),
+        id="RSPEED_2698",
+    ),
 ]
