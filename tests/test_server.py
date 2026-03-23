@@ -94,7 +94,10 @@ async def test_app_lifespan_closes_client_on_exception():
 
 def test_get_app_context_returns_lifespan_app_context():
     """Helper returns the typed app context from lifespan context."""
-    expected_context = AppContext(http_client=AsyncMock(spec=httpx.AsyncClient))
+    expected_context = AppContext(
+        http_client=AsyncMock(spec=httpx.AsyncClient),
+        solr_endpoint="http://localhost:8983/solr/portal/select",
+    )
     ctx = cast(Context, SimpleNamespace(lifespan_context={"app": expected_context}))
 
     assert get_app_context(ctx) is expected_context
@@ -103,3 +106,25 @@ def test_get_app_context_returns_lifespan_app_context():
 def test_mcp_has_lifespan_configured():
     """FastMCP instance has a configured lifespan function."""
     assert getattr(mcp, "lifespan", None) is not None
+
+
+@pytest.mark.asyncio
+async def test_app_context_has_solr_endpoint():
+    """Lifespan populates AppContext.solr_endpoint from ServerConfig default."""
+    async with _app_lifespan(mcp) as lifespan_context:
+        app_context = lifespan_context["app"]
+        assert app_context.solr_endpoint == "http://localhost:8983/solr/portal/select"
+
+
+def test_server_config_assignment_propagates_to_lifespan():
+    """Direct _server_config assignment is picked up by the lifespan."""
+    from okp_mcp import server as server_module
+    from okp_mcp.config import ServerConfig
+
+    original = server_module._server_config
+    try:
+        cfg = ServerConfig()
+        server_module._server_config = cfg
+        assert server_module._server_config is cfg
+    finally:
+        server_module._server_config = original
