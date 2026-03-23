@@ -99,4 +99,19 @@ FUNCTIONAL_TEST_CASES = [
         ),
         id="RSPEED_2698",
     ),
+    pytest.param(
+        FunctionalCase(
+            question="When was RHEL 10 released?",
+            expected_doc_refs=[
+                "red-hat-enterprise-linux-release-dates",
+                "release-dates",
+            ],
+            required_facts=[
+                ("2025-05-20", "May 20, 2025", "May 20"),
+                "10.0",
+            ],
+            forbidden_claims=["has not been released"],
+        ),
+        id="RSPEED_2697",
+    ),
 ]

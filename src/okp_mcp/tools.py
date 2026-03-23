@@ -53,6 +53,11 @@ def _detect_vm_intent(query_lower: str) -> bool:
     return any(kw in query_lower for kw in ["vm", "virtual machine", "virtualization", "vms", "hypervisor"])
 
 
+def _detect_release_date_intent(query_lower: str) -> bool:
+    """Return True if the lowercased query asks about release dates or when something was released."""
+    return any(kw in query_lower for kw in ["release date", "released", "when was", "general availability"])
+
+
 def _build_search_queries(
     cleaned: str,
     original_query: str,
@@ -60,6 +65,7 @@ def _build_search_queries(
     version: str,
     max_results: int,
     vm_intent: bool,
+    release_date_intent: bool,
 ) -> tuple[dict, dict, dict]:
     """Build the three Solr query parameter dicts for search_documentation.
 
@@ -102,6 +108,8 @@ def _build_search_queries(
     sol_bq = 'main_content:(deprecated OR removed OR unsupported OR "end of life" OR "no longer")^5'
     if vm_intent and extra_bq:
         sol_bq = f"{sol_bq} {extra_bq}"
+    if release_date_intent:
+        sol_bq = f'{sol_bq} allTitle:"release dates"^30 title:"release dates"^20'
     sol_params = {
         "q": cleaned,
         "fq": sol_filters,
@@ -279,9 +287,10 @@ async def search_documentation(
         product = _PRODUCT_ALIASES.get(product, product) or "Red Hat Enterprise Linux"
         query_lower = query.lower()
         vm_intent = _detect_vm_intent(query_lower)
+        release_date_intent = _detect_release_date_intent(query_lower)
         cleaned = _clean_query(query)
         doc_params, sol_params, dep_params = _build_search_queries(
-            cleaned, query, product, version, max_results, vm_intent
+            cleaned, query, product, version, max_results, vm_intent, release_date_intent
         )
         doc_data, sol_data, dep_data = await asyncio.gather(
             _solr_query(doc_params, client=app.http_client),
