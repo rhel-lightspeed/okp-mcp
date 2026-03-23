@@ -2,7 +2,7 @@
 
 import re
 
-from .content import strip_boilerplate
+from .content import strip_boilerplate, strip_index_suffix
 from .solr import _extract_relevant_section, _get_highlights
 
 EOL_PRODUCT_MENTIONS = [
@@ -151,7 +151,7 @@ async def _format_result(doc: dict, data: dict, include_content: bool = False, q
     doc_id = doc.get("id", "")
     view_uri = doc.get("view_uri", "")
     title = doc.get("allTitle") or doc.get("heading_h1") or doc.get("title", "").split("|")[0].strip() or "Untitled"
-    url_path = view_uri or doc_id
+    url_path = strip_index_suffix(view_uri or doc_id)
     highlights = _get_highlights(data, doc_id, view_uri, query=query)
     content_text = await _resolve_content_text(highlights, include_content, doc, query)
 
