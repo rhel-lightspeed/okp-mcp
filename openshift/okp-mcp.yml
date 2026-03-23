@@ -58,7 +58,7 @@ objects:
                 - name: MCP_LOG_LEVEL
                   value: "${LOG_LEVEL}"
                 - name: MCP_SOLR_URL
-                  value: "${SOLR_URL}"
+                  value: "${SOLR_BASE_URL}"
               livenessProbe:
                 tcpSocket:
                   port: 8000
@@ -138,7 +138,7 @@ parameters:
       Log level for the MCP server. Valid values: DEBUG, INFO,
       WARNING, ERROR, CRITICAL.
     value: INFO
-  - name: SOLR_URL
+  - name: SOLR_BASE_URL
     displayName: Solr Base URL
     description: Base URL of the OKP Solr instance.
     value: http://redhat-okp:8983

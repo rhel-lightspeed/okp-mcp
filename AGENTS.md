@@ -197,7 +197,7 @@ No circular imports. `content.py` has zero internal dependencies.
 
 Config uses `pydantic_settings.BaseSettings` with `MCP_` env prefix. CLI via `CliApp.run()`. Precedence: CLI > env vars > defaults. Derived values use `@computed_field`.
 
-Module-level constants `SOLR_URL`, `SOLR_ENDPOINT`, `STOP_WORDS` live in `config.py` outside the class to avoid circular dependencies when imported by `solr.py` and `tools.py`.
+Module-level constant `STOP_WORDS` lives in `config.py` outside the class to avoid circular import issues. The Solr endpoint is no longer a module-level constant — it flows through `ServerConfig.solr_endpoint` → `AppContext.solr_endpoint` at runtime.
 
 ## Testing Patterns
 
