@@ -44,18 +44,30 @@ def _quote_hyphenated_compounds(tokens: list[str]) -> list[str]:
     return [f'"{t}"' if "-" in t and not t.startswith('"') and len(t) > 3 else t for t in tokens]
 
 
+_TERM_TRIM_CHARS = "?.,!"
+
+
+def _normalize_query_token(token: str) -> str:
+    """Strip trailing punctuation and lowercase a query token for BM25 matching."""
+    return token.lower().strip(_TERM_TRIM_CHARS)
+
+
+def _is_numeric(token: str) -> bool:
+    """Return True for numeric version tokens (e.g. '10', '9', '9.4', '4.16')."""
+    return bool(re.fullmatch(r"\d+(?:\.\d+)*", _normalize_query_token(token)))
+
+
 def _clean_query(query: str) -> str:
     """Strip English stopwords and quote hyphenated compounds for SOLR relevance.
 
-    Preserves quoted phrases intact. Hyphenated tokens like ``rpm-ostree`` are
-    wrapped in double quotes so SOLR matches them as phrases instead of splitting
-    on the hyphen. Falls back to the original query if stripping would remove all
-    terms.
+    Preserves quoted phrases intact, and always keeps numeric tokens (e.g. '10',
+    '9') since they are critical for version-specific queries in Red Hat content.
+    Hyphenated tokens like ``rpm-ostree`` are wrapped in double quotes so SOLR
+    matches them as phrases instead of splitting on the hyphen. Falls back to the
+    original query if stripping would remove all terms.
     """
     tokens = _split_quoted_and_plain(query)
-    parts = [
-        t if t.startswith('"') else t for t in tokens if t.startswith('"') or t.lower().strip("?.,!") not in STOP_WORDS
-    ]
+    parts = [t for t in tokens if t.startswith('"') or _is_numeric(t) or t.lower().strip("?.,!") not in STOP_WORDS]
     # Solr's tokenizer splits hyphens (rpm-ostree → rpm + ostree), so quote them
     # to force phrase matching. Without this, "rpm" alone floods results with
     # generic RPM package docs, burying actual rpm-ostree content.
@@ -194,6 +206,10 @@ _EXTRACTION_BOOST_KEYWORDS = frozenset(
         "cockpit",
         "virsh",
         "cockpit-machines",
+        "life cycle",
+        "full support",
+        "maintenance support",
+        "extended life",
     ]
 )
 
@@ -304,18 +320,23 @@ def _format_excerpts(
     return "\n\n---\n\n".join(parts)
 
 
-def _extract_relevant_section(content: str, query: str, per_section: int = 1500) -> str:
+def _extract_relevant_section(content: str, query: str, per_section: int = 1500, max_sections: int = 3) -> str:
     """Extract the most relevant sections using BM25 paragraph scoring.
 
     Splits content on blank lines (paragraphs), scores each paragraph using
-    BM25 (Okapi BM25 via rank-bm25), and returns the top 3 non-overlapping
+    BM25 (Okapi BM25 via rank-bm25), and returns the top non-overlapping
     paragraphs joined with separator markers. For book-sized documents (>10KB),
     skips the first 5% to avoid matching on the table of contents.
 
     Paragraphs containing deprecation/critical keywords get a 2x boost, while
     paragraphs about RHV/RHEV are demoted 20x when the query has no RHV intent.
     """
-    terms = [t.lower() for t in query.split() if len(t) > 3 or t.isupper()]
+    terms = [
+        normalized
+        for token in query.split()
+        if (normalized := _normalize_query_token(token))
+        and (len(normalized) > 3 or token.isupper() or _is_numeric(token))
+    ]
     if not terms:
         return content[:per_section]
 
@@ -327,7 +348,7 @@ def _extract_relevant_section(content: str, query: str, per_section: int = 1500)
         raw_paragraphs = content.split("\n")
 
     scored = _collect_scored_paragraphs(content, raw_paragraphs, terms, query_lower, search_start)
-    selected = _select_nonoverlapping(scored)
+    selected = _select_nonoverlapping(scored, max_count=max_sections)
 
     if not selected:
         return content[search_start : search_start + per_section]

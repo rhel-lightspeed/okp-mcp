@@ -100,9 +100,23 @@ def _extract_version_lists(text: str) -> str:
     return "\n".join(bullets)
 
 
+_LARGE_DOC_THRESHOLD = 10_000
+
+
 async def _resolve_content_text(highlights: str, include_content: bool, doc: dict, query: str) -> str:
-    """Resolve the content text to display: highlights take priority, then main_content."""
+    """Resolve the content text to display: highlights take priority, then main_content.
+
+    For large documents (>10KB), Solr highlights may miss key overview paragraphs
+    when earlier sections (e.g. tables of contents) consume highlight slots.
+    In this case, BM25-extracted content supplements the highlights.
+    """
     if highlights:
+        if include_content and query and doc.get("main_content"):
+            content = strip_boilerplate(doc["main_content"])
+            if len(content) > _LARGE_DOC_THRESHOLD:
+                bm25_section = _extract_relevant_section(content, query, per_section=1000, max_sections=1)
+                if bm25_section:
+                    return f"{highlights}\n\n---\n\n{bm25_section}"
         return highlights
     if include_content and doc.get("main_content"):
         content = strip_boilerplate(doc["main_content"])
