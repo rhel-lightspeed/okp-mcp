@@ -49,6 +49,10 @@ class ServerConfig(BaseSettings):
         default="http://localhost:8983",
         description="Base URL of the Solr instance",
     )
+    max_response_chars: int = Field(
+        default=48_000,
+        description="Maximum characters in search_documentation responses (~16K tokens)",
+    )
 
     @computed_field
     @property
