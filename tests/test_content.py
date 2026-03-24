@@ -2,7 +2,7 @@
 
 import pytest
 
-from okp_mcp.content import clean_content, strip_boilerplate, strip_index_suffix, truncate_content
+from okp_mcp.content import clean_content, doc_uri, strip_boilerplate, truncate_content
 
 
 @pytest.mark.parametrize(
@@ -69,29 +69,34 @@ def test_clean_content_edge_cases(text, max_chars, expected):
 
 
 @pytest.mark.parametrize(
-    "path,expected",
+    "doc,expected",
     [
-        ("/solutions/3257611/index.html", "/solutions/3257611"),
-        ("/articles/2585/index.html", "/articles/2585"),
-        ("/documentation/en-us/rhel/9/html-single/guide/index.html", "/documentation/en-us/rhel/9/html-single/guide"),
-        ("/security/cve/CVE-2024-9823/", "/security/cve/CVE-2024-9823/"),
-        ("/errata/RHSA-2022:4915/", "/errata/RHSA-2022:4915/"),
-        ("", ""),
-        ("/solutions/123", "/solutions/123"),
+        ({"id": "/solutions/3257611/index.html"}, "/solutions/3257611"),
+        ({"id": "/articles/2585/index.html"}, "/articles/2585"),
+        (
+            {"id": "/documentation/en-us/rhel/9/html-single/guide/index.html"},
+            "/documentation/en-us/rhel/9/html-single/guide",
+        ),
+        ({"view_uri": "/security/cve/CVE-2024-9823/"}, "/security/cve/CVE-2024-9823/"),
+        ({"view_uri": "/errata/RHSA-2022:4915/"}, "/errata/RHSA-2022:4915/"),
+        ({}, ""),
+        ({"id": "/solutions/123"}, "/solutions/123"),
+        ({"view_uri": "/solutions/7134031", "id": "/solutions/7134031/index.html"}, "/solutions/7134031"),
     ],
     ids=[
-        "solution-id",
-        "article-id",
-        "documentation-id",
+        "solution-id-strips-suffix",
+        "article-id-strips-suffix",
+        "documentation-id-strips-suffix",
         "cve-view-uri-unchanged",
         "errata-view-uri-unchanged",
-        "empty-string",
-        "no-suffix",
+        "empty-doc-returns-empty",
+        "no-suffix-unchanged",
+        "view-uri-preferred-over-id",
     ],
 )
-def test_strip_index_suffix(path, expected):
-    """Trailing /index.html is stripped from Solr document ID paths."""
-    assert strip_index_suffix(path) == expected
+def test_doc_uri(doc, expected):
+    """doc_uri returns canonical URL path, preferring view_uri and stripping /index.html."""
+    assert doc_uri(doc) == expected
 
 
 def test_clean_content_strips_then_truncates():

@@ -46,19 +46,14 @@ def strip_boilerplate(text: str) -> str:
     return text
 
 
-def strip_index_suffix(path: str) -> str:
-    """Remove trailing /index.html from URL paths.
+def doc_uri(doc: dict) -> str:
+    """Return the canonical URL path for a Solr document.
 
-    Solr document IDs include /index.html (e.g. /solutions/123/index.html)
-    but access.redhat.com returns 404 for these paths.
-
-    Args:
-        path: URL path that may end with /index.html.
-
-    Returns:
-        Path with /index.html suffix removed.
+    Prefers view_uri, falls back to id. Strips trailing /index.html
+    because Solr document IDs carry it but access.redhat.com 404s on those paths.
     """
-    return path.removesuffix("/index.html")
+    uri = doc.get("view_uri") or doc.get("id", "")
+    return uri.removesuffix("/index.html")
 
 
 def clean_content(text: str | None, max_chars: int) -> str:
