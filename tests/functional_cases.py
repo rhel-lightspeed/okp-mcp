@@ -1,4 +1,4 @@
-"""Functional test case data for RSPEED CLA scenarios."""
+"""Functional test case data for RSPEED / CLA scenarios (Jira and eval ids)."""
 
 from dataclasses import dataclass
 
@@ -17,6 +17,7 @@ class FunctionalCase:
     expected_doc_refs: list[str]
     required_facts: list[str | tuple[str, ...]]
     forbidden_claims: list[str]
+    expected_first_doc: str | None = None
 
 
 FUNCTIONAL_TEST_CASES = [
@@ -157,78 +158,103 @@ FUNCTIONAL_TEST_CASES = [
                 "hugepage",
             ],
             required_facts=[
-                "default_hugepagesz",
-                "grubby",
+                "hugepage",
+                "1G",
+                ("64", "1024"),
+                ("grub", "kernel"),
+            ],
+            forbidden_claims=["configures hugepages dynamically"],
+        ),
+        id="RSPEED_2479",
+    ),
+    pytest.param(
+        FunctionalCase(
+            question="What are the migration options from Red Hat Fuse to Red Hat build of Apache Camel?",
+            expected_doc_refs=[
+                "red_hat_fuse",
+                "migration",
+                "camel",
+            ],
+            required_facts=[
+                ("migration", "migrate"),
+                ("fuse", "red hat fuse"),
+                ("camel", "apache camel"),
             ],
             forbidden_claims=[],
+            expected_first_doc="red hat application services",
         ),
-        id="RSPEED_2200",
+        id="fuse_regression_eol",
     ),
     pytest.param(
         FunctionalCase(
-            question="How to prepare a custom SELinux policy based on AVC messages?",
+            question="What are the migration options from Red Hat Gluster Storage to Red Hat Ceph Storage?",
             expected_doc_refs=[
-                "5494701",
-                "323393",
-                "audit2allow",
+                "gluster",
+                "migration",
+                "ceph storage",
             ],
             required_facts=[
-                "audit2allow",
-                ("ausearch", "audit.log"),
-                "semodule",
-            ],
-            forbidden_claims=["only rules provided by Red Hat"],
-        ),
-        id="RSPEED_2136",
-    ),
-    pytest.param(
-        FunctionalCase(
-            question="How to enable bnxt_en NIC driver debugging?",
-            expected_doc_refs=[
-                "45950",
-                "driver debugging",
-            ],
-            required_facts=[
-                ("msglvl", "modprobe", "dynamic debug", "module parameter", "/etc/modprobe.d"),
+                ("migration", "migrate"),
+                ("gluster", "red hat gluster storage"),
+                ("ceph", "storage"),
             ],
             forbidden_claims=[],
+            expected_first_doc="red hat gluster storage",
         ),
-        id="RSPEED_2123",
+        id="gluster_regression_eol",
     ),
     pytest.param(
         FunctionalCase(
-            question=(
-                "configure lacp bond with name prod and NIC of bond are ens6 and ens8,"
-                " lacp rate is slow, ip of bond is 192.9.8.3/24, gateway 192.9.8.1."
-                " provide commands with nmcli"
-            ),
+            question="How to configure RHV Manager for high availability?",
             expected_doc_refs=[
-                "1526613",
-                "3713371",
-                "bond",
+                "virtual",
+                "high availability",
+                "rhv",
             ],
             required_facts=[
-                ("802.3ad", "mode=4"),
-                ("bond-slave", "slave"),
+                ("high availability", "ha"),
+                ("rhv", "red hat virtualization"),
             ],
-            forbidden_claims=["active-lacp"],
+            forbidden_claims=["not a Red Hat product"],
+            expected_first_doc="virtualization life cycle",
         ),
-        id="RSPEED_2113",
+        id="rhv_regression_eol",
     ),
     pytest.param(
         FunctionalCase(
-            question="how to set up kea",
+            question="What is the list of Red Hat Enterprise Linux for SAP Application Server packages?",
             expected_doc_refs=[
-                "7126352",
-                "managing_networking_infrastructure_services",
-                "kea",
+                "red_hat_enterprise_linux_for_sap_applications",
+                "package list",
+                "SAP",
             ],
             required_facts=[
-                ("kea-dhcp4", "dnf install kea", "kea-dhcp"),
-                ("RHEL 10", "Red Hat Enterprise Linux 10"),
+                "package list",
+                "SAP Application Server",
             ],
             forbidden_claims=["not a Red Hat product"],
         ),
         id="RSPEED_1998",
+    ),
+    pytest.param(
+        FunctionalCase(
+            question="What are the names of the three RHEL System Roles for SAP used to preconfigure systems?",
+            expected_doc_refs=[
+                "red_hat_enterprise_linux_system_roles_for_sap",
+                "red_hat_enterprise_linux_for_sap_solutions",
+                "sap_netweaver_preconfigure",
+            ],
+            required_facts=[
+                "sap_general_preconfigure",
+                "sap_netweaver_preconfigure",
+                "sap_hana_preconfigure",
+                "preconfigure",
+            ],
+            # Wrong answers often omit sap_netweaver_preconfigure or substitute sap_swpm (install role).
+            # We rely on required_facts for the three preconfigure names; avoid forbidding sap_swpm
+            # because a good answer may mention install roles separately.
+            forbidden_claims=[],
+        ),
+        id="sap_004",
     ),
 ]

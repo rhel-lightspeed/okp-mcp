@@ -132,7 +132,8 @@ async def test_cla_scenario(case: FunctionalCase) -> None:
     Starts a fresh MCP server subprocess per test to avoid anyio cancel-scope
     conflicts with pytest-asyncio fixture teardown. Each test:
     1. Spawns the OKP MCP server via MCPServerStdio.
-    2. Sends the question to Gemini 2.5 Flash with temperature=0.
+    2. Sends the question to Vertex Gemini (model from OKP_FUNCTIONAL_MODEL
+       or gemini-2.5-flash) with temperature=0.
     3. Asserts at least one MCP tool was called.
     4. Asserts at least one expected document reference appears in tool results or response.
     5. Asserts all required factual phrases appear in the response (case-insensitive).
