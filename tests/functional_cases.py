@@ -129,4 +129,23 @@ FUNCTIONAL_TEST_CASES = [
         ),
         id="RSPEED_2294",
     ),
+    pytest.param(
+        FunctionalCase(
+            question="how do i rollback my system to a previous version using rpm-ostree",
+            expected_doc_refs=[
+                "composing_installing_and_managing_rhel_for_edge_images",
+                "rpm-ostree",
+                "using_image_mode_for_rhel",
+            ],
+            required_facts=[
+                "rpm-ostree rollback",
+                ("reboot", "systemctl reboot"),
+            ],
+            forbidden_claims=[
+                "rpm-ostree split",
+                "transaction rollback",
+            ],
+        ),
+        id="RSPEED_1929",
+    ),
 ]
