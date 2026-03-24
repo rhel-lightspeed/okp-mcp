@@ -1,6 +1,7 @@
 """MCP tool definitions for RHEL OKP knowledge base search."""
 
 import asyncio
+import os
 import re
 
 import httpx
@@ -294,6 +295,13 @@ async def search_documentation(
         doc_results, sol_results, has_deprecation = await _deduplicate_and_sort_results(
             doc_data, sol_data, dep_data, query
         )
+        pinned_blocks = await _pinned_search_doc_blocks(query)
+        if pinned_blocks:
+            banner = (
+                "📌 **PINNED DOCUMENTS** (dev only: set `MCP_PIN_SEARCH_DOCS`). "
+                "Unset for normal Solr ranking.\n\n"
+            )
+            doc_results = [banner + "\n\n---\n\n".join(pinned_blocks)] + doc_results
         return _assemble_search_output(doc_results, sol_results, has_deprecation, query)
     except httpx.TimeoutException:
         logger.warning("Search timed out for query: %r", query)
@@ -493,8 +501,8 @@ async def search_articles(
 
 
 _DOCUMENT_FL = (
-    "allTitle,main_content,view_uri,documentKind,"
-    "product,documentation_version,"
+    "id,allTitle,title,heading_h1,main_content,view_uri,documentKind,"
+    "product,documentation_version,lastModifiedDate,"
     "cve_details,portal_synopsis,portal_summary"
 )
 
@@ -546,6 +554,48 @@ async def _fetch_document_raw(doc_id: str, client: httpx.AsyncClient | None = No
     finally:
         if close_client:
             await client.aclose()
+
+
+async def _pinned_search_doc_blocks(query: str) -> list[str]:
+    """Load Solr docs by id and format like search hits; prepend when MCP_PIN_SEARCH_DOCS is set.
+
+    Comma-separated Solr ``id`` values (same strings as ``get_document`` / ``view_uri`` paths),
+    e.g. ``/documentation/en-us/red_hat_enterprise_linux_for_sap_solutions/9/html-single/...``.
+
+    Development only: proves whether surfacing a given doc fixes LLM answers before changing
+    ranking. Unset ``MCP_PIN_SEARCH_DOCS`` in production.
+    """
+    raw = os.environ.get("MCP_PIN_SEARCH_DOCS", "").strip()
+    if not raw:
+        return []
+    pin_suffix = os.environ.get("MCP_PIN_SEARCH_QUERY_SUFFIX", "").strip()
+    blocks: list[str] = []
+    for doc_id in (x.strip() for x in raw.split(",") if x.strip()):
+        fetch_query = f"{query} {pin_suffix}".strip() if pin_suffix else query
+        try:
+            data = await _fetch_document_with_query(doc_id, fetch_query)
+        except (httpx.HTTPError, ValueError, KeyError):
+            logger.exception("MCP_PIN_SEARCH_DOCS: fetch failed for id %r", doc_id)
+            continue
+        docs = data.get("response", {}).get("docs", [])
+        if not docs:
+            logger.warning("MCP_PIN_SEARCH_DOCS: no Solr document for id %r", doc_id)
+            continue
+        doc = docs[0]
+        # Highlighting is keyed by Solr uniqueKey (`id`). Older fetches omitted `id` from `fl`,
+        # so highlights/BM25 fell back to weak matches (e.g. legal-notice boilerplate).
+        if not doc.get("id"):
+            doc["id"] = doc_id
+        if not doc.get("view_uri"):
+            doc["view_uri"] = doc_id
+        text, _sk = await _format_result(doc, data, include_content=True, query=fetch_query)
+        blocks.append(text)
+    if blocks:
+        logger.warning(
+            "MCP_PIN_SEARCH_DOCS active: prepending %d pinned document(s) to search_documentation",
+            len(blocks),
+        )
+    return blocks
 
 
 async def _format_document(doc: dict, data: dict, doc_id: str, query: str) -> str:

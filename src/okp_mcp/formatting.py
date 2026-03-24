@@ -31,6 +31,7 @@ _REPLACEMENT_RE = re.compile(
     re.IGNORECASE,
 )
 
+
 SORT_REPLACEMENT = -1
 SORT_DEPRECATION = 0
 SORT_NORMAL = 1
@@ -64,11 +65,14 @@ def _annotate_result(title: str, highlights: str, content: str) -> tuple[list[st
     text = f"{title} {highlights} {content}"
     is_deprecated = bool(_DEPRECATION_RE.search(text))
     has_replacement = bool(_REPLACEMENT_RE.search(text))
+    text_lower = text.lower()
     eol_product = ""
     for product_name, short in EOL_PRODUCT_MENTIONS:
-        if product_name.lower() in text.lower():
-            eol_product = f"{product_name} ({short})"
-            break
+        if product_name.lower() not in text_lower:
+            continue
+
+        eol_product = f"{product_name} ({short})"
+        break
 
     if has_replacement:
         annotations.append("\u2192 Recommended replacement mentioned")
