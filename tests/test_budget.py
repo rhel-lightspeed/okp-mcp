@@ -194,6 +194,16 @@ class TestAssembleSearchOutput:
         has_omit = "omitted" in output.lower()
         assert has_omit == should_omit
 
+    def test_tight_budget_guarantees_at_least_one_of_each_type(self):
+        """When budget is very tight, at least 1 doc and 1 solution are always included."""
+        doc_results = ["Doc A", "Doc B", "Doc C"]
+        sol_results = ["Solution X", "Solution Y"]
+        output = _assemble_search_output(doc_results, sol_results, "query", max_chars=100)
+        assert "**Documentation** (1 results)" in output or "**Documentation** (" in output
+        assert "**Solutions & Articles** (1 results)" in output or "**Solutions & Articles** (" in output
+        assert "Doc A" in output
+        assert "Solution X" in output or "Solution Y" in output
+
     def test_large_results_both_sections_survive(self):
         """Both sections survive even when individual results are large."""
         doc_results = ["D" * 500]

@@ -205,6 +205,17 @@ def _select_within_budget(results: list[str], budget: int) -> list[str]:
     return selected
 
 
+def _allocate_result_slots(doc_results: list[str], sol_results: list[str], selected_count: int) -> tuple[int, int]:
+    """Allocate slots between docs and solutions, guaranteeing at least 1 of each when both exist."""
+    min_docs = 1 if doc_results else 0
+    min_sols = 1 if sol_results else 0
+
+    doc_slots = max(min_docs, min(len(doc_results), selected_count - min_sols))
+    sol_slots = max(min_sols, selected_count - doc_slots)
+
+    return doc_slots, sol_slots
+
+
 def _assemble_search_output(
     doc_results: list[str],
     sol_results: list[str],
@@ -224,9 +235,9 @@ def _assemble_search_output(
     content_budget = max(1, max_chars - overhead)
 
     selected_count = len(_select_within_budget(doc_results + sol_results, content_budget))
-    included_docs = doc_results[: min(len(doc_results), selected_count)]
-    remaining_for_solutions = max(0, selected_count - len(included_docs))
-    included_solutions = sol_results[:remaining_for_solutions]
+    doc_slots, sol_slots = _allocate_result_slots(doc_results, sol_results, selected_count)
+    included_docs = doc_results[:doc_slots]
+    included_solutions = sol_results[:sol_slots]
 
     logger.info(
         "Budget trimming: kept %d/%d doc results, %d/%d solution results",
