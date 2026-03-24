@@ -555,11 +555,12 @@ async def _fetch_document_raw(doc_id: str, client: httpx.AsyncClient | None = No
             await client.aclose()
 
 
-async def _format_document(doc: dict, data: dict, doc_id: str, query: str) -> str:
+async def _format_document(doc: dict, data: dict, doc_id: str, query: str, max_chars: int) -> str:
     """Format a fetched document into a readable string.
 
     Renders title, type, product/version, URL, synopsis/summary/CVE details,
     and content (highlights if available, otherwise extracted relevant section).
+    Truncates final output to max_chars as a safety net.
     """
     view_uri = doc.get("view_uri", "")
     result = f"**{doc.get('allTitle', 'Untitled')}**"
@@ -583,10 +584,10 @@ async def _format_document(doc: dict, data: dict, doc_id: str, query: str) -> st
             if highlights:
                 result += f"\n\nContent:\n{highlights}"
             else:
-                result += f"\n\nContent:\n{_extract_relevant_section(content, query)}"
+                result += f"\n\nContent:\n{_extract_relevant_section(content, query, max_sections=8)}"
         else:
-            result += f"\n\nContent:\n{_extract_relevant_section(content, '')}"
-    return result
+            result += f"\n\nContent:\n{_extract_relevant_section(content, '', max_sections=8)}"
+    return truncate_content(result, max_chars)
 
 
 @mcp.tool
@@ -610,7 +611,7 @@ async def get_document(ctx: Context, doc_id: str, query: str = "") -> str:
         if not docs:
             return f"Document not found: {doc_id}"
 
-        return await _format_document(docs[0], data, doc_id, query)
+        return await _format_document(docs[0], data, doc_id, query, app.max_response_chars)
     except httpx.TimeoutException:
         logger.warning("Search timed out for query: %r", query)
         return "The search timed out. Please try again with a simpler query."
