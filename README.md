@@ -36,6 +36,24 @@ Settings come from CLI arguments and `MCP_*` environment variables. CLI args tak
 
 Run `okp-mcp --help` for the full list.
 
+### Pinning documents in `search_documentation` (debug)
+
+To check whether **forcing a Solr document into the first search results** fixes the LLM answer (before changing ranking), set:
+
+```bash
+export MCP_PIN_SEARCH_DOCS='/documentation/en-us/red_hat_enterprise_linux_for_sap_solutions/9/html-single/red_hat_enterprise_linux_system_roles_for_sap/index/index.html'
+```
+
+Use comma-separated Solr `id` values (same as `get_document` / `view_uri` paths). Each pinned doc is fetched with the **same query** as the user search so Solr highlights / BM25 excerpts align with that query. A banner is prepended to the tool output. **Unset in production.**
+
+If the pinned excerpt is still boilerplate (e.g. legal notice), append extra terms **only for the pinned fetch** (not the main search):
+
+```bash
+export MCP_PIN_SEARCH_QUERY_SUFFIX='sap_general_preconfigure sap_hana_preconfigure sap_netweaver_preconfigure'
+```
+
+`get_document` / pinned fetch responses now request Solr field `id` so highlight maps match the document key; if `view_uri` is empty in the index, the pinned path is used for the portal URL.
+
 ## Running with Compose
 
 Start the OKP Solr instance and MCP server together:
@@ -78,7 +96,7 @@ make test        # pytest with coverage
 
 ## Functional Tests
 
-Functional tests run real queries against a live Solr instance and Vertex AI Gemini to verify the MCP server returns accurate RHEL knowledge. They are gated behind the `functional` pytest marker and skipped by default.
+Functional tests run real queries against a live Solr instance and Vertex AI Gemini to verify the MCP server returns accurate RHEL knowledge. They are gated behind the `functional` pytest marker and skipped by default. Scenarios are defined in `tests/functional_cases.py` (e.g. RSPEED CLA tickets and eval ids such as `sap_004`).
 
 Prerequisites:
 
@@ -100,7 +118,15 @@ Run them:
 uv run pytest -m functional -v
 ```
 
+Add `-rs` to print **why** a test was skipped (missing creds, `GOOGLE_CLOUD_PROJECT`, or Solr not on `localhost:8983`):
+
+```bash
+uv run pytest -m functional -k sap_004 -v -rs
+```
+
 Credentials are loaded exclusively from `.env` — bare environment variables are not sufficient. The tests skip gracefully if `.env` is missing, credentials are invalid, or Solr is unavailable.
+
+**Org policy blocks the default Gemini model:** Some GCP organizations restrict Vertex models via `constraints/vertexai.allowedModels`. If the run fails with `FAILED_PRECONDITION` / `disallowed Gen AI model gemini-2.5-flash`, either ask your admin to allow `publishers/google/models/gemini-2.5-flash:predict`, or set **`OKP_FUNCTIONAL_MODEL`** in `.env` to a model your policy already allows (see `.env.example` for examples).
 
 ## License
 
