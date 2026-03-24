@@ -121,3 +121,16 @@ def test_solr_url_from_env():
 
     assert config.solr_url == "http://remote:1234"
     assert config.solr_endpoint == "http://remote:1234/solr/portal/select"
+
+
+def test_max_response_chars_default():
+    """max_response_chars defaults to 30000."""
+    config = ServerConfig()
+    assert config.max_response_chars == 30_000
+
+
+def test_max_response_chars_env_override():
+    """MCP_MAX_RESPONSE_CHARS environment variable overrides the default."""
+    with patch.dict("os.environ", {"MCP_MAX_RESPONSE_CHARS": "20000"}):
+        config = ServerConfig()
+    assert config.max_response_chars == 20_000
