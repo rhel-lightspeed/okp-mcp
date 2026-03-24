@@ -102,7 +102,7 @@ def _build_search_queries(
         "bq": doc_bq,
         "rq": "{!rerank reRankQuery=$rqq reRankDocs=200 reRankWeight=3}",
         "rqq": f'title:"{rqq_safe}"^10 main_content:"{rqq_safe}"^5',
-        "hl.snippets": "10",
+        "hl.snippets": "6",
     }
 
     sol_bq = 'main_content:(deprecated OR removed OR unsupported OR "end of life" OR "no longer")^5'
