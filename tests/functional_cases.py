@@ -148,4 +148,87 @@ FUNCTIONAL_TEST_CASES = [
         ),
         id="RSPEED_2201",
     ),
+    pytest.param(
+        FunctionalCase(
+            question="How to configure 64 hugepages of size 1G at boot time in RHEL 10?",
+            expected_doc_refs=[
+                "3936101",
+                "2791291",
+                "hugepage",
+            ],
+            required_facts=[
+                "default_hugepagesz",
+                "grubby",
+            ],
+            forbidden_claims=[],
+        ),
+        id="RSPEED_2200",
+    ),
+    pytest.param(
+        FunctionalCase(
+            question="How to prepare a custom SELinux policy based on AVC messages?",
+            expected_doc_refs=[
+                "5494701",
+                "323393",
+                "audit2allow",
+            ],
+            required_facts=[
+                "audit2allow",
+                ("ausearch", "audit.log"),
+                "semodule",
+            ],
+            forbidden_claims=["only rules provided by Red Hat"],
+        ),
+        id="RSPEED_2136",
+    ),
+    pytest.param(
+        FunctionalCase(
+            question="How to enable bnxt_en NIC driver debugging?",
+            expected_doc_refs=[
+                "45950",
+                "driver debugging",
+            ],
+            required_facts=[
+                ("msglvl", "modprobe", "dynamic debug", "module parameter", "/etc/modprobe.d"),
+            ],
+            forbidden_claims=[],
+        ),
+        id="RSPEED_2123",
+    ),
+    pytest.param(
+        FunctionalCase(
+            question=(
+                "configure lacp bond with name prod and NIC of bond are ens6 and ens8,"
+                " lacp rate is slow, ip of bond is 192.9.8.3/24, gateway 192.9.8.1."
+                " provide commands with nmcli"
+            ),
+            expected_doc_refs=[
+                "1526613",
+                "3713371",
+                "bond",
+            ],
+            required_facts=[
+                ("802.3ad", "mode=4"),
+                ("bond-slave", "slave"),
+            ],
+            forbidden_claims=["active-lacp"],
+        ),
+        id="RSPEED_2113",
+    ),
+    pytest.param(
+        FunctionalCase(
+            question="how to set up kea",
+            expected_doc_refs=[
+                "7126352",
+                "managing_networking_infrastructure_services",
+                "kea",
+            ],
+            required_facts=[
+                ("kea-dhcp4", "dnf install kea", "kea-dhcp"),
+                ("RHEL 10", "Red Hat Enterprise Linux 10"),
+            ],
+            forbidden_claims=["not a Red Hat product"],
+        ),
+        id="RSPEED_1998",
+    ),
 ]
