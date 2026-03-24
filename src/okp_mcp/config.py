@@ -49,6 +49,10 @@ class ServerConfig(BaseSettings):
         default="http://localhost:8983",
         description="Base URL of the Solr instance",
     )
+    max_response_chars: int = Field(
+        default=30_000,
+        description="Maximum characters in a single tool response",
+    )
 
     @computed_field
     @property

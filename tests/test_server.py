@@ -97,6 +97,7 @@ def test_get_app_context_returns_lifespan_app_context():
     expected_context = AppContext(
         http_client=AsyncMock(spec=httpx.AsyncClient),
         solr_endpoint="http://localhost:8983/solr/portal/select",
+        max_response_chars=30_000,
     )
     ctx = cast(Context, SimpleNamespace(lifespan_context={"app": expected_context}))
 
