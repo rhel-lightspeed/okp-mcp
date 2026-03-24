@@ -129,4 +129,20 @@ FUNCTIONAL_TEST_CASES = [
         ),
         id="RSPEED_2294",
     ),
+    pytest.param(
+        FunctionalCase(
+            question="How to configure RHEL on AWS with Secure Boot?",
+            expected_doc_refs=[
+                "deploying_rhel_9_on_amazon_web_services",
+                "deploying_and_managing_rhel_on_amazon_web_services",
+                "Secure Boot",
+            ],
+            required_facts=[
+                "marketplace",
+                ("custom image", "custom AMI"),
+            ],
+            forbidden_claims=["do not expose"],
+        ),
+        id="RSPEED_2201",
+    ),
 ]
