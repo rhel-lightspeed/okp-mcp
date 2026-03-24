@@ -7,7 +7,7 @@ import httpx
 from fastmcp import Context
 
 from .config import logger
-from .content import doc_uri, strip_boilerplate
+from .content import _select_within_budget, doc_uri, strip_boilerplate, truncate_content
 from .formatting import SORT_DEPRECATION, _format_result
 from .server import get_app_context, mcp
 from .solr import _clean_query, _extract_relevant_section, _get_highlights, _solr_query
@@ -94,8 +94,7 @@ def _build_search_queries(
         "q": cleaned,
         "fq": doc_filters,
         "fl": (
-            "id,allTitle,heading_h1,title,view_uri,product,"
-            "documentation_version,documentKind,main_content,lastModifiedDate,score"
+            "id,allTitle,heading_h1,title,view_uri,product,documentation_version,documentKind,lastModifiedDate,score"
         ),
         "rows": max_results,
         "bf": "recip(ms(NOW,lastModifiedDate),3.16e-11,1,1)^0.3",
@@ -113,7 +112,7 @@ def _build_search_queries(
     sol_params = {
         "q": cleaned,
         "fq": sol_filters,
-        "fl": "id,allTitle,heading_h1,title,view_uri,product,documentKind,main_content,lastModifiedDate,score",
+        "fl": "id,allTitle,heading_h1,title,view_uri,product,documentKind,lastModifiedDate,score",
         "rows": max_results + 2,
         "bf": "recip(ms(NOW,lastModifiedDate),3.16e-11,1,1)^0.3",
         "bq": sol_bq,
@@ -133,7 +132,7 @@ def _build_search_queries(
     dep_params = {
         "q": f"{cleaned} deprecated removed",
         "fq": ["documentKind:(solution OR article OR documentation)", product_fq, eol_fq],
-        "fl": "id,allTitle,heading_h1,title,view_uri,product,documentKind,main_content,lastModifiedDate,score",
+        "fl": "id,allTitle,heading_h1,title,view_uri,product,documentKind,lastModifiedDate,score",
         "rows": 3,
         "bq": dep_bq,
     }
@@ -190,14 +189,21 @@ def _assemble_search_output(
     sol_results: list[str],
     has_deprecation: bool,
     query: str,
+    max_chars: int,
 ) -> str:
     """Assemble the final output string from categorized search results.
+
+    Applies a character budget: documentation gets 60%, solutions/articles get 40%.
+    Results are already priority-sorted, _select_within_budget drops tail entries.
 
     Returns a formatted string with documentation and solution sections,
     or an empty-results message when both lists are empty.
     """
     if not doc_results and not sol_results:
         return f"No results found for: {query}"
+
+    doc_budget = int(max_chars * 0.6)
+    sol_budget = max_chars - doc_budget
 
     output_parts = []
     if has_deprecation:
@@ -207,11 +213,11 @@ def _assemble_search_output(
             "over workarounds for other products."
         )
     if doc_results:
-        output_parts.append(f"**Documentation** ({len(doc_results)} results):\n\n" + "\n\n---\n\n".join(doc_results))
+        doc_text = _select_within_budget(doc_results, doc_budget, query)
+        output_parts.append(f"**Documentation** ({len(doc_results)} results):\n\n" + doc_text)
     if sol_results:
-        output_parts.append(
-            f"**Solutions & Articles** ({len(sol_results)} results):\n\n" + "\n\n---\n\n".join(sol_results)
-        )
+        sol_text = _select_within_budget(sol_results, sol_budget, query)
+        output_parts.append(f"**Solutions & Articles** ({len(sol_results)} results):\n\n" + sol_text)
 
     return "\n\n===\n\n".join(output_parts)
 
@@ -294,7 +300,8 @@ async def search_documentation(
         doc_results, sol_results, has_deprecation = await _deduplicate_and_sort_results(
             doc_data, sol_data, dep_data, query
         )
-        return _assemble_search_output(doc_results, sol_results, has_deprecation, query)
+        result = _assemble_search_output(doc_results, sol_results, has_deprecation, query, app.max_response_chars)
+        return truncate_content(result, app.max_response_chars)
     except httpx.TimeoutException:
         logger.warning("Search timed out for query: %r", query)
         return "The search timed out. Please try again with a simpler query."
