@@ -18,7 +18,10 @@ project = RSPEED AND labels = "cla-incorrect-answer" AND status != Closed ORDER 
 
 Fields needed: `summary,labels,status,description`
 
-Skip tickets that aren't about factual knowledge errors (e.g., jailbreak/prompt-injection issues, or problems that require changes outside this repo).
+Skip tickets that aren't about factual knowledge errors:
+- Jailbreak/prompt-injection issues
+- Model guardrail/scope issues (e.g., whether CLA should refuse to answer a question entirely)
+- Problems that require changes outside this repo
 
 Cross-reference against existing test case IDs in `tests/functional_cases.py`:
 
@@ -26,7 +29,13 @@ Cross-reference against existing test case IDs in `tests/functional_cases.py`:
 grep 'id="RSPEED_' tests/functional_cases.py
 ```
 
-Skip any ticket that already has a test case. Take the most recently created ticket that doesn't.
+Also check unmerged PRs for test cases in flight:
+
+```bash
+gh pr list --state open --json number,title,headRefName
+```
+
+Skip any ticket that already has a test case or an open PR. Take the most recently created ticket that doesn't.
 
 Read the ticket description to extract:
 - The question CLA answered incorrectly
@@ -43,6 +52,10 @@ git checkout -b rspeed-<ticket_number>
 
 All changes for this ticket (test case, code fixes) should be committed on this branch.
 
+### Batching multiple tickets
+
+When processing several tickets at once, use a combined branch name (e.g., `rspeed-2200-2136`). This works well when most or all tests pass immediately without code fixes, since the test-only changes can ship in a single PR. If a ticket needs a code fix, split it to its own branch/PR to keep the fix isolated and reviewable.
+
 ## Step 2: Build the Test Case
 
 ### 2a. Find the Best Solr Documents
@@ -56,6 +69,10 @@ curl -s "http://localhost:8983/solr/portal/select" \
   --data-urlencode 'fq=-product:"Red Hat Virtualization"' \
   --data-urlencode "fl=id,allTitle,view_uri,documentKind,product,documentation_version,score" \
   --data-urlencode "rows=10" \
+  --data-urlencode "hl=on" \
+  --data-urlencode "hl.fl=main_content" \
+  --data-urlencode "hl.snippets=3" \
+  --data-urlencode "hl.fragsize=200" \
   --data-urlencode "wt=json" \
   | python3 -m json.tool
 ```
