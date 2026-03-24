@@ -94,6 +94,11 @@ def _apply_vm_highlight_override(params: dict, cleaned: str) -> None:
     params["hl.q"] = f"{cleaned} virsh cockpit deprecated virt-manager"
 
 
+def _apply_eus_highlight_override(params: dict, cleaned: str) -> None:
+    """Set hl.q to focus highlights on Enhanced EUS facts rather than general EUS content."""
+    params["hl.q"] = f'{cleaned} "Enhanced EUS" "48 months" "Enhanced Extended Update Support"'
+
+
 def _build_search_queries(
     cleaned: str,
     original_query: str,
@@ -155,6 +160,8 @@ def _build_search_queries(
     if vm_intent:
         _apply_vm_highlight_override(doc_params, cleaned)
         _apply_vm_highlight_override(sol_params, cleaned)
+    if eus_intent:
+        _apply_eus_highlight_override(sol_params, cleaned)
 
     dep_bq = (
         'allTitle:(deprecated OR removed OR "no longer" OR "end of life")^20 '
