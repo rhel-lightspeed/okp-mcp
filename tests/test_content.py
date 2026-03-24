@@ -19,10 +19,27 @@ def test_truncate_content_no_op(text, max_chars):
 
 
 def test_truncate_content_over_limit():
-    """Truncated text includes character counts in the truncation message."""
-    result = truncate_content("x" * 100, max_chars=50)
-    assert result.startswith("x" * 50)
-    assert "[Content truncated - showing 50 of 100 characters]" in result
+    """Truncated text includes character counts and stays within max_chars."""
+    result = truncate_content("x" * 100, max_chars=80)
+    assert "[Content truncated" in result
+    assert "of 100 characters]" in result
+    assert len(result) <= 80
+
+
+@pytest.mark.parametrize(
+    "text_len,max_chars",
+    [
+        (100, 80),
+        (10_000, 500),
+        (10_000, 100),
+        (200, 60),
+    ],
+    ids=["small-text", "large-text", "tight-limit", "very-tight-limit"],
+)
+def test_truncate_content_never_exceeds_max_chars(text_len, max_chars):
+    """Output length never exceeds max_chars regardless of input size."""
+    result = truncate_content("x" * text_len, max_chars=max_chars)
+    assert len(result) <= max_chars
 
 
 @pytest.mark.parametrize(

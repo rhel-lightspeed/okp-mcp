@@ -7,8 +7,8 @@ import httpx
 from fastmcp import Context
 
 from .config import logger
-from .content import strip_boilerplate, strip_index_suffix
-from .formatting import SORT_DEPRECATION, _format_result
+from .content import strip_boilerplate
+from .formatting import _format_result
 from .server import get_app_context, mcp
 from .solr import _clean_query, _extract_relevant_section, _get_highlights, _solr_query
 
@@ -143,8 +143,7 @@ def _build_search_queries(
 
 def _doc_uri(doc: dict) -> str | None:
     """Return the canonical URI for a Solr document."""
-    uri = doc.get("view_uri") or doc.get("id")
-    return strip_index_suffix(uri) if uri else None
+    return doc.get("view_uri") or doc.get("id")
 
 
 async def _format_docs(docs: list[dict], data: dict, query: str) -> list[tuple[str, int]]:
@@ -172,10 +171,10 @@ async def _deduplicate_and_sort_results(
     sol_data: dict,
     dep_data: dict,
     query: str,
-) -> tuple[list[str], list[str], bool]:
+) -> tuple[list[str], list[str]]:
     """Deduplicate results across doc/sol/dep buckets and sort by relevance.
 
-    Returns (doc_results, sol_results, has_deprecation).
+    Returns (doc_results, sol_results).
     """
     doc_pairs = await _format_docs(doc_data["response"]["docs"], doc_data, query)
     sol_pairs = await _format_docs(sol_data["response"]["docs"], sol_data, query)
@@ -187,15 +186,30 @@ async def _deduplicate_and_sort_results(
     sol_pairs.extend(dep_pairs)
     sol_pairs.sort(key=lambda pair: pair[1])
 
-    has_deprecation = any(sk == SORT_DEPRECATION for _, sk in doc_pairs + sol_pairs)
-    return [text for text, _ in doc_pairs], [text for text, _ in sol_pairs], has_deprecation
+    return [text for text, _ in doc_pairs], [text for text, _ in sol_pairs]
+
+
+def _select_within_budget(results: list[str], budget: int) -> list[str]:
+    """Select results that fit within a character budget while keeping one result."""
+    if not results:
+        return []
+
+    selected = [results[0]]
+    total = len(results[0])
+    separator_cost = len("\n\n---\n\n")
+    for result in results[1:]:
+        if total + separator_cost + len(result) > budget:
+            break
+        selected.append(result)
+        total += separator_cost + len(result)
+    return selected
 
 
 def _assemble_search_output(
     doc_results: list[str],
     sol_results: list[str],
-    has_deprecation: bool,
     query: str,
+    max_chars: int,
 ) -> str:
     """Assemble the final output string from categorized search results.
 
@@ -205,6 +219,24 @@ def _assemble_search_output(
     if not doc_results and not sol_results:
         return f"No results found for: {query}"
 
+    section_count = int(bool(doc_results)) + int(bool(sol_results))
+    overhead = 200 + 50 + (section_count * 40) + (8 if section_count == 2 else 0)
+    content_budget = max(1, max_chars - overhead)
+
+    selected_count = len(_select_within_budget(doc_results + sol_results, content_budget))
+    included_docs = doc_results[: min(len(doc_results), selected_count)]
+    remaining_for_solutions = max(0, selected_count - len(included_docs))
+    included_solutions = sol_results[:remaining_for_solutions]
+
+    logger.info(
+        "Budget trimming: kept %d/%d doc results, %d/%d solution results",
+        len(included_docs),
+        len(doc_results),
+        len(included_solutions),
+        len(sol_results),
+    )
+
+    has_deprecation = any("⚠️ Deprecation/Removal Notice" in result for result in included_docs + included_solutions)
     output_parts = []
     if has_deprecation:
         output_parts.append(
@@ -212,14 +244,22 @@ def _assemble_search_output(
             "If sources disagree, treat the deprecation/removal notice as authoritative "
             "over workarounds for other products."
         )
-    if doc_results:
-        output_parts.append(f"**Documentation** ({len(doc_results)} results):\n\n" + "\n\n---\n\n".join(doc_results))
-    if sol_results:
+    if included_docs:
         output_parts.append(
-            f"**Solutions & Articles** ({len(sol_results)} results):\n\n" + "\n\n---\n\n".join(sol_results)
+            f"**Documentation** ({len(included_docs)} results):\n\n" + "\n\n---\n\n".join(included_docs)
+        )
+    if included_solutions:
+        output_parts.append(
+            f"**Solutions & Articles** ({len(included_solutions)} results):\n\n"
+            + "\n\n---\n\n".join(included_solutions)
         )
 
-    return "\n\n===\n\n".join(output_parts)
+    output = "\n\n===\n\n".join(output_parts)
+    omitted = (len(doc_results) + len(sol_results)) - (len(included_docs) + len(included_solutions))
+    if omitted > 0:
+        output += f"\n\n[{omitted} additional results omitted to stay within response size limit]"
+
+    return output
 
 
 def _format_solution_article_doc(doc: dict, data: dict, query: str) -> str:
@@ -231,7 +271,7 @@ def _format_solution_article_doc(doc: dict, data: dict, query: str) -> str:
     doc_id = doc.get("id", "")
     view_uri = doc.get("view_uri", "")
     title = doc.get("allTitle") or doc.get("heading_h1") or doc.get("title", "").split("|")[0].strip() or "Untitled"
-    url_path = strip_index_suffix(view_uri or doc_id)
+    url_path = view_uri or doc_id
     highlights = _get_highlights(data, view_uri, doc_id, query=query)
     result = f"**{title}**"
     result += f"\nURL: https://access.redhat.com{url_path}"
@@ -249,7 +289,7 @@ def _format_errata_doc(doc: dict) -> str:
         result += f" | Severity: {doc['portal_severity']}"
     if doc.get("portal_synopsis"):
         result += f"\nSynopsis: {doc['portal_synopsis']}"
-    result += f"\nURL: https://access.redhat.com{strip_index_suffix(doc.get('view_uri', ''))}"
+    result += f"\nURL: https://access.redhat.com{doc.get('view_uri', '')}"
     return result
 
 
@@ -285,6 +325,7 @@ async def search_documentation(
     )
     try:
         app = get_app_context(ctx)
+        max_chars = app.max_response_chars
         product = _PRODUCT_ALIASES.get(product, product) or "Red Hat Enterprise Linux"
         query_lower = query.lower()
         vm_intent = _detect_vm_intent(query_lower)
@@ -298,10 +339,8 @@ async def search_documentation(
             _solr_query(sol_params, client=app.http_client, solr_endpoint=app.solr_endpoint),
             _solr_query(dep_params, client=app.http_client, solr_endpoint=app.solr_endpoint),
         )
-        doc_results, sol_results, has_deprecation = await _deduplicate_and_sort_results(
-            doc_data, sol_data, dep_data, query
-        )
-        return _assemble_search_output(doc_results, sol_results, has_deprecation, query)
+        doc_results, sol_results = await _deduplicate_and_sort_results(doc_data, sol_data, dep_data, query)
+        return _assemble_search_output(doc_results, sol_results, query, max_chars=max_chars)
     except httpx.TimeoutException:
         logger.warning("Search timed out for query: %r", query)
         return "The search timed out. Please try again with a simpler query."
@@ -398,7 +437,7 @@ async def search_cves(
             if doc.get("cve_details"):
                 detail = doc["cve_details"][:300]
                 result += f"\nDetails: {detail}"
-            result += f"\nURL: https://access.redhat.com{strip_index_suffix(doc.get('view_uri', ''))}"
+            result += f"\nURL: https://access.redhat.com{doc.get('view_uri', '')}"
             results.append(result)
 
         return f"Found {len(docs)} CVEs for '{query}':\n\n" + "\n\n---\n\n".join(results)
@@ -562,14 +601,13 @@ async def _format_document(doc: dict, data: dict, doc_id: str, query: str) -> st
     and content (highlights if available, otherwise extracted relevant section).
     """
     view_uri = doc.get("view_uri", "")
-    url_path = strip_index_suffix(view_uri or doc_id)
     result = f"**{doc.get('allTitle', 'Untitled')}**"
     result += f"\nType: {doc.get('documentKind', 'Unknown')}"
     if doc.get("product"):
         result += f"\nProduct: {doc['product']}"
     if doc.get("documentation_version"):
         result += f" {doc['documentation_version']}"
-    result += f"\nURL: https://access.redhat.com{url_path}"
+    result += f"\nURL: https://access.redhat.com{view_uri}"
 
     if doc.get("portal_synopsis"):
         result += f"\n\nSynopsis: {doc['portal_synopsis']}"

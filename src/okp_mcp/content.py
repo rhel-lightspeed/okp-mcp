@@ -10,22 +10,29 @@ _NOT_INCLUDED_PATTERN = re.compile(r"This content is not included\.")
 
 
 def truncate_content(text: str, max_chars: int) -> str:
-    """Truncate text to max_chars, appending truncation message if needed.
+    """Truncate text to max_chars, including the truncation message within the limit.
 
     Args:
         text: The text to truncate.
-        max_chars: Maximum number of characters to keep.
+        max_chars: Maximum total characters in the returned string.
 
     Returns:
-        Original text if under limit, otherwise first max_chars plus truncation message.
+        Original text if under limit, otherwise a prefix plus truncation message
+        that together do not exceed max_chars.
     """
     if len(text) <= max_chars:
         return text
 
     total_chars = len(text)
-    truncated = text[:max_chars]
-    message = f"\n\n[Content truncated - showing {max_chars} of {total_chars} characters]"
-    return truncated + message
+    # Reserve space for the suffix so the total output stays within max_chars.
+    # Use a conservatively long placeholder to measure suffix length, then
+    # recompute with the real kept count.
+    suffix_template = f"\n\n[Content truncated - showing {{}} of {total_chars} characters]"
+    # Longest possible kept count has same digits as max_chars
+    suffix_max_len = len(suffix_template.format(max_chars))
+    kept = max(0, max_chars - suffix_max_len)
+    message = suffix_template.format(kept)
+    return text[:kept] + message
 
 
 def strip_boilerplate(text: str) -> str:
