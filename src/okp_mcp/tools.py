@@ -7,7 +7,7 @@ import httpx
 from fastmcp import Context
 
 from .config import logger
-from .content import strip_boilerplate, strip_index_suffix
+from .content import doc_uri, strip_boilerplate
 from .formatting import SORT_DEPRECATION, _format_result
 from .server import get_app_context, mcp
 from .solr import _clean_query, _extract_relevant_section, _get_highlights, _solr_query
@@ -141,12 +141,6 @@ def _build_search_queries(
     return doc_params, sol_params, dep_params
 
 
-def _doc_uri(doc: dict) -> str | None:
-    """Return the canonical URI for a Solr document."""
-    uri = doc.get("view_uri") or doc.get("id")
-    return strip_index_suffix(uri) if uri else None
-
-
 async def _format_docs(docs: list[dict], data: dict, query: str) -> list[tuple[str, int]]:
     """Format a list of Solr docs into (text, sort_key) pairs."""
     return list(await asyncio.gather(*[_format_result(d, data, include_content=True, query=query) for d in docs]))
@@ -160,7 +154,7 @@ async def _collect_dep_pairs(
     """Format dep docs not already seen in doc/sol results."""
     pairs: list[tuple[str, int]] = []
     for d in dep_data["response"]["docs"]:
-        uri = _doc_uri(d)
+        uri = doc_uri(d)
         if uri not in seen_uris:
             pairs.append(await _format_result(d, dep_data, include_content=True, query=query))
             seen_uris.add(uri)
@@ -180,8 +174,8 @@ async def _deduplicate_and_sort_results(
     doc_pairs = await _format_docs(doc_data["response"]["docs"], doc_data, query)
     sol_pairs = await _format_docs(sol_data["response"]["docs"], sol_data, query)
 
-    seen_uris = {_doc_uri(d) for d in doc_data["response"]["docs"]}
-    seen_uris |= {_doc_uri(d) for d in sol_data["response"]["docs"]}
+    seen_uris = {doc_uri(d) for d in doc_data["response"]["docs"]}
+    seen_uris |= {doc_uri(d) for d in sol_data["response"]["docs"]}
     dep_pairs = await _collect_dep_pairs(dep_data, seen_uris, query)
 
     sol_pairs.extend(dep_pairs)
@@ -231,10 +225,9 @@ def _format_solution_article_doc(doc: dict, data: dict, query: str) -> str:
     doc_id = doc.get("id", "")
     view_uri = doc.get("view_uri", "")
     title = doc.get("allTitle") or doc.get("heading_h1") or doc.get("title", "").split("|")[0].strip() or "Untitled"
-    url_path = strip_index_suffix(view_uri or doc_id)
     highlights = _get_highlights(data, view_uri, doc_id, query=query)
     result = f"**{title}**"
-    result += f"\nURL: https://access.redhat.com{url_path}"
+    result += f"\nURL: https://access.redhat.com{doc_uri(doc)}"
     if highlights:
         result += f"\n> {highlights}"
     return result
@@ -249,7 +242,7 @@ def _format_errata_doc(doc: dict) -> str:
         result += f" | Severity: {doc['portal_severity']}"
     if doc.get("portal_synopsis"):
         result += f"\nSynopsis: {doc['portal_synopsis']}"
-    result += f"\nURL: https://access.redhat.com{strip_index_suffix(doc.get('view_uri', ''))}"
+    result += f"\nURL: https://access.redhat.com{doc_uri(doc)}"
     return result
 
 
@@ -398,7 +391,7 @@ async def search_cves(
             if doc.get("cve_details"):
                 detail = doc["cve_details"][:300]
                 result += f"\nDetails: {detail}"
-            result += f"\nURL: https://access.redhat.com{strip_index_suffix(doc.get('view_uri', ''))}"
+            result += f"\nURL: https://access.redhat.com{doc_uri(doc)}"
             results.append(result)
 
         return f"Found {len(docs)} CVEs for '{query}':\n\n" + "\n\n---\n\n".join(results)
@@ -562,14 +555,13 @@ async def _format_document(doc: dict, data: dict, doc_id: str, query: str) -> st
     and content (highlights if available, otherwise extracted relevant section).
     """
     view_uri = doc.get("view_uri", "")
-    url_path = strip_index_suffix(view_uri or doc_id)
     result = f"**{doc.get('allTitle', 'Untitled')}**"
     result += f"\nType: {doc.get('documentKind', 'Unknown')}"
     if doc.get("product"):
         result += f"\nProduct: {doc['product']}"
     if doc.get("documentation_version"):
         result += f" {doc['documentation_version']}"
-    result += f"\nURL: https://access.redhat.com{url_path}"
+    result += f"\nURL: https://access.redhat.com{doc_uri(doc)}"
 
     if doc.get("portal_synopsis"):
         result += f"\n\nSynopsis: {doc['portal_synopsis']}"
