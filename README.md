@@ -126,8 +126,6 @@ uv run pytest -m functional -k sap_004 -v -rs
 
 Credentials are loaded exclusively from `.env` — bare environment variables are not sufficient. The tests skip gracefully if `.env` is missing, credentials are invalid, or Solr is unavailable.
 
-**Org policy blocks the default Gemini model:** Some GCP organizations restrict Vertex models via `constraints/vertexai.allowedModels`. If the run fails with `FAILED_PRECONDITION` / `disallowed Gen AI model gemini-2.5-flash`, either ask your admin to allow `publishers/google/models/gemini-2.5-flash:predict`, or set **`OKP_FUNCTIONAL_MODEL`** in `.env` to a model your policy already allows (see `.env.example` for examples).
-
 ## License
 
 See [LICENSE](LICENSE) for details.
