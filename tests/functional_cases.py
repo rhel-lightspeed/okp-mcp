@@ -114,4 +114,19 @@ FUNCTIONAL_TEST_CASES = [
         ),
         id="RSPEED_2697",
     ),
+    pytest.param(
+        FunctionalCase(
+            question="What is most current version of Python for RHEL 10?",
+            expected_doc_refs=[
+                "dynamic_programming_languages",
+                "Application Stream",
+                "python 3.12",
+            ],
+            required_facts=[
+                "3.12",
+            ],
+            forbidden_claims=["has not been officially released"],
+        ),
+        id="RSPEED_2294",
+    ),
 ]
