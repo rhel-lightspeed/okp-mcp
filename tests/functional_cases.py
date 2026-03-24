@@ -1,4 +1,4 @@
-"""Functional test case data for RSPEED CLA scenarios."""
+"""Functional test case data for RSPEED / CLA scenarios (Jira and eval ids)."""
 
 from dataclasses import dataclass
 
@@ -128,5 +128,26 @@ FUNCTIONAL_TEST_CASES = [
             forbidden_claims=["has not been officially released"],
         ),
         id="RSPEED_2294",
+    ),
+    pytest.param(
+        FunctionalCase(
+            question="What are the names of the three RHEL System Roles for SAP used to preconfigure systems?",
+            expected_doc_refs=[
+                "red_hat_enterprise_linux_system_roles_for_sap",
+                "red_hat_enterprise_linux_for_sap_solutions",
+                "sap_netweaver_preconfigure",
+            ],
+            required_facts=[
+                "sap_general_preconfigure",
+                "sap_netweaver_preconfigure",
+                "sap_hana_preconfigure",
+                "preconfigure",
+            ],
+            # Wrong answers often omit sap_netweaver_preconfigure or substitute sap_swpm (install role).
+            # We rely on required_facts for the three preconfigure names; avoid forbidding sap_swpm
+            # because a good answer may mention install roles separately.
+            forbidden_claims=[],
+        ),
+        id="sap_004",
     ),
 ]
