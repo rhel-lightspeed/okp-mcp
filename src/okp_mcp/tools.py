@@ -58,6 +58,42 @@ def _detect_release_date_intent(query_lower: str) -> bool:
     return any(kw in query_lower for kw in ["release date", "released", "when was", "general availability"])
 
 
+def _detect_eus_intent(query_lower: str) -> bool:
+    """Return True if the lowercased query asks about EUS or Extended Update Support."""
+    return "eus" in query_lower or "extended update support" in query_lower
+
+
+def _build_sol_boosts(
+    extra_bq: str,
+    rqq_safe: str,
+    vm_intent: bool,
+    release_date_intent: bool,
+    eus_intent: bool,
+) -> tuple[str, str, int]:
+    """Build sol_bq, sol_rqq, and sol_rq_weight for the solutions/articles query."""
+    sol_bq = 'main_content:(deprecated OR removed OR unsupported OR "end of life" OR "no longer")^5'
+    if vm_intent and extra_bq:
+        sol_bq = f"{sol_bq} {extra_bq}"
+    if release_date_intent:
+        sol_bq = (
+            f'{sol_bq} title:"Enterprise Linux Release Dates"^200 allTitle:"release dates"^30 title:"release dates"^20'
+        )
+    if eus_intent:
+        sol_bq = f'{sol_bq} title:"Enhanced EUS"^100 title:"EUS FAQ"^80'
+    sol_rq_weight = 5 if release_date_intent else 2
+    sol_rqq = (
+        f'title:"{rqq_safe}"^10 main_content:(deprecated OR removed OR unsupported OR "no longer" OR "{rqq_safe}")^3'
+    )
+    if release_date_intent:
+        sol_rqq = f'allTitle:"release dates"^50 {sol_rqq}'
+    return sol_bq, sol_rqq, sol_rq_weight
+
+
+def _apply_vm_highlight_override(params: dict, cleaned: str) -> None:
+    """Set hl.q to include virsh/cockpit terms so Solr highlights surface VM tool mentions."""
+    params["hl.q"] = f"{cleaned} virsh cockpit deprecated virt-manager"
+
+
 def _build_search_queries(
     cleaned: str,
     original_query: str,
@@ -66,6 +102,7 @@ def _build_search_queries(
     max_results: int,
     vm_intent: bool,
     release_date_intent: bool,
+    eus_intent: bool,
 ) -> tuple[dict, dict, dict]:
     """Build the three Solr query parameter dicts for search_documentation.
 
@@ -76,11 +113,9 @@ def _build_search_queries(
     doc_filters = ["documentKind:(documentation OR access-drupal10-node-type-page)", product_fq, eol_fq]
     sol_filters = ["documentKind:(solution OR article)", product_fq, eol_fq]
 
-    if version:
-        version_boost = f"documentation_version:{version}^10"
-    else:
-        # Default: boost RHEL 9/10 docs so they outrank older versions
-        version_boost = "documentation_version:10^10 documentation_version:9^8"
+    version_boost = (
+        f"documentation_version:{version}^10" if version else "documentation_version:10^10 documentation_version:9^8"
+    )
 
     extra_bq = (
         'title:(cockpit OR virtualization OR "virt-manager")^15 main_content:(cockpit OR "cockpit-machines")^5'
@@ -101,27 +136,25 @@ def _build_search_queries(
         "bq": doc_bq,
         "rq": "{!rerank reRankQuery=$rqq reRankDocs=200 reRankWeight=3}",
         "rqq": f'title:"{rqq_safe}"^10 main_content:"{rqq_safe}"^5',
-        "hl.snippets": "10",
+        "hl.snippets": "15",
     }
 
-    sol_bq = 'main_content:(deprecated OR removed OR unsupported OR "end of life" OR "no longer")^5'
-    if vm_intent and extra_bq:
-        sol_bq = f"{sol_bq} {extra_bq}"
-    if release_date_intent:
-        sol_bq = f'{sol_bq} allTitle:"release dates"^30 title:"release dates"^20'
+    sol_bq, sol_rqq, sol_rq_weight = _build_sol_boosts(extra_bq, rqq_safe, vm_intent, release_date_intent, eus_intent)
     sol_params = {
         "q": cleaned,
         "fq": sol_filters,
         "fl": "id,allTitle,heading_h1,title,view_uri,product,documentKind,lastModifiedDate,score",
-        "rows": max_results + 2,
+        "rows": max_results + 5,
+        "hl.snippets": "10",
         "bf": "recip(ms(NOW,lastModifiedDate),3.16e-11,1,1)^0.3",
         "bq": sol_bq,
-        "rq": "{!rerank reRankQuery=$rqq reRankDocs=200 reRankWeight=2}",
-        "rqq": (
-            f'title:"{rqq_safe}"^10 '
-            f'main_content:(deprecated OR removed OR unsupported OR "no longer" OR "{rqq_safe}")^3'
-        ),
+        "rq": "{!rerank reRankQuery=$rqq reRankDocs=200 reRankWeight=" + str(sol_rq_weight) + "}",
+        "rqq": sol_rqq,
     }
+
+    if vm_intent:
+        _apply_vm_highlight_override(doc_params, cleaned)
+        _apply_vm_highlight_override(sol_params, cleaned)
 
     dep_bq = (
         'allTitle:(deprecated OR removed OR "no longer" OR "end of life")^20 '
@@ -140,22 +173,29 @@ def _build_search_queries(
     return doc_params, sol_params, dep_params
 
 
-async def _format_docs(docs: list[dict], data: dict, query: str) -> list[tuple[str, int]]:
+async def _format_docs(docs: list[dict], data: dict, query: str, max_content: int = 0) -> list[tuple[str, int]]:
     """Format a list of Solr docs into (text, sort_key) pairs."""
-    return list(await asyncio.gather(*[_format_result(d, data, include_content=True, query=query) for d in docs]))
+    kwargs: dict = {"include_content": True, "query": query}
+    if max_content:
+        kwargs["max_content"] = max_content
+    return list(await asyncio.gather(*[_format_result(d, data, **kwargs) for d in docs]))
 
 
 async def _collect_dep_pairs(
     dep_data: dict,
     seen_uris: set,
     query: str,
+    max_content: int = 0,
 ) -> list[tuple[str, int]]:
     """Format dep docs not already seen in doc/sol results."""
+    kwargs: dict = {"include_content": True, "query": query}
+    if max_content:
+        kwargs["max_content"] = max_content
     pairs: list[tuple[str, int]] = []
     for d in dep_data["response"]["docs"]:
         uri = doc_uri(d)
         if uri not in seen_uris:
-            pairs.append(await _format_result(d, dep_data, include_content=True, query=query))
+            pairs.append(await _format_result(d, dep_data, **kwargs))
             seen_uris.add(uri)
     return pairs
 
@@ -170,12 +210,13 @@ async def _deduplicate_and_sort_results(
 
     Returns (doc_results, sol_results, has_deprecation).
     """
+    _SOL_CONTENT_CAP = 2_500
     doc_pairs = await _format_docs(doc_data["response"]["docs"], doc_data, query)
-    sol_pairs = await _format_docs(sol_data["response"]["docs"], sol_data, query)
+    sol_pairs = await _format_docs(sol_data["response"]["docs"], sol_data, query, max_content=_SOL_CONTENT_CAP)
 
     seen_uris = {doc_uri(d) for d in doc_data["response"]["docs"]}
     seen_uris |= {doc_uri(d) for d in sol_data["response"]["docs"]}
-    dep_pairs = await _collect_dep_pairs(dep_data, seen_uris, query)
+    dep_pairs = await _collect_dep_pairs(dep_data, seen_uris, query, max_content=_SOL_CONTENT_CAP)
 
     sol_pairs.extend(dep_pairs)
     sol_pairs.sort(key=lambda pair: pair[1])
@@ -214,7 +255,9 @@ def _assemble_search_output(
         )
     if doc_results:
         doc_text = _select_within_budget(doc_results, doc_budget, query)
+        doc_used = len(doc_text)
         output_parts.append(f"**Documentation** ({len(doc_results)} results):\n\n" + doc_text)
+        sol_budget += doc_budget - doc_used
     if sol_results:
         sol_text = _select_within_budget(sol_results, sol_budget, query)
         output_parts.append(f"**Solutions & Articles** ({len(sol_results)} results):\n\n" + sol_text)
@@ -288,9 +331,10 @@ async def search_documentation(
         query_lower = query.lower()
         vm_intent = _detect_vm_intent(query_lower)
         release_date_intent = _detect_release_date_intent(query_lower)
+        eus_intent = _detect_eus_intent(query_lower)
         cleaned = _clean_query(query)
         doc_params, sol_params, dep_params = _build_search_queries(
-            cleaned, query, product, version, max_results, vm_intent, release_date_intent
+            cleaned, query, product, version, max_results, vm_intent, release_date_intent, eus_intent
         )
         doc_data, sol_data, dep_data = await asyncio.gather(
             _solr_query(doc_params, client=app.http_client, solr_endpoint=app.solr_endpoint),
