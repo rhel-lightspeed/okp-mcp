@@ -7,7 +7,7 @@ import httpx
 from fastmcp import Context
 
 from .config import logger
-from .content import doc_uri, strip_boilerplate
+from .content import _select_within_budget, doc_uri, strip_boilerplate, truncate_content
 from .formatting import SORT_DEPRECATION, _format_result
 from .server import get_app_context, mcp
 from .solr import _clean_query, _extract_relevant_section, _get_highlights, _solr_query
@@ -58,6 +58,41 @@ def _detect_release_date_intent(query_lower: str) -> bool:
     return any(kw in query_lower for kw in ["release date", "released", "when was", "general availability"])
 
 
+def _detect_eus_intent(query_lower: str) -> bool:
+    """Return True if the lowercased query asks about EUS or Extended Update Support."""
+    return "eus" in query_lower or "extended update support" in query_lower
+
+
+def _build_sol_boosts(
+    extra_bq: str,
+    rqq_safe: str,
+    vm_intent: bool,
+    release_date_intent: bool,
+    eus_intent: bool,
+) -> tuple[str, str, int]:
+    """Build sol_bq, sol_rqq, and sol_rq_weight for the solutions/articles query."""
+    sol_bq = 'main_content:(deprecated OR removed OR unsupported OR "end of life" OR "no longer")^5'
+    if vm_intent and extra_bq:
+        sol_bq = f"{sol_bq} {extra_bq}"
+    if release_date_intent:
+        sol_bq = (
+            f'{sol_bq} title:"Enterprise Linux Release Dates"^200 allTitle:"release dates"^30 title:"release dates"^20'
+        )
+    if eus_intent:
+        sol_bq = f'{sol_bq} title:"Enhanced EUS"^100 title:"EUS FAQ"^80'
+    sol_rq_weight = 5 if release_date_intent else 2
+    sol_rqq = (
+        f'title:"{rqq_safe}"^10 main_content:(deprecated OR removed OR unsupported OR "no longer" OR "{rqq_safe}")^3'
+    )
+    if release_date_intent:
+        sol_rqq = f'allTitle:"release dates"^50 {sol_rqq}'
+    return sol_bq, sol_rqq, sol_rq_weight
+
+
+_VM_HIGHLIGHT_TERMS = "virsh cockpit deprecated virt-manager"
+_EUS_HIGHLIGHT_TERMS = '"Enhanced EUS" "48 months" "Enhanced Extended Update Support"'
+
+
 def _build_search_queries(
     cleaned: str,
     original_query: str,
@@ -66,6 +101,7 @@ def _build_search_queries(
     max_results: int,
     vm_intent: bool,
     release_date_intent: bool,
+    eus_intent: bool,
 ) -> tuple[dict, dict, dict]:
     """Build the three Solr query parameter dicts for search_documentation.
 
@@ -76,11 +112,9 @@ def _build_search_queries(
     doc_filters = ["documentKind:(documentation OR access-drupal10-node-type-page)", product_fq, eol_fq]
     sol_filters = ["documentKind:(solution OR article)", product_fq, eol_fq]
 
-    if version:
-        version_boost = f"documentation_version:{version}^10"
-    else:
-        # Default: boost RHEL 9/10 docs so they outrank older versions
-        version_boost = "documentation_version:10^10 documentation_version:9^8"
+    version_boost = (
+        f"documentation_version:{version}^10" if version else "documentation_version:10^10 documentation_version:9^8"
+    )
 
     extra_bq = (
         'title:(cockpit OR virtualization OR "virt-manager")^15 main_content:(cockpit OR "cockpit-machines")^5'
@@ -94,35 +128,34 @@ def _build_search_queries(
         "q": cleaned,
         "fq": doc_filters,
         "fl": (
-            "id,allTitle,heading_h1,title,view_uri,product,"
-            "documentation_version,documentKind,main_content,lastModifiedDate,score"
+            "id,allTitle,heading_h1,title,view_uri,product,documentation_version,documentKind,lastModifiedDate,score"
         ),
         "rows": max_results,
         "bf": "recip(ms(NOW,lastModifiedDate),3.16e-11,1,1)^0.3",
         "bq": doc_bq,
         "rq": "{!rerank reRankQuery=$rqq reRankDocs=200 reRankWeight=3}",
         "rqq": f'title:"{rqq_safe}"^10 main_content:"{rqq_safe}"^5',
-        "hl.snippets": "10",
+        "hl.snippets": "15",
     }
 
-    sol_bq = 'main_content:(deprecated OR removed OR unsupported OR "end of life" OR "no longer")^5'
-    if vm_intent and extra_bq:
-        sol_bq = f"{sol_bq} {extra_bq}"
-    if release_date_intent:
-        sol_bq = f'{sol_bq} allTitle:"release dates"^30 title:"release dates"^20'
+    sol_bq, sol_rqq, sol_rq_weight = _build_sol_boosts(extra_bq, rqq_safe, vm_intent, release_date_intent, eus_intent)
     sol_params = {
         "q": cleaned,
         "fq": sol_filters,
-        "fl": "id,allTitle,heading_h1,title,view_uri,product,documentKind,main_content,lastModifiedDate,score",
-        "rows": max_results + 2,
+        "fl": "id,allTitle,heading_h1,title,view_uri,product,documentKind,lastModifiedDate,score",
+        "rows": max_results + 5,
+        "hl.snippets": "10",
         "bf": "recip(ms(NOW,lastModifiedDate),3.16e-11,1,1)^0.3",
         "bq": sol_bq,
-        "rq": "{!rerank reRankQuery=$rqq reRankDocs=200 reRankWeight=2}",
-        "rqq": (
-            f'title:"{rqq_safe}"^10 '
-            f'main_content:(deprecated OR removed OR unsupported OR "no longer" OR "{rqq_safe}")^3'
-        ),
+        "rq": "{!rerank reRankQuery=$rqq reRankDocs=200 reRankWeight=" + str(sol_rq_weight) + "}",
+        "rqq": sol_rqq,
     }
+
+    if vm_intent:
+        doc_params["hl.q"] = f"{cleaned} {_VM_HIGHLIGHT_TERMS}"
+        sol_params["hl.q"] = f"{cleaned} {_VM_HIGHLIGHT_TERMS}"
+    if eus_intent:
+        sol_params["hl.q"] = f"{cleaned} {_EUS_HIGHLIGHT_TERMS}"
 
     dep_bq = (
         'allTitle:(deprecated OR removed OR "no longer" OR "end of life")^20 '
@@ -133,7 +166,7 @@ def _build_search_queries(
     dep_params = {
         "q": f"{cleaned} deprecated removed",
         "fq": ["documentKind:(solution OR article OR documentation)", product_fq, eol_fq],
-        "fl": "id,allTitle,heading_h1,title,view_uri,product,documentKind,main_content,lastModifiedDate,score",
+        "fl": "id,allTitle,heading_h1,title,view_uri,product,documentKind,lastModifiedDate,score",
         "rows": 3,
         "bq": dep_bq,
     }
@@ -141,22 +174,29 @@ def _build_search_queries(
     return doc_params, sol_params, dep_params
 
 
-async def _format_docs(docs: list[dict], data: dict, query: str) -> list[tuple[str, int]]:
+async def _format_docs(docs: list[dict], data: dict, query: str, max_content: int = 0) -> list[tuple[str, int]]:
     """Format a list of Solr docs into (text, sort_key) pairs."""
-    return list(await asyncio.gather(*[_format_result(d, data, include_content=True, query=query) for d in docs]))
+    kwargs: dict = {"include_content": True, "query": query}
+    if max_content:
+        kwargs["max_content"] = max_content
+    return list(await asyncio.gather(*[_format_result(d, data, **kwargs) for d in docs]))
 
 
 async def _collect_dep_pairs(
     dep_data: dict,
     seen_uris: set,
     query: str,
+    max_content: int = 0,
 ) -> list[tuple[str, int]]:
     """Format dep docs not already seen in doc/sol results."""
+    kwargs: dict = {"include_content": True, "query": query}
+    if max_content:
+        kwargs["max_content"] = max_content
     pairs: list[tuple[str, int]] = []
     for d in dep_data["response"]["docs"]:
         uri = doc_uri(d)
         if uri not in seen_uris:
-            pairs.append(await _format_result(d, dep_data, include_content=True, query=query))
+            pairs.append(await _format_result(d, dep_data, **kwargs))
             seen_uris.add(uri)
     return pairs
 
@@ -171,12 +211,13 @@ async def _deduplicate_and_sort_results(
 
     Returns (doc_results, sol_results, has_deprecation).
     """
+    _SOL_CONTENT_CAP = 2_500
     doc_pairs = await _format_docs(doc_data["response"]["docs"], doc_data, query)
-    sol_pairs = await _format_docs(sol_data["response"]["docs"], sol_data, query)
+    sol_pairs = await _format_docs(sol_data["response"]["docs"], sol_data, query, max_content=_SOL_CONTENT_CAP)
 
     seen_uris = {doc_uri(d) for d in doc_data["response"]["docs"]}
     seen_uris |= {doc_uri(d) for d in sol_data["response"]["docs"]}
-    dep_pairs = await _collect_dep_pairs(dep_data, seen_uris, query)
+    dep_pairs = await _collect_dep_pairs(dep_data, seen_uris, query, max_content=_SOL_CONTENT_CAP)
 
     sol_pairs.extend(dep_pairs)
     sol_pairs.sort(key=lambda pair: pair[1])
@@ -190,14 +231,21 @@ def _assemble_search_output(
     sol_results: list[str],
     has_deprecation: bool,
     query: str,
+    max_chars: int,
 ) -> str:
     """Assemble the final output string from categorized search results.
+
+    Applies a character budget: documentation gets 60%, solutions/articles get 40%.
+    Results are already priority-sorted, _select_within_budget drops tail entries.
 
     Returns a formatted string with documentation and solution sections,
     or an empty-results message when both lists are empty.
     """
     if not doc_results and not sol_results:
         return f"No results found for: {query}"
+
+    doc_budget = int(max_chars * 0.6)
+    sol_budget = max_chars - doc_budget
 
     output_parts = []
     if has_deprecation:
@@ -207,11 +255,13 @@ def _assemble_search_output(
             "over workarounds for other products."
         )
     if doc_results:
-        output_parts.append(f"**Documentation** ({len(doc_results)} results):\n\n" + "\n\n---\n\n".join(doc_results))
+        doc_text = _select_within_budget(doc_results, doc_budget, query)
+        doc_used = len(doc_text)
+        output_parts.append(f"**Documentation** ({len(doc_results)} results):\n\n" + doc_text)
+        sol_budget += doc_budget - doc_used
     if sol_results:
-        output_parts.append(
-            f"**Solutions & Articles** ({len(sol_results)} results):\n\n" + "\n\n---\n\n".join(sol_results)
-        )
+        sol_text = _select_within_budget(sol_results, sol_budget, query)
+        output_parts.append(f"**Solutions & Articles** ({len(sol_results)} results):\n\n" + sol_text)
 
     return "\n\n===\n\n".join(output_parts)
 
@@ -282,9 +332,10 @@ async def search_documentation(
         query_lower = query.lower()
         vm_intent = _detect_vm_intent(query_lower)
         release_date_intent = _detect_release_date_intent(query_lower)
+        eus_intent = _detect_eus_intent(query_lower)
         cleaned = _clean_query(query)
         doc_params, sol_params, dep_params = _build_search_queries(
-            cleaned, query, product, version, max_results, vm_intent, release_date_intent
+            cleaned, query, product, version, max_results, vm_intent, release_date_intent, eus_intent
         )
         doc_data, sol_data, dep_data = await asyncio.gather(
             _solr_query(doc_params, client=app.http_client, solr_endpoint=app.solr_endpoint),
@@ -294,7 +345,8 @@ async def search_documentation(
         doc_results, sol_results, has_deprecation = await _deduplicate_and_sort_results(
             doc_data, sol_data, dep_data, query
         )
-        return _assemble_search_output(doc_results, sol_results, has_deprecation, query)
+        result = _assemble_search_output(doc_results, sol_results, has_deprecation, query, app.max_response_chars)
+        return truncate_content(result, app.max_response_chars)
     except httpx.TimeoutException:
         logger.warning("Search timed out for query: %r", query)
         return "The search timed out. Please try again with a simpler query."
@@ -548,11 +600,12 @@ async def _fetch_document_raw(doc_id: str, client: httpx.AsyncClient | None = No
             await client.aclose()
 
 
-async def _format_document(doc: dict, data: dict, doc_id: str, query: str) -> str:
+async def _format_document(doc: dict, data: dict, doc_id: str, query: str, max_chars: int) -> str:
     """Format a fetched document into a readable string.
 
     Renders title, type, product/version, URL, synopsis/summary/CVE details,
     and content (highlights if available, otherwise extracted relevant section).
+    Truncates final output to max_chars as a safety net.
     """
     view_uri = doc.get("view_uri", "")
     result = f"**{doc.get('allTitle', 'Untitled')}**"
@@ -576,10 +629,10 @@ async def _format_document(doc: dict, data: dict, doc_id: str, query: str) -> st
             if highlights:
                 result += f"\n\nContent:\n{highlights}"
             else:
-                result += f"\n\nContent:\n{_extract_relevant_section(content, query)}"
+                result += f"\n\nContent:\n{_extract_relevant_section(content, query, max_sections=8)}"
         else:
-            result += f"\n\nContent:\n{_extract_relevant_section(content, '')}"
-    return result
+            result += f"\n\nContent:\n{_extract_relevant_section(content, '', max_sections=8)}"
+    return truncate_content(result, max_chars)
 
 
 @mcp.tool
@@ -603,7 +656,7 @@ async def get_document(ctx: Context, doc_id: str, query: str = "") -> str:
         if not docs:
             return f"Document not found: {doc_id}"
 
-        return await _format_document(docs[0], data, doc_id, query)
+        return await _format_document(docs[0], data, doc_id, query, app.max_response_chars)
     except httpx.TimeoutException:
         logger.warning("Search timed out for query: %r", query)
         return "The search timed out. Please try again with a simpler query."
