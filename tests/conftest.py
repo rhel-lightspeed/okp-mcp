@@ -46,6 +46,35 @@ def solr_mock(sample_solr_response):
         yield route
 
 
+@pytest.fixture
+def rag_chunk_response():
+    """Realistic portal-rag chunk response shared by lexical, hybrid, and semantic tests."""
+    return {
+        "response": {
+            "numFound": 1,
+            "docs": [
+                {
+                    "doc_id": "/security/cve/CVE-2024-42225_chunk_2",
+                    "parent_id": "/security/cve/CVE-2024-42225",
+                    "title": "CVE-2024-42225 - Red Hat Customer Portal",
+                    "chunk": "A potential flaw was found...",
+                    "headings": "CVE-2024-42225,Description",
+                    "chunk_index": 2,
+                    "num_tokens": 49,
+                    "is_chunk": True,
+                }
+            ],
+        }
+    }
+
+
+@pytest.fixture
+async def rag_client():
+    """Async httpx client with automatic cleanup for RAG tests."""
+    async with httpx.AsyncClient() as client:
+        yield client
+
+
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
     """Deselect functional tests unless explicitly requested with -m functional."""
     if "functional" not in (config.getoption("-m") or ""):
