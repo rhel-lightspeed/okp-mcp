@@ -131,3 +131,8 @@ def test_server_config_assignment_propagates_to_lifespan():
         assert server_module._server_config is cfg
     finally:
         server_module._server_config = original
+
+
+def test_mcp_masks_error_details():
+    """FastMCP instance hides internal error details for unhandled exceptions."""
+    assert mcp._mask_error_details is True  # type: ignore[attr-defined]

@@ -60,4 +60,5 @@ mcp = FastMCP(
     lifespan=_app_lifespan,
     version=__version__,
     website_url="https://github.com/rhel-lightspeed/okp-mcp",
+    mask_error_details=True,  # Mask internal exception details from MCP clients for unhandled errors
 )
