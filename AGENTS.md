@@ -78,6 +78,12 @@ src/okp_mcp/
   solr.py        # Solr query builder, BM25 paragraph extraction, RHV filtering
   content.py     # Boilerplate stripping, content truncation, text cleaning
   formatting.py  # Result annotation, deprecation/replacement detection, sort keys
+  rag/           # Query functions for portal-rag Solr core
+    __init__.py  # re-exports: lexical_search, hybrid_search, semantic_search
+    common.py    # lightweight Solr query runner, EMPTY_RAG_RESPONSE constant
+    lexical.py   # lexical_search() via /select (basic eDisMax)
+    hybrid.py    # hybrid_search() via /hybrid-search (server-side boosted eDisMax)
+    semantic.py  # semantic_search() stub via /semantic-search (KNN, needs embedding model)
 tests/
   conftest.py          # shared fixtures (solr mocks, sample responses) + functional marker deselection
   functional_cases.py  # FunctionalCase dataclass + parametrized RSPEED test data
@@ -107,6 +113,8 @@ INCORRECT_ANSWER_LOOP.md  # step-by-step workflow for turning RSPEED "incorrect 
 | Deploy to OpenShift | `openshift/okp-mcp.yml` | Template with params: IMAGE, IMAGE_TAG, REPLICAS, etc. |
 | Solr schema reference | `docs/OKP_RAG_EXPLORATION.md` | RAG container cores, vector embeddings, schema comparison |
 | Legacy Solr reference | `docs/SOLR_EXPLORATION.md` | Historical: original redhat-okp container schema map |
+| Add a RAG query function | `src/okp_mcp/rag/` | One file per search type; `common.py` for the shared query runner |
+| Change RAG query execution | `src/okp_mcp/rag/common.py` | `rag_query()` handles HTTP, JSON parsing, and error handling |
 
 ## Boot Sequence
 
@@ -129,6 +137,10 @@ tools.py    → config, server, solr, content, formatting
 formatting.py → content, solr
 solr.py     → config
 content.py  → (standalone)
+rag/common.py   → config (logger only)
+rag/lexical.py  → rag.common
+rag/hybrid.py   → rag.common
+rag/semantic.py → rag.common
 ```
 
 No circular imports. `content.py` has zero internal dependencies.
