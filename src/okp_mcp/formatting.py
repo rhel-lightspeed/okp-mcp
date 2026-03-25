@@ -116,7 +116,30 @@ def _determine_sort_key(
     return sort_key
 
 
-def _annotate_result(title: str, highlights: str, content: str, query: str = "") -> tuple[list[str], str, int]:
+def _scan_eol_product(text_lower: str, query: str, title: str, content: str, product: str) -> tuple[str, bool]:
+    """Detect EOL product mentions, respecting the authoritative Solr product field.
+
+    Returns (eol_product_label, is_substantive).  When *product* is set and
+    does not match any EOL name the scan is skipped — the product field is
+    the ground-truth for what a document is about.  When *product* itself IS
+    an EOL product the substantive check is skipped (always demote).
+    """
+    if product and not any(pn.lower() in product.lower() for pn, _ in EOL_PRODUCT_MENTIONS):
+        return "", False
+
+    for product_name, short in EOL_PRODUCT_MENTIONS:
+        if product_name.lower() not in text_lower:
+            continue
+        label = f"{product_name} ({short})"
+        substantive = _is_substantive_eol_mention(query, product_name, title, content) if not product else False
+        return label, substantive
+
+    return "", False
+
+
+def _annotate_result(
+    title: str, highlights: str, content: str, query: str = "", product: str = ""
+) -> tuple[list[str], str, int]:
     """Scan title and content for deprecation, replacement, and EOL-product signals.
 
     Returns (annotations, applicability, sort_key) where sort_key controls
@@ -127,16 +150,8 @@ def _annotate_result(title: str, highlights: str, content: str, query: str = "")
     text = f"{title} {highlights} {content}"
     is_deprecated = bool(_DEPRECATION_RE.search(text))
     has_replacement = bool(_REPLACEMENT_RE.search(text))
-    text_lower = text.lower()
-    eol_product = ""
-    is_substantive = False
-    for product_name, short in EOL_PRODUCT_MENTIONS:
-        if product_name.lower() not in text_lower:
-            continue
 
-        eol_product = f"{product_name} ({short})"
-        is_substantive = _is_substantive_eol_mention(query, product_name, title, content)
-        break
+    eol_product, is_substantive = _scan_eol_product(text.lower(), query, title, content, product)
 
     if has_replacement:
         annotations.append("\u2192 Recommended replacement mentioned")
@@ -243,7 +258,9 @@ async def _format_result(
     highlights = _get_highlights(data, doc_id, view_uri, query=query)
     content_text = await _resolve_content_text(highlights, include_content, doc, query)
 
-    annotations, applicability, sort_key = _annotate_result(title, highlights, content_text, query)
+    annotations, applicability, sort_key = _annotate_result(
+        title, highlights, content_text, query, product=doc.get("product", "")
+    )
     doc_kind = doc.get("documentKind", "")
     kind_label = {"solution": "Solution", "article": "Article", "documentation": "Documentation"}.get(
         doc_kind, doc_kind.replace("access-drupal10-node-type-page", "Documentation")
