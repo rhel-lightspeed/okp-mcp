@@ -81,30 +81,60 @@ async def _solr_query(params: dict, client: httpx.AsyncClient | None = None, *, 
     if client is None:
         client = httpx.AsyncClient(timeout=30.0)
     base_params = {
+        # Response format: return results as JSON.
         "wt": "json",
+        # Use Extended DisMax, which supports field boosting, phrase boosting, and minimum-match.
         "defType": "edismax",
+        # Query fields with boosts: title matches matter most (^5), headings and synopses help,
+        # and body content contributes at lower weight.
         "qf": "title^5 main_content heading_h1^3 heading_h2 portal_synopsis allTitle^3 content^2 all_content^1",
+        # Phrase boost: reward documents where all query terms appear as an exact phrase.
         "pf": "main_content^5 title^8",
+        # Phrase slop for pf: terms may be up to 3 positions apart and still earn the phrase boost.
         "ps": "3",
+        # Bigram phrase boost: reward docs where adjacent pairs of query terms appear nearby.
         "pf2": "main_content^3 title^5",
+        # Bigram slop: term pairs may be up to 2 positions apart.
         "ps2": "2",
+        # Trigram phrase boost: reward docs where consecutive triples of query terms appear nearby.
         "pf3": "main_content^1 title^2",
+        # Trigram slop: term triples may be up to 5 positions apart.
         "ps3": "5",
+        # --- Highlighting (returns relevant snippets from matched documents) ---
+        # Enable highlighting.
         "hl": "on",
+        # Generate highlights from the main_content field only.
         "hl.fl": "main_content",
+        # Return up to 6 highlighted snippets per document.
         "hl.snippets": "6",
+        # Target snippet size in characters (extended to sentence boundaries, see fragsizeIsMinimum).
         "hl.fragsize": "600",
+        # Use the Unified Highlighter (fastest, most accurate, supports all options below).
         "hl.method": "unified",
+        # Analyze up to 512K characters per document for highlighting (covers long RHEL docs).
         "hl.maxAnalyzedChars": "512000",
+        # Break fragments on sentence boundaries rather than mid-sentence.
         "hl.bs.type": "SENTENCE",
+        # Use English rules for sentence-boundary detection.
         "hl.bs.language": "en",
+        # Treat fragsize as a minimum: snippets grow to the next sentence boundary instead of cutting off.
         "hl.fragsizeIsMinimum": "true",
+        # If no query terms match in a document, return a summary from the start of the field.
         "hl.defaultSummary": "true",
+        # Use BM25 term weighting to score highlighted passages instead of simple term frequency.
         "hl.weightMatches": "true",
+        # Fragment alignment: position each snippet so the match starts roughly 1/3 in from the left,
+        # giving context before and after.
         "hl.fragAlignRatio": "0.33",
+        # BM25 k1 (term saturation): higher values make repeated terms contribute more to the score.
         "hl.score.k1": "1.0",
+        # BM25 b (length normalization): 0.65 moderately penalizes very long documents.
         "hl.score.b": "0.65",
+        # BM25 pivot: documents around 200 characters get neutral length treatment;
+        # shorter docs score slightly higher, longer ones slightly lower.
         "hl.score.pivot": "200",
+        # Minimum match: for 1-2 terms all must match; for 5+ terms at least 75% must match.
+        # Keeps short queries precise while allowing longer queries some flexibility.
         "mm": "2<-1 5<75%",
     }
     base_params.update(params)
