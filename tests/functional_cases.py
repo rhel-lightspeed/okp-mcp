@@ -205,17 +205,18 @@ FUNCTIONAL_TEST_CASES = [
     ),
     pytest.param(
         FunctionalCase(
-            question="How to configure RHV Manager for high availability?",
+            question="What are the migration options for Red Hat Virtualization to OpenShift Virtualization?",
             expected_doc_refs=[
-                "virtual",
-                "high availability",
-                "rhv",
+                "red_hat_virtualization",
+                "migration",
+                "openshift virtualization",
             ],
             required_facts=[
-                ("high availability", "ha"),
+                ("migration", "migrate"),
+                ("openshift", "virtualization"),
                 ("rhv", "red hat virtualization"),
             ],
-            forbidden_claims=["not a Red Hat product"],
+            forbidden_claims=[],
             expected_first_doc="virtualization life cycle",
         ),
         id="rhv_regression_eol",

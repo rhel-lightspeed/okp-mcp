@@ -9,6 +9,8 @@ EOL_PRODUCT_MENTIONS = [
     ("Red Hat Virtualization", "RHV"),
     ("RHEV", "RHV"),
     ("Red Hat Hyperconverged Infrastructure", "RHHI"),
+    ("Red Hat Fuse", "Fuse"),
+    ("Red Hat Gluster Storage", "Gluster"),
 ]
 
 _DEPRECATION_RE = re.compile(
@@ -35,26 +37,86 @@ _REPLACEMENT_RE = re.compile(
 SORT_REPLACEMENT = -1
 SORT_DEPRECATION = 0
 SORT_NORMAL = 1
+SORT_EOL_SUBSTANTIVE = 1
 SORT_EOL_PRODUCT = 2
 
 
-def _determine_sort_key(has_replacement: bool, is_deprecated: bool, eol_product: str) -> int:
-    """Determine result sort key with priority: deprecated > EOL product > replacement > normal.
+def _is_substantive_eol_mention(query: str, product_name: str, title: str, content: str) -> bool:
+    """Check if this is a substantive mention of an EOL product worthy of top ranking.
 
-    When multiple flags are true, last-writer-wins: SORT_DEPRECATION > SORT_EOL_PRODUCT > SORT_REPLACEMENT.
-    If eol_product is set, always returns SORT_EOL_PRODUCT (overrides replacement flag).
+    Returns True if the user explicitly asked about the EOL product and the content
+    provides substantial information about it, not just incidental mentions.
+    """
+    query_lower = query.lower()
+    product_lower = product_name.lower()
+    title_lower = title.lower()
+    content_lower = content.lower()
+
+    product_in_query = product_lower in query_lower
+
+    product_aliases = {
+        "red hat virtualization": ["rhv", "virtualization"],
+        "red hat fuse": ["fuse", "integration"],
+        "red hat gluster storage": ["gluster", "storage"],
+    }
+
+    aliases = product_aliases.get(product_lower, [])
+    alias_in_query = any(alias in query_lower for alias in aliases)
+
+    if not (product_in_query or alias_in_query):
+        return False
+
+    product_primary_in_title = product_lower in title_lower or any(alias in title_lower for alias in aliases)
+
+    if not product_primary_in_title:
+        return False
+
+    migration_indicators = [
+        "migrate",
+        "migration",
+        "replacement",
+        "alternative",
+        "superseded",
+        "successor",
+        "end of life",
+        "eol",
+    ]
+    is_migration_content = any(indicator in content_lower for indicator in migration_indicators)
+
+    configuration_indicators = [
+        "configure",
+        "configuration",
+        "install",
+        "setup",
+        "deploy",
+        "administration",
+        "guide",
+        "tutorial",
+        "how to",
+    ]
+    is_configuration_content = any(indicator in content_lower for indicator in configuration_indicators)
+
+    return is_migration_content or is_configuration_content
+
+
+def _determine_sort_key(
+    has_replacement: bool, is_deprecated: bool, eol_product: str, is_substantive: bool = False
+) -> int:
+    """Determine result sort key: deprecated > substantive EOL > EOL product > replacement > normal.
+
+    If eol_product is set and is_substantive is True, returns SORT_EOL_SUBSTANTIVE (ranked with normal content).
     """
     sort_key = SORT_NORMAL
     if has_replacement and not eol_product:
         sort_key = SORT_REPLACEMENT
     if eol_product:
-        sort_key = SORT_EOL_PRODUCT
+        sort_key = SORT_EOL_SUBSTANTIVE if is_substantive else SORT_EOL_PRODUCT
     if is_deprecated and not eol_product:
         sort_key = SORT_DEPRECATION
     return sort_key
 
 
-def _annotate_result(title: str, highlights: str, content: str) -> tuple[list[str], str, int]:
+def _annotate_result(title: str, highlights: str, content: str, query: str = "") -> tuple[list[str], str, int]:
     """Scan title and content for deprecation, replacement, and EOL-product signals.
 
     Returns (annotations, applicability, sort_key) where sort_key controls
@@ -65,26 +127,32 @@ def _annotate_result(title: str, highlights: str, content: str) -> tuple[list[st
     text = f"{title} {highlights} {content}"
     is_deprecated = bool(_DEPRECATION_RE.search(text))
     has_replacement = bool(_REPLACEMENT_RE.search(text))
+    text_lower = text.lower()
     eol_product = ""
+    is_substantive = False
     for product_name, short in EOL_PRODUCT_MENTIONS:
-        if product_name.lower() in text.lower():
-            eol_product = f"{product_name} ({short})"
-            break
+        if product_name.lower() not in text_lower:
+            continue
+
+        eol_product = f"{product_name} ({short})"
+        is_substantive = _is_substantive_eol_mention(query, product_name, title, content)
+        break
 
     if has_replacement:
         annotations.append("\u2192 Recommended replacement mentioned")
     if is_deprecated:
         annotations.append("\u26a0\ufe0f Deprecation/Removal Notice")
     if eol_product:
-        annotations.append(
-            f"\u26a0\ufe0f RHV-only content below \u2014 not applicable to standard RHEL KVM (product: {eol_product})"
-        )
+        if is_substantive:
+            annotations.append(f"\u26a0\ufe0f EOL product content: {eol_product}")
+        else:
+            annotations.append(f"\u26a0\ufe0f EOL product \u2014 incidental mention (product: {eol_product})")
 
     applicability = "RHEL"
     if eol_product:
         applicability = f"{eol_product} only"
 
-    sort_key = _determine_sort_key(has_replacement, is_deprecated, eol_product)
+    sort_key = _determine_sort_key(has_replacement, is_deprecated, eol_product, is_substantive)
     return annotations, applicability, sort_key
 
 
@@ -160,12 +228,22 @@ async def _format_result(
     """Format a single Solr document with applicability labels and annotations."""
     doc_id = doc.get("id", "")
     view_uri = doc.get("view_uri", "")
-    title = doc.get("allTitle") or doc.get("heading_h1") or doc.get("title", "").split("|")[0].strip() or "Untitled"
+    all_title = doc.get("allTitle")
+    heading_h1 = doc.get("heading_h1")
+    doc_title = doc.get("title", "")
+    if all_title:
+        title = all_title
+    elif heading_h1:
+        title = heading_h1[0] if isinstance(heading_h1, list) else heading_h1
+    elif doc_title:
+        title = doc_title.split("|")[0].strip()
+    else:
+        title = "Untitled"
     url_path = doc_uri(doc)
     highlights = _get_highlights(data, doc_id, view_uri, query=query)
     content_text = await _resolve_content_text(highlights, include_content, doc, query)
 
-    annotations, applicability, sort_key = _annotate_result(title, highlights, content_text)
+    annotations, applicability, sort_key = _annotate_result(title, highlights, content_text, query)
     doc_kind = doc.get("documentKind", "")
     kind_label = {"solution": "Solution", "article": "Article", "documentation": "Documentation"}.get(
         doc_kind, doc_kind.replace("access-drupal10-node-type-page", "Documentation")
