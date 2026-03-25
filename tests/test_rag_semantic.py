@@ -1,10 +1,12 @@
 """Tests for semantic (KNN vector) search against portal-rag."""
 
+from unittest.mock import AsyncMock
+
 import httpx
 import pytest
 import respx
 
-from okp_mcp.rag.semantic import semantic_search
+from okp_mcp.rag.semantic import semantic_search, semantic_text_search
 
 SOLR_URL = "http://localhost:8983"
 SEMANTIC_ENDPOINT = f"{SOLR_URL}/solr/portal-rag/semantic-search"
@@ -97,19 +99,12 @@ async def test_semantic_search_returns_raw_dict_from_rag_query(rag_client):
     ids=["dim-128", "dim-256", "dim-512"],
 )
 async def test_semantic_search_raises_value_error_on_wrong_dimension(rag_client, dimension, expected_in_error):
-    """semantic_search raises ValueError when vector length is not 384."""
+    """semantic_search raises ValueError mentioning both actual and expected (384) dimensions."""
     vector = [0.01] * dimension
 
-    with pytest.raises(ValueError, match=expected_in_error):
+    with pytest.raises(ValueError, match=expected_in_error) as exc_info:
         await semantic_search(vector, client=rag_client, solr_url=SOLR_URL)
-
-
-async def test_semantic_search_dimension_error_mentions_expected_384(rag_client):
-    """semantic_search ValueError message includes the expected dimension (384)."""
-    vector = [0.01] * 256
-
-    with pytest.raises(ValueError, match="384"):
-        await semantic_search(vector, client=rag_client, solr_url=SOLR_URL)
+    assert "384" in str(exc_info.value)
 
 
 async def test_semantic_search_succeeds_with_valid_384_dimension_vector(rag_client):
@@ -120,3 +115,58 @@ async def test_semantic_search_succeeds_with_valid_384_dimension_vector(rag_clie
 
     assert route.called
     assert result == RAG_SEMANTIC_RESPONSE
+
+
+# --- semantic_text_search tests ---
+
+
+@pytest.fixture()
+def mock_embedder():
+    """Provide an AsyncMock embedder that returns VALID_VECTOR from encode_async."""
+    embedder = AsyncMock()
+    embedder.encode_async = AsyncMock(return_value=VALID_VECTOR)
+    return embedder
+
+
+async def test_semantic_text_search_calls_encode_async_with_text(rag_client, mock_embedder):
+    """semantic_text_search calls embedder.encode_async with the provided text."""
+    with respx.mock:
+        respx.get(SEMANTIC_ENDPOINT).mock(return_value=httpx.Response(200, json=RAG_SEMANTIC_RESPONSE))
+        await semantic_text_search("some text", embedder=mock_embedder, client=rag_client, solr_url=SOLR_URL)
+
+    mock_embedder.encode_async.assert_called_once_with("some text")
+
+
+async def test_semantic_text_search_passes_vector_from_embedder_to_semantic_search(rag_client, mock_embedder):
+    """semantic_text_search passes the embedder vector through to the Solr endpoint."""
+    with respx.mock(assert_all_called=True) as router:
+        route = router.get(SEMANTIC_ENDPOINT).mock(return_value=httpx.Response(200, json=RAG_SEMANTIC_RESPONSE))
+        await semantic_text_search("query text", embedder=mock_embedder, client=rag_client, solr_url=SOLR_URL)
+
+    assert route.called
+    call_params = route.calls[0].request.url.params
+    assert "0.01" in call_params["q"]
+
+
+async def test_semantic_text_search_returns_solr_response(rag_client, mock_embedder):
+    """semantic_text_search returns the raw Solr response dict."""
+    with respx.mock:
+        respx.get(SEMANTIC_ENDPOINT).mock(return_value=httpx.Response(200, json=RAG_SEMANTIC_RESPONSE))
+        result = await semantic_text_search("test query", embedder=mock_embedder, client=rag_client, solr_url=SOLR_URL)
+
+    assert result == RAG_SEMANTIC_RESPONSE
+    assert result["response"]["numFound"] == 1
+
+
+async def test_semantic_text_search_propagates_max_results(rag_client, mock_embedder):
+    """semantic_text_search passes max_results through to the Solr query rows param."""
+    with respx.mock(assert_all_called=True) as router:
+        route = router.get(SEMANTIC_ENDPOINT).mock(return_value=httpx.Response(200, json=RAG_SEMANTIC_RESPONSE))
+        await semantic_text_search(
+            "test query", embedder=mock_embedder, client=rag_client, solr_url=SOLR_URL, max_results=25
+        )
+
+    assert route.called
+    call_params = route.calls[0].request.url.params
+    assert call_params["rows"] == "25"
+    assert "topK=25" in call_params["q"]
