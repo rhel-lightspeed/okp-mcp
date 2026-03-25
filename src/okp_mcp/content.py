@@ -66,6 +66,9 @@ def _select_within_budget(results: list[str], max_chars: int, query: str) -> str
         included.append(result)
         chars_used += result_len
 
+    if not included:
+        return truncate_content(results[0], max_chars)
+
     output = separator.join(included)
 
     if len(included) < len(results):

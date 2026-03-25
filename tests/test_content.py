@@ -169,3 +169,12 @@ def test_select_within_budget_tiny_budget():
     result = "a" * 1000
     output = _select_within_budget([result], max_chars=10, query="test")
     assert "Content truncated" in output
+
+
+def test_select_within_budget_first_exceeds_budget_multi():
+    """First result in a multi-result list exceeding the budget is hard-truncated."""
+    big = "z" * 5000
+    output = _select_within_budget([big, "small"], max_chars=100, query="test")
+    assert "Content truncated" in output
+    assert len(output) <= 200
+    assert "Budget reached" not in output
