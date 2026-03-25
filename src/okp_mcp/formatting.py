@@ -27,7 +27,8 @@ _VERSION_LIST_RE = re.compile(
 
 _REPLACEMENT_RE = re.compile(
     r"\b(replaced by|use .{1,20} instead|the recommended replacement|"
-    r"cockpit is the|virsh is the|vnc is the supported)\b",
+    r"cockpit is the|virsh is the|vnc is the supported|"
+    r"Enterprise Linux Release Dates|Enhanced .{0,30}EUS)\b",
     re.IGNORECASE,
 )
 
