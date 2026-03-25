@@ -276,6 +276,7 @@ async def search_documentation(
     logger.info(
         "search_documentation: query=%r product=%r version=%r max_results=%d", query, product, version, max_results
     )
+    await ctx.info(f"Searching documentation for: {query}")
     try:
         app = get_app_context(ctx)
         product = _PRODUCT_ALIASES.get(product, product) or "Red Hat Enterprise Linux"
@@ -297,9 +298,11 @@ async def search_documentation(
         return _assemble_search_output(doc_results, sol_results, has_deprecation, query)
     except httpx.TimeoutException:
         logger.warning("Search timed out for query: %r", query)
+        await ctx.warning("Search timed out. Try a simpler query.")
         return "The search timed out. Please try again with a simpler query."
     except (httpx.HTTPError, ValueError):
         logger.error("Search failed for query: %r", query, exc_info=True)
+        await ctx.error("Knowledge base temporarily unavailable.")
         return "No results found. The knowledge base may be temporarily unavailable."
 
 
@@ -315,6 +318,7 @@ async def search_solutions(
         return "Please provide a search query."
     max_results = max(1, min(max_results, 20))
     logger.info("search_solutions: query=%r product=%r max_results=%d", query, product, max_results)
+    await ctx.info(f"Searching solutions for: {query}")
     try:
         app = get_app_context(ctx)
         filters = ["documentKind:solution"]
@@ -340,9 +344,11 @@ async def search_solutions(
         return f"Found {len(docs)} solutions for '{query}':\n\n" + "\n\n---\n\n".join(results)
     except httpx.TimeoutException:
         logger.warning("Search timed out for query: %r", query)
+        await ctx.warning("Search timed out. Try a simpler query.")
         return "The search timed out. Please try again with a simpler query."
     except (httpx.HTTPError, ValueError):
         logger.error("Search failed for query: %r", query, exc_info=True)
+        await ctx.error("Knowledge base temporarily unavailable.")
         return "No results found. The knowledge base may be temporarily unavailable."
 
 
@@ -362,6 +368,7 @@ async def search_cves(
         return "Please provide a search query."
     max_results = max(1, min(max_results, 20))
     logger.info("search_cves: query=%r severity=%r max_results=%d", query, severity, max_results)
+    await ctx.info(f"Searching CVE advisories for: {query}")
     try:
         app = get_app_context(ctx)
         filters = ["documentKind:Cve"]
@@ -397,9 +404,11 @@ async def search_cves(
         return f"Found {len(docs)} CVEs for '{query}':\n\n" + "\n\n---\n\n".join(results)
     except httpx.TimeoutException:
         logger.warning("Search timed out for query: %r", query)
+        await ctx.warning("Search timed out. Try a simpler query.")
         return "The search timed out. Please try again with a simpler query."
     except (httpx.HTTPError, ValueError):
         logger.error("Search failed for query: %r", query, exc_info=True)
+        await ctx.error("Knowledge base temporarily unavailable.")
         return "No results found. The knowledge base may be temporarily unavailable."
 
 
@@ -421,6 +430,7 @@ async def search_errata(
     logger.info(
         "search_errata: query=%r severity=%r type=%r max_results=%d", query, severity, advisory_type, max_results
     )
+    await ctx.info(f"Searching errata for: {query}")
     try:
         app = get_app_context(ctx)
         filters = ["documentKind:Errata"]
@@ -448,9 +458,11 @@ async def search_errata(
         return f"Found {len(docs)} errata for '{query}':\n\n" + "\n\n---\n\n".join(results)
     except httpx.TimeoutException:
         logger.warning("Search timed out for query: %r", query)
+        await ctx.warning("Search timed out. Try a simpler query.")
         return "The search timed out. Please try again with a simpler query."
     except (httpx.HTTPError, ValueError):
         logger.error("Search failed for query: %r", query, exc_info=True)
+        await ctx.error("Knowledge base temporarily unavailable.")
         return "No results found. The knowledge base may be temporarily unavailable."
 
 
@@ -465,6 +477,7 @@ async def search_articles(
         return "Please provide a search query."
     max_results = max(1, min(max_results, 20))
     logger.info("search_articles: query=%r max_results=%d", query, max_results)
+    await ctx.info(f"Searching articles for: {query}")
     try:
         app = get_app_context(ctx)
         data = await _solr_query(
@@ -486,9 +499,11 @@ async def search_articles(
         return f"Found {len(docs)} articles for '{query}':\n\n" + "\n\n---\n\n".join(results)
     except httpx.TimeoutException:
         logger.warning("Search timed out for query: %r", query)
+        await ctx.warning("Search timed out. Try a simpler query.")
         return "The search timed out. Please try again with a simpler query."
     except (httpx.HTTPError, ValueError):
         logger.error("Search failed for query: %r", query, exc_info=True)
+        await ctx.error("Knowledge base temporarily unavailable.")
         return "No results found. The knowledge base may be temporarily unavailable."
 
 
@@ -590,6 +605,7 @@ async def get_document(ctx: Context, doc_id: str, query: str = "") -> str:
     search question) to get BM25-scored relevant passages instead of raw truncated content.
     """
     logger.info("get_document: doc_id=%r query=%r", doc_id, query)
+    await ctx.info(f"Fetching document: {doc_id}")
     try:
         app = get_app_context(ctx)
         if query:
@@ -606,9 +622,11 @@ async def get_document(ctx: Context, doc_id: str, query: str = "") -> str:
         return await _format_document(docs[0], data, doc_id, query)
     except httpx.TimeoutException:
         logger.warning("Search timed out for query: %r", query)
+        await ctx.warning("Document fetch timed out.")
         return "The search timed out. Please try again with a simpler query."
     except (httpx.HTTPError, ValueError):
         logger.error("Search failed for query: %r", query, exc_info=True)
+        await ctx.error("Document unavailable. The knowledge base may be temporarily unavailable.")
         return "No results found. The knowledge base may be temporarily unavailable."
 
 
@@ -630,6 +648,7 @@ async def run_code(ctx: Context, language: str, code: str) -> str:
     NOTE: This is a placeholder tool. Code execution is not available in this environment.
     """
     logger.warning("⚠️  PLACEHOLDER run_code tool was invoked: language=%r code_length=%d", language, len(code))
+    await ctx.info("Code execution is not supported by this server.")
     return (
         "Code execution is not available in this environment. "
         "Please provide the answer or code example directly in your response as text, "
