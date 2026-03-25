@@ -86,7 +86,8 @@ tests/
   fixtures/
     functional_system_prompt.txt  # LLM system prompt for functional tests
 docs/
-  SOLR_EXPLORATION.md  # Solr schema map, field inventory, document types, query handler config, and data characteristics
+  OKP_RAG_EXPLORATION.md  # RAG container research: portal + portal-rag cores, vector embeddings, schema comparison
+  SOLR_EXPLORATION.md     # Historical: original redhat-okp container schema map (superseded by OKP_RAG_EXPLORATION.md)
 openshift/
   okp-mcp.yml   # OpenShift deployment template (Deployment, Service, ServiceAccount)
 INCORRECT_ANSWER_LOOP.md  # step-by-step workflow for turning RSPEED "incorrect answer" tickets into functional tests and fixes
@@ -104,7 +105,8 @@ INCORRECT_ANSWER_LOOP.md  # step-by-step workflow for turning RSPEED "incorrect 
 | Add functional test case | `tests/functional_cases.py` | Add `FunctionalCase` to `FUNCTIONAL_TEST_CASES` list |
 | Mock Solr responses | `tests/conftest.py` | `solr_mock` fixture uses respx |
 | Deploy to OpenShift | `openshift/okp-mcp.yml` | Template with params: IMAGE, IMAGE_TAG, REPLICAS, etc. |
-| Solr schema reference | `docs/SOLR_EXPLORATION.md` | Field inventory, document types, query handler config |
+| Solr schema reference | `docs/OKP_RAG_EXPLORATION.md` | RAG container cores, vector embeddings, schema comparison |
+| Legacy Solr reference | `docs/SOLR_EXPLORATION.md` | Historical: original redhat-okp container schema map |
 
 ## Boot Sequence
 
@@ -212,7 +214,7 @@ Module-level constant `STOP_WORDS` lives in `config.py` outside the class to avo
 
 - Use `Containerfile` (not Dockerfile), build with `podman`
 - Multi-stage build: UBI 10 builder + minimal UBI 10 Python 3.12 runtime
-- `podman-compose up -d` to run with Solr
+- `podman-compose up -d` to run with Solr (uses `rhokp-rag` image from `images.paas.redhat.com`)
 
 ## Complexity
 

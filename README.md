@@ -40,11 +40,12 @@ Run `okp-mcp --help` for the full list.
 
 Start the OKP Solr instance and MCP server together:
 
-```
+```bash
+podman login images.paas.redhat.com
 podman-compose up -d
 ```
 
-This pulls the official OKP image from `registry.redhat.io` (requires `podman login registry.redhat.io` first) and builds the MCP server container locally.
+This pulls the OKP RAG image from `images.paas.redhat.com` (requires authentication) and builds the MCP server container locally.
 
 Build the MCP server image:
 
