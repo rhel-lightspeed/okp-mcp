@@ -1,8 +1,9 @@
 services:
-  # Red Hat OKP — Offline Knowledge Portal (Solr-based documentation index)
-  # Requires registry.redhat.io authentication: podman login registry.redhat.io
+
+  # Red Hat OKP with RAG chunks (pre-release)
+  # Service name kept as redhat-okp for DNS compatibility with MCP server config.
   redhat-okp:
-    image: registry.redhat.io/offline-knowledge-portal/rhokp-rhel9:latest
+    image: images.paas.redhat.com/offline-kbase/rhokp-rag:mar-9-2026
     container_name: redhat-okp
     ports:
       - "8983:8983"
@@ -10,7 +11,7 @@ services:
       ACCESS_KEY: ${OKP_ACCESS_KEY}
       SOLR_JETTY_HOST: "0.0.0.0"
     volumes:
-      - okp-solr-data:/opt/solr/server/solr/portal/data
+      - redhat-okp-rag-data:/opt/solr/server/solr/portal/data
     restart: unless-stopped
 
   # OKP MCP Server — Solr bridge for LLM tool calls
@@ -29,4 +30,4 @@ services:
     restart: unless-stopped
 
 volumes:
-  okp-solr-data:
+  redhat-okp-rag-data:
