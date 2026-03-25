@@ -54,6 +54,14 @@ class ServerConfig(BaseSettings):
         ge=1,
         description="Maximum characters in a single tool response",
     )
+    embedding_model: str = Field(
+        default="ibm-granite/granite-embedding-30m-english",
+        description="Embedding model name or path for text-to-vector encoding",
+    )
+    embedding_cache_dir: str | None = Field(
+        default=None,
+        description="HuggingFace cache directory for embedding model (None = use HF default)",
+    )
 
     @computed_field
     @property
