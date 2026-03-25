@@ -79,11 +79,13 @@ src/okp_mcp/
   content.py     # Boilerplate stripping, content truncation, text cleaning
   formatting.py  # Result annotation, deprecation/replacement detection, sort keys
   rag/           # Query functions for portal-rag Solr core
-    __init__.py  # re-exports: lexical_search, hybrid_search, semantic_search
+    __init__.py  # re-exports: lexical_search, hybrid_search, semantic_search, semantic_text_search, reciprocal_rank_fusion
     common.py    # lightweight Solr query runner, EMPTY_RAG_RESPONSE constant
     lexical.py   # lexical_search() via /select (basic eDisMax)
     hybrid.py    # hybrid_search() via /hybrid-search (server-side boosted eDisMax)
-    semantic.py  # semantic_search() stub via /semantic-search (KNN, needs embedding model)
+    semantic.py  # semantic_search() (KNN vector) + semantic_text_search() (text -> embed -> KNN)
+    embeddings.py  # Embedder class: text-to-vector via granite-embedding-30m-english (ThreadPoolExecutor)
+    rrf.py          # reciprocal_rank_fusion() for merging lexical + semantic result sets
 tests/
   conftest.py          # shared fixtures (solr mocks, sample responses) + functional marker deselection
   functional_cases.py  # FunctionalCase dataclass + parametrized RSPEED test data
@@ -114,6 +116,8 @@ INCORRECT_ANSWER_LOOP.md  # step-by-step workflow for turning RSPEED "incorrect 
 | Solr schema reference | `docs/OKP_RAG_EXPLORATION.md` | RAG container cores, vector embeddings, schema comparison |
 | Legacy Solr reference | `docs/SOLR_EXPLORATION.md` | Historical: original redhat-okp container schema map |
 | Add a RAG query function | `src/okp_mcp/rag/` | One file per search type; `common.py` for the shared query runner |
+| Add embedding model | `src/okp_mcp/rag/embeddings.py` | Embedder class, ThreadPoolExecutor for async |
+| Add search fusion | `src/okp_mcp/rag/rrf.py` | reciprocal_rank_fusion(), pure function |
 | Change RAG query execution | `src/okp_mcp/rag/common.py` | `rag_query()` handles HTTP, JSON parsing, and error handling |
 
 ## Boot Sequence
@@ -137,10 +141,12 @@ tools.py    → config, server, solr, content, formatting
 formatting.py → content, solr
 solr.py     → config
 content.py  → (standalone)
-rag/common.py   → config (logger only)
-rag/lexical.py  → rag.common
-rag/hybrid.py   → rag.common
-rag/semantic.py → rag.common
+rag/common.py     → config (logger only)
+rag/lexical.py    → rag.common
+rag/hybrid.py     → rag.common
+rag/semantic.py   → rag.common, rag.embeddings (TYPE_CHECKING only, not at runtime)
+rag/embeddings.py → sentence_transformers, torch (isolated here only)
+rag/rrf.py        → (standalone, no imports)
 ```
 
 No circular imports. `content.py` has zero internal dependencies.
@@ -213,6 +219,8 @@ Config uses `pydantic_settings.BaseSettings` with `MCP_` env prefix. CLI via `Cl
 
 Module-level constant `STOP_WORDS` lives in `config.py` outside the class to avoid circular import issues. The Solr endpoint is no longer a module-level constant — it flows through `ServerConfig.solr_endpoint` → `AppContext.solr_endpoint` at runtime.
 
+Two new embedding fields: `embedding_model` (default: `"ibm-granite/granite-embedding-30m-english"`) and `embedding_cache_dir` (default: `None`). Available as `MCP_EMBEDDING_MODEL` and `MCP_EMBEDDING_CACHE_DIR` env vars. Read by `Embedder` callers, not wired into `AppContext` yet.
+
 ## Testing Patterns
 
 - **HTTP mocking**: `respx` library (not `responses` or `aioresponses`)
@@ -227,6 +235,8 @@ Module-level constant `STOP_WORDS` lives in `config.py` outside the class to avo
 - Use `Containerfile` (not Dockerfile), build with `podman`
 - Multi-stage build: UBI 10 builder + minimal UBI 10 Python 3.12 runtime
 - `podman-compose up -d` to run with Solr (uses `rhokp-rag` image from `images.paas.redhat.com`)
+- Embedding model (`ibm-granite/granite-embedding-30m-english`) is pre-cached in the builder stage via `huggingface_hub.snapshot_download()` to `/build/models`, then copied to `/app/models` in the runtime image
+- `HF_HUB_CACHE=/app/models` points sentence-transformers to the cached model; `HF_HUB_OFFLINE=1` prevents network calls at runtime
 
 ## Complexity
 
