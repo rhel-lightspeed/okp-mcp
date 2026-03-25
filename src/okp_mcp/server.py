@@ -2,6 +2,7 @@
 
 # pyright: reportAttributeAccessIssue=false
 
+import importlib.metadata
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -48,8 +49,15 @@ def get_app_context(ctx: Context) -> AppContext:
     return ctx.lifespan_context["app"]
 
 
+try:
+    __version__ = importlib.metadata.version("okp-mcp")
+except importlib.metadata.PackageNotFoundError:
+    __version__ = "dev"
+
 mcp = FastMCP(
     "RHEL OKP Knowledge Base",
     instructions="Search the Red Hat documentation, CVEs, errata, solutions, and articles to answer RHEL questions.",
     lifespan=_app_lifespan,
+    version=__version__,
+    website_url="https://github.com/rhel-lightspeed/okp-mcp",
 )

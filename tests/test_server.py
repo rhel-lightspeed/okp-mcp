@@ -21,10 +21,12 @@ from okp_mcp.server import AppContext, _app_lifespan, get_app_context, mcp
             "instructions",
             "Search the Red Hat documentation, CVEs, errata, solutions, and articles to answer RHEL questions.",
         ),
+        ("version", "0.1.0"),
+        ("website_url", "https://github.com/rhel-lightspeed/okp-mcp"),
     ],
 )
 def test_mcp_properties(attr, expected):
-    """FastMCP instance has the expected name and instructions."""
+    """FastMCP instance has the expected name, instructions, version, and website_url."""
     assert getattr(mcp, attr) == expected
 
 
