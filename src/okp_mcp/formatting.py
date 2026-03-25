@@ -102,6 +102,13 @@ def _extract_version_lists(text: str) -> str:
 
 _LARGE_DOC_THRESHOLD = 10_000
 
+# Cap content per search result to prevent a single large document from
+# consuming the entire tool response. With hl.fragsizeIsMinimum=true,
+# Solr can produce highlight fragments of several thousand characters each,
+# so even a few snippets can exceed the caller's budget and push all
+# subsequent results out of the tool response.
+_MAX_RESULT_CONTENT = 4_500
+
 
 async def _resolve_content_text(highlights: str, include_content: bool, doc: dict, query: str) -> str:
     """Resolve the content text to display: highlights take priority, then main_content.
@@ -146,7 +153,9 @@ def _build_metadata_lines(doc: dict, kind_label: str | None, applicability: str,
     return lines
 
 
-async def _format_result(doc: dict, data: dict, include_content: bool = False, query: str = "") -> tuple[str, int]:
+async def _format_result(
+    doc: dict, data: dict, include_content: bool = False, query: str = "", max_content: int = _MAX_RESULT_CONTENT
+) -> tuple[str, int]:
     """Format a single Solr document with applicability labels and annotations."""
     doc_id = doc.get("id", "")
     view_uri = doc.get("view_uri", "")
@@ -170,5 +179,7 @@ async def _format_result(doc: dict, data: dict, include_content: bool = False, q
     if version_bullets:
         result += f"\nReleases mentioned:\n{version_bullets}"
     if content_text:
+        if len(content_text) > max_content:
+            content_text = content_text[:max_content] + " [...]"
         result += f"\nContent: {content_text}"
     return result, sort_key
