@@ -10,7 +10,9 @@ dependencies = [
     "httpx",
     "pydantic-settings>=2.13.1",
     "rank-bm25",
+    "sentence-transformers>=3.0.0",
     "stop-words>=2025.11.4",
+    "torch>=2.1.0",
 ]
 
 [project.scripts]
@@ -54,3 +56,11 @@ select = ["E", "F", "W", "I", "UP", "S", "B", "A", "C4", "SIM"]
 
 [tool.ty.environment]
 python-version = "3.12"
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
