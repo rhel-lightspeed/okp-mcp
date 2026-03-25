@@ -2,7 +2,7 @@
 
 import pytest
 
-from okp_mcp.content import clean_content, doc_uri, strip_boilerplate, truncate_content
+from okp_mcp.content import _select_within_budget, clean_content, doc_uri, strip_boilerplate, truncate_content
 
 
 @pytest.mark.parametrize(
@@ -110,3 +110,71 @@ def test_clean_content_strips_then_truncates():
     result = clean_content(text, max_chars=300)
     assert "This content is not included." not in result
     assert "fast-track publication program" not in result
+
+
+# --- _select_within_budget tests ---
+
+
+def test_select_within_budget_all_fit():
+    """Results fitting within budget are all included without a truncation notice."""
+    results = ["short1", "short2", "short3"]
+    output = _select_within_budget(results, max_chars=1000, query="test")
+    assert "short1" in output
+    assert "short2" in output
+    assert "short3" in output
+    assert "Budget reached" not in output
+
+
+def test_select_within_budget_drops_tail():
+    """Results exceeding the budget are dropped with a count message."""
+    big = "x" * 2000
+    results = [big] * 5
+    output = _select_within_budget(results, max_chars=5000, query="test")
+    assert "Budget reached" in output
+    assert "of 5 results" in output
+
+
+def test_select_within_budget_single_huge_truncated():
+    """A single result exceeding the budget is hard-truncated via truncate_content."""
+    huge = "y" * 50_000
+    output = _select_within_budget([huge], max_chars=1000, query="test")
+    assert len(output) <= 1200  # slack for the truncation message itself
+    assert "Content truncated" in output
+
+
+def test_select_within_budget_empty():
+    """Empty results list returns a no-results message containing the query."""
+    output = _select_within_budget([], max_chars=30_000, query="myquery")
+    assert "No results found for: myquery" in output
+
+
+def test_select_within_budget_separator():
+    """Included results are joined with the expected separator."""
+    results = ["result_a", "result_b"]
+    output = _select_within_budget(results, max_chars=10_000, query="test")
+    assert "---" in output
+    assert "result_a" in output
+    assert "result_b" in output
+
+
+def test_select_within_budget_exact_boundary():
+    """A single result exactly at the budget boundary is included without truncation."""
+    result = "a" * 100
+    output = _select_within_budget([result], max_chars=100, query="test")
+    assert output == result
+
+
+def test_select_within_budget_tiny_budget():
+    """A very small budget causes even the first result to be truncated."""
+    result = "a" * 1000
+    output = _select_within_budget([result], max_chars=10, query="test")
+    assert "Content truncated" in output
+
+
+def test_select_within_budget_first_exceeds_budget_multi():
+    """First result in a multi-result list exceeding the budget is hard-truncated."""
+    big = "z" * 5000
+    output = _select_within_budget([big, "small"], max_chars=100, query="test")
+    assert "Content truncated" in output
+    assert len(output) <= 200
+    assert "Budget reached" not in output
