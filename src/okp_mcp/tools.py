@@ -277,6 +277,7 @@ async def search_documentation(
         "search_documentation: query=%r product=%r version=%r max_results=%d", query, product, version, max_results
     )
     await ctx.info(f"Searching documentation for: {query}")
+    await ctx.report_progress(progress=0, total=1)
     try:
         app = get_app_context(ctx)
         product = _PRODUCT_ALIASES.get(product, product) or "Red Hat Enterprise Linux"
@@ -295,7 +296,9 @@ async def search_documentation(
         doc_results, sol_results, has_deprecation = await _deduplicate_and_sort_results(
             doc_data, sol_data, dep_data, query
         )
-        return _assemble_search_output(doc_results, sol_results, has_deprecation, query)
+        result = _assemble_search_output(doc_results, sol_results, has_deprecation, query)
+        await ctx.report_progress(progress=1, total=1)
+        return result
     except httpx.TimeoutException:
         logger.warning("Search timed out for query: %r", query)
         await ctx.warning("Search timed out. Try a simpler query.")
@@ -319,6 +322,7 @@ async def search_solutions(
     max_results = max(1, min(max_results, 20))
     logger.info("search_solutions: query=%r product=%r max_results=%d", query, product, max_results)
     await ctx.info(f"Searching solutions for: {query}")
+    await ctx.report_progress(progress=0, total=1)
     try:
         app = get_app_context(ctx)
         filters = ["documentKind:solution"]
@@ -341,7 +345,9 @@ async def search_solutions(
             return f"No solutions found for: {query}"
 
         results = [_format_solution_article_doc(doc, data, query) for doc in docs]
-        return f"Found {len(docs)} solutions for '{query}':\n\n" + "\n\n---\n\n".join(results)
+        result = f"Found {len(docs)} solutions for '{query}':\n\n" + "\n\n---\n\n".join(results)
+        await ctx.report_progress(progress=1, total=1)
+        return result
     except httpx.TimeoutException:
         logger.warning("Search timed out for query: %r", query)
         await ctx.warning("Search timed out. Try a simpler query.")
@@ -369,6 +375,7 @@ async def search_cves(
     max_results = max(1, min(max_results, 20))
     logger.info("search_cves: query=%r severity=%r max_results=%d", query, severity, max_results)
     await ctx.info(f"Searching CVE advisories for: {query}")
+    await ctx.report_progress(progress=0, total=1)
     try:
         app = get_app_context(ctx)
         filters = ["documentKind:Cve"]
@@ -401,7 +408,9 @@ async def search_cves(
             result += f"\nURL: https://access.redhat.com{doc_uri(doc)}"
             results.append(result)
 
-        return f"Found {len(docs)} CVEs for '{query}':\n\n" + "\n\n---\n\n".join(results)
+        output = f"Found {len(docs)} CVEs for '{query}':\n\n" + "\n\n---\n\n".join(results)
+        await ctx.report_progress(progress=1, total=1)
+        return output
     except httpx.TimeoutException:
         logger.warning("Search timed out for query: %r", query)
         await ctx.warning("Search timed out. Try a simpler query.")
@@ -431,6 +440,7 @@ async def search_errata(
         "search_errata: query=%r severity=%r type=%r max_results=%d", query, severity, advisory_type, max_results
     )
     await ctx.info(f"Searching errata for: {query}")
+    await ctx.report_progress(progress=0, total=1)
     try:
         app = get_app_context(ctx)
         filters = ["documentKind:Errata"]
@@ -455,7 +465,9 @@ async def search_errata(
             return f"No errata found for: {query}"
 
         results = [_format_errata_doc(doc) for doc in docs]
-        return f"Found {len(docs)} errata for '{query}':\n\n" + "\n\n---\n\n".join(results)
+        output = f"Found {len(docs)} errata for '{query}':\n\n" + "\n\n---\n\n".join(results)
+        await ctx.report_progress(progress=1, total=1)
+        return output
     except httpx.TimeoutException:
         logger.warning("Search timed out for query: %r", query)
         await ctx.warning("Search timed out. Try a simpler query.")
@@ -478,6 +490,7 @@ async def search_articles(
     max_results = max(1, min(max_results, 20))
     logger.info("search_articles: query=%r max_results=%d", query, max_results)
     await ctx.info(f"Searching articles for: {query}")
+    await ctx.report_progress(progress=0, total=1)
     try:
         app = get_app_context(ctx)
         data = await _solr_query(
@@ -496,7 +509,9 @@ async def search_articles(
             return f"No articles found for: {query}"
 
         results = [_format_solution_article_doc(doc, data, query) for doc in docs]
-        return f"Found {len(docs)} articles for '{query}':\n\n" + "\n\n---\n\n".join(results)
+        output = f"Found {len(docs)} articles for '{query}':\n\n" + "\n\n---\n\n".join(results)
+        await ctx.report_progress(progress=1, total=1)
+        return output
     except httpx.TimeoutException:
         logger.warning("Search timed out for query: %r", query)
         await ctx.warning("Search timed out. Try a simpler query.")
@@ -606,6 +621,7 @@ async def get_document(ctx: Context, doc_id: str, query: str = "") -> str:
     """
     logger.info("get_document: doc_id=%r query=%r", doc_id, query)
     await ctx.info(f"Fetching document: {doc_id}")
+    await ctx.report_progress(progress=0, total=1)
     try:
         app = get_app_context(ctx)
         if query:
@@ -619,7 +635,9 @@ async def get_document(ctx: Context, doc_id: str, query: str = "") -> str:
         if not docs:
             return f"Document not found: {doc_id}"
 
-        return await _format_document(docs[0], data, doc_id, query)
+        result = await _format_document(docs[0], data, doc_id, query)
+        await ctx.report_progress(progress=1, total=1)
+        return result
     except httpx.TimeoutException:
         logger.warning("Search timed out for query: %r", query)
         await ctx.warning("Document fetch timed out.")

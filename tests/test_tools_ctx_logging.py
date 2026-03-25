@@ -151,3 +151,24 @@ async def test_run_code_logs_ctx_info(mock_ctx):
     assert "not available" in result.lower()
     mock_ctx.info.assert_awaited_once()
     assert "not supported" in mock_ctx.info.call_args[0][0].lower()
+
+
+async def test_search_documentation_reports_progress(mock_ctx):
+    """search_documentation calls report_progress twice (start and end)."""
+    with patch("okp_mcp.tools._solr_query", AsyncMock(return_value=_EMPTY_SOLR)):
+        await tools.search_documentation(mock_ctx, "test query")
+    assert mock_ctx.report_progress.await_count == 2
+
+
+async def test_get_document_reports_progress(mock_ctx):
+    """get_document calls report_progress twice."""
+    solr_resp = {
+        "responseHeader": {"status": 0, "QTime": 1},
+        "response": {
+            "numFound": 1,
+            "docs": [{"allTitle": "Test", "view_uri": "/docs/test", "documentKind": "documentation"}],
+        },
+    }
+    with patch("okp_mcp.tools._fetch_document_raw", AsyncMock(return_value=solr_resp)):
+        await tools.get_document(mock_ctx, "/docs/test")
+    assert mock_ctx.report_progress.await_count == 2
