@@ -23,6 +23,7 @@ class AppContext:
 
     http_client: httpx.AsyncClient
     solr_endpoint: str
+    max_response_chars: int
 
 
 @asynccontextmanager
@@ -31,10 +32,13 @@ async def _app_lifespan(server: FastMCP) -> AsyncIterator[dict[str, AppContext]]
     del server
     cfg = _server_config if _server_config is not None else ServerConfig()
     solr_endpoint = cfg.solr_endpoint
+    max_response_chars = cfg.max_response_chars
     logger.info("SOLR endpoint: %s", solr_endpoint)
     client = httpx.AsyncClient(timeout=30.0)
     try:
-        yield {"app": AppContext(http_client=client, solr_endpoint=solr_endpoint)}
+        yield {
+            "app": AppContext(http_client=client, solr_endpoint=solr_endpoint, max_response_chars=max_response_chars)
+        }
     finally:
         await client.aclose()
 

@@ -121,3 +121,23 @@ def test_solr_url_from_env():
 
     assert config.solr_url == "http://remote:1234"
     assert config.solr_endpoint == "http://remote:1234/solr/portal/select"
+
+
+def test_max_response_chars_default():
+    """max_response_chars defaults to 30000."""
+    config = ServerConfig()
+    assert config.max_response_chars == 30_000
+
+
+def test_max_response_chars_env_override():
+    """MCP_MAX_RESPONSE_CHARS environment variable overrides the default."""
+    with patch.dict("os.environ", {"MCP_MAX_RESPONSE_CHARS": "20000"}):
+        config = ServerConfig()
+    assert config.max_response_chars == 20_000
+
+
+@pytest.mark.parametrize("bad_value", [0, -1, -100])
+def test_max_response_chars_rejects_non_positive(bad_value):
+    """max_response_chars rejects zero and negative values at load time."""
+    with pytest.raises(ValidationError, match="max_response_chars"):
+        ServerConfig(max_response_chars=bad_value)
