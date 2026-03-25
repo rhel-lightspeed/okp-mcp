@@ -61,4 +61,5 @@ mcp = FastMCP(
     version=__version__,
     website_url="https://github.com/rhel-lightspeed/okp-mcp",
     mask_error_details=True,  # Mask internal exception details from MCP clients for unhandled errors
+    strict_input_validation=True,  # Reject type coercion silently; e.g. reject str "5" for int max_results
 )

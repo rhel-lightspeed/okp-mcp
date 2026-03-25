@@ -136,3 +136,8 @@ def test_server_config_assignment_propagates_to_lifespan():
 def test_mcp_masks_error_details():
     """FastMCP instance hides internal error details for unhandled exceptions."""
     assert mcp._mask_error_details is True  # type: ignore[attr-defined]
+
+
+def test_mcp_validates_input_strictly():
+    """FastMCP instance rejects type coercion for tool parameters."""
+    assert mcp.strict_input_validation is True

@@ -153,6 +153,12 @@ async def test_run_code_logs_ctx_info(mock_ctx):
     assert "not supported" in mock_ctx.info.call_args[0][0].lower()
 
 
+async def test_run_code_returns_friendly_message(mock_ctx):
+    """run_code placeholder returns helpful message without validation error."""
+    result = await tools.run_code(mock_ctx, language="python", code="print('hello')")
+    assert "not available" in result.lower()
+
+
 async def test_search_documentation_reports_progress(mock_ctx):
     """search_documentation calls report_progress twice (start and end)."""
     with patch("okp_mcp.tools._solr_query", AsyncMock(return_value=_EMPTY_SOLR)):
