@@ -28,6 +28,56 @@ def truncate_content(text: str, max_chars: int) -> str:
     return truncated + message
 
 
+def _select_within_budget(results: list[str], max_chars: int, query: str) -> str:
+    """Select results within character budget, dropping lower-priority tail results.
+
+    Iterates through pre-sorted results, accumulating them until adding the next
+    would exceed max_chars. Appends a truncation message when results are dropped.
+    A single result that exceeds the budget is hard-truncated via truncate_content.
+
+    Args:
+        results: Pre-formatted, priority-sorted result strings to include.
+        max_chars: Maximum total characters in the output.
+        query: Original search query (used in fallback messages).
+
+    Returns:
+        Joined result string within the character budget, with truncation notice if needed.
+    """
+    if not results:
+        return f"No results found for: {query}"
+
+    if len(results) == 1:
+        if len(results[0]) > max_chars:
+            return truncate_content(results[0], max_chars)
+        return results[0]
+
+    separator = "\n\n---\n\n"
+    included = []
+    chars_used = 0
+
+    for result in results:
+        result_len = len(result)
+        if included:
+            result_len += len(separator)
+
+        if chars_used + result_len > max_chars:
+            break
+
+        included.append(result)
+        chars_used += result_len
+
+    output = separator.join(included)
+
+    if len(included) < len(results):
+        message = (
+            f"\n\n[Budget reached - showing {len(included)} of {len(results)} "
+            f"results ({chars_used:,} of {max_chars:,} chars)]"
+        )
+        output += message
+
+    return output
+
+
 def strip_boilerplate(text: str) -> str:
     """Remove known boilerplate patterns from text.
 
