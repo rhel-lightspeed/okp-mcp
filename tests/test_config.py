@@ -18,6 +18,7 @@ def test_defaults():
     assert config.port == 8000
     assert config.log_level == "INFO"
     assert config.solr_url == "http://localhost:8983"
+    assert config.rag_solr_url is None
 
 
 @pytest.mark.parametrize(
@@ -141,3 +142,24 @@ def test_max_response_chars_rejects_non_positive(bad_value):
     """max_response_chars rejects zero and negative values at load time."""
     with pytest.raises(ValidationError, match="max_response_chars"):
         ServerConfig(max_response_chars=bad_value)
+
+
+@pytest.mark.parametrize(
+    "rag_solr_url, expected",
+    [
+        (None, None),
+        ("http://rag:8984", "http://rag:8984"),
+        ("http://custom-rag:9000", "http://custom-rag:9000"),
+    ],
+)
+def test_rag_solr_url_values(rag_solr_url, expected):
+    """rag_solr_url accepts None (default) or explicit URL string."""
+    config = ServerConfig(rag_solr_url=rag_solr_url)
+    assert config.rag_solr_url == expected
+
+
+def test_rag_solr_url_from_env():
+    """MCP_RAG_SOLR_URL env var populates rag_solr_url field."""
+    with patch.dict("os.environ", {"MCP_RAG_SOLR_URL": "http://rag:8984"}):
+        config = ServerConfig()
+    assert config.rag_solr_url == "http://rag:8984"

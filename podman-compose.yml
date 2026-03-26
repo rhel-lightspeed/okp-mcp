@@ -38,10 +38,8 @@ services:
     ports:
       - "8000:8000"
     environment:
-      # For standard testing, use the main OKP Solr instance:
       MCP_SOLR_URL: http://redhat-okp:8983
-      # For RAG testing, switch to the RAG Solr instance:
-      # MCP_SOLR_URL: http://redhat-okp-rag:8984
+      MCP_RAG_SOLR_URL: http://redhat-okp-rag:8984
     depends_on:
       - redhat-okp
     restart: unless-stopped

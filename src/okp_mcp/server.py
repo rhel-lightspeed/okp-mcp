@@ -24,6 +24,7 @@ class AppContext:
     http_client: httpx.AsyncClient
     solr_endpoint: str
     max_response_chars: int
+    rag_solr_url: str
 
 
 @asynccontextmanager
@@ -33,11 +34,20 @@ async def _app_lifespan(server: FastMCP) -> AsyncIterator[dict[str, AppContext]]
     cfg = _server_config if _server_config is not None else ServerConfig()
     solr_endpoint = cfg.solr_endpoint
     max_response_chars = cfg.max_response_chars
+    rag_solr_url = cfg.rag_solr_url or cfg.solr_url
+    if cfg.rag_solr_url is None:
+        logger.warning("MCP_RAG_SOLR_URL not set; falling back to solr_url (%s) for RAG queries", cfg.solr_url)
     logger.info("SOLR endpoint: %s", solr_endpoint)
+    logger.info("RAG Solr URL: %s", rag_solr_url)
     client = httpx.AsyncClient(timeout=30.0)
     try:
         yield {
-            "app": AppContext(http_client=client, solr_endpoint=solr_endpoint, max_response_chars=max_response_chars)
+            "app": AppContext(
+                http_client=client,
+                solr_endpoint=solr_endpoint,
+                max_response_chars=max_response_chars,
+                rag_solr_url=rag_solr_url,
+            )
         }
     finally:
         await client.aclose()
