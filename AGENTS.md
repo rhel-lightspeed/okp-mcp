@@ -86,7 +86,8 @@ src/okp_mcp/
     hybrid.py    # hybrid_search() via /hybrid-search (server-side boosted eDisMax)
     semantic.py  # semantic_search() (KNN vector) + semantic_text_search() (text -> embed -> KNN)
     embeddings.py  # Embedder class: text-to-vector via granite-embedding-30m-english (ThreadPoolExecutor)
-    rrf.py          # reciprocal_rank_fusion() for merging lexical + semantic result sets
+    rrf.py       # reciprocal_rank_fusion() for merging lexical + semantic result sets
+    tools.py     # @mcp.tool definitions for RAG search (search_rag)
 tests/
   conftest.py          # shared fixtures (solr mocks, sample responses) + functional marker deselection
   functional_cases.py  # FunctionalCase dataclass + parametrized RSPEED test data
@@ -101,6 +102,7 @@ tests/
     test_models.py     # RagDocument + RagResponse construction, extras, equality
     test_rrf.py        # reciprocal_rank_fusion() merging, scoring, edge cases
     test_semantic.py   # semantic_search() KNN, dimension validation, text search
+    test_tools.py      # Unit tests for search_rag MCP tool
   fixtures/
     functional_system_prompt.txt  # LLM system prompt for functional tests
 docs/
@@ -126,6 +128,7 @@ INCORRECT_ANSWER_LOOP.md  # step-by-step workflow for turning RSPEED "incorrect 
 | Solr schema reference | `docs/OKP_RAG_EXPLORATION.md` | RAG container cores, vector embeddings, schema comparison |
 | Legacy Solr reference | `docs/SOLR_EXPLORATION.md` | Historical: original redhat-okp container schema map |
 | Add a RAG query function | `src/okp_mcp/rag/` | One file per search type; `common.py` for the shared query runner |
+| Add a RAG MCP tool | `src/okp_mcp/rag/tools.py` | `@mcp.tool` with `tags={"rag"}`; conditionally disabled when `MCP_RAG_SOLR_URL` not set |
 | Add embedding model | `src/okp_mcp/rag/embeddings.py` | Embedder class, ThreadPoolExecutor for async |
 | Add search fusion | `src/okp_mcp/rag/rrf.py` | reciprocal_rank_fusion(), pure function |
 | Use typed Solr response models | `src/okp_mcp/rag/models.py` | `RagDocument` (extra fields allowed) + `RagResponse` (num_found + docs) |
@@ -137,11 +140,12 @@ INCORRECT_ANSWER_LOOP.md  # step-by-step workflow for turning RSPEED "incorrect 
 uv run okp-mcp [--transport ...] [--port ...]
   → pyproject.toml: okp-mcp = "okp_mcp:main"
   → __init__.py: main()
-      ├─ CliApp.run(ServerConfig)     # parse CLI + MCP_* env vars
-      ├─ _configure_logging()
-      └─ mcp.run(transport=...)       # start FastMCP server
-          → server.py: _app_lifespan()  # creates shared httpx.AsyncClient
-          → tools.py: @mcp.tool funcs  # registered via side-effect import
+       ├─ CliApp.run(ServerConfig)     # parse CLI + MCP_* env vars
+       ├─ _configure_logging()
+       └─ mcp.run(transport=...)       # start FastMCP server
+           → server.py: _app_lifespan()  # creates shared httpx.AsyncClient
+           → tools.py: @mcp.tool funcs  # registered via side-effect import
+           → rag/tools.py: @mcp.tool funcs  # registered via side-effect import (disabled if MCP_RAG_SOLR_URL not set)
 ```
 
 ## Module Dependencies
@@ -159,6 +163,7 @@ rag/hybrid.py     → rag.common, rag.models
 rag/semantic.py   → rag.common, rag.models, rag.embeddings (TYPE_CHECKING only, not at runtime)
 rag/embeddings.py → sentence_transformers, torch (isolated here only)
 rag/rrf.py        → rag.models
+rag/tools.py      → server (mcp, get_app_context), rag.common (clean_rag_query, RAG_FL), rag.formatting, rag.hybrid
 ```
 
 No circular imports. `content.py` has zero internal dependencies.
