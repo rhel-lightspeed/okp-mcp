@@ -8,9 +8,7 @@
                 "run",
                 "src/okp_mcp/__init__.py:mcp",
                 "--transport",
-                "streamable-http",
-                "--port",
-                "8000",
+                "stdio",
                 "--reload",
                 "--reload-dir",
                 "src/"
