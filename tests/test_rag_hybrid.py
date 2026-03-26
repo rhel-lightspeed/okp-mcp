@@ -4,6 +4,7 @@ import httpx
 import respx
 
 from okp_mcp.rag.hybrid import hybrid_search
+from okp_mcp.rag.models import RagResponse
 
 HYBRID_ENDPOINT = "http://localhost:8983/solr/portal-rag/hybrid-search"
 SOLR_URL = "http://localhost:8983"
@@ -16,7 +17,7 @@ async def test_hybrid_search_sends_get_to_hybrid_search_endpoint(rag_client, rag
         result = await hybrid_search("firewalld RHEL 9", client=rag_client, solr_url=SOLR_URL)
 
     assert route.called
-    assert result == rag_chunk_response
+    assert result.num_found == 1
 
 
 async def test_hybrid_search_includes_query_in_params(rag_client, rag_chunk_response):
@@ -70,8 +71,8 @@ async def test_hybrid_search_default_max_results_is_10(rag_client, rag_chunk_res
     assert call_params["rows"] == "10"
 
 
-async def test_hybrid_search_returns_raw_dict_from_rag_query(rag_client):
-    """hybrid_search returns the raw dict from rag_query()."""
+async def test_hybrid_search_returns_rag_response(rag_client):
+    """hybrid_search returns RagResponse from rag_query()."""
     custom_response = {
         "response": {
             "numFound": 2,
@@ -87,6 +88,6 @@ async def test_hybrid_search_returns_raw_dict_from_rag_query(rag_client):
         result = await hybrid_search("test query", client=rag_client, solr_url=SOLR_URL)
 
     assert route.called
-    assert result == custom_response
-    assert result["response"]["numFound"] == 2
-    assert len(result["response"]["docs"]) == 2
+    assert isinstance(result, RagResponse)
+    assert result.num_found == 2
+    assert len(result.docs) == 2

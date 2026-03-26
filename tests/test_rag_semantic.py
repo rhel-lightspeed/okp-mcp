@@ -6,6 +6,7 @@ import httpx
 import pytest
 import respx
 
+from okp_mcp.rag.models import RagResponse
 from okp_mcp.rag.semantic import semantic_search, semantic_text_search
 
 SOLR_URL = "http://localhost:8983"
@@ -38,7 +39,7 @@ async def test_semantic_search_sends_get_to_semantic_search_endpoint(rag_client)
         result = await semantic_search(VALID_VECTOR, client=rag_client, solr_url=SOLR_URL)
 
     assert route.called
-    assert result == RAG_SEMANTIC_RESPONSE
+    assert result.num_found == 1
 
 
 async def test_semantic_search_includes_knn_query_format(rag_client):
@@ -77,16 +78,15 @@ async def test_semantic_search_includes_fq_is_chunk_true(rag_client):
     assert call_params["fq"] == "is_chunk:true"
 
 
-async def test_semantic_search_returns_raw_dict_from_rag_query(rag_client):
-    """semantic_search returns raw dict from rag_query()."""
+async def test_semantic_search_returns_rag_response(rag_client):
+    """semantic_search returns RagResponse from rag_query()."""
     with respx.mock(assert_all_called=True) as router:
         route = router.get(SEMANTIC_ENDPOINT).mock(return_value=httpx.Response(200, json=RAG_SEMANTIC_RESPONSE))
         result = await semantic_search(VALID_VECTOR, client=rag_client, solr_url=SOLR_URL)
 
     assert route.called
-    assert isinstance(result, dict)
-    assert "response" in result
-    assert result["response"]["numFound"] == 1
+    assert isinstance(result, RagResponse)
+    assert result.num_found == 1
 
 
 @pytest.mark.parametrize(
@@ -114,7 +114,7 @@ async def test_semantic_search_succeeds_with_valid_384_dimension_vector(rag_clie
         result = await semantic_search(VALID_VECTOR, client=rag_client, solr_url=SOLR_URL)
 
     assert route.called
-    assert result == RAG_SEMANTIC_RESPONSE
+    assert result.num_found == 1
 
 
 # --- semantic_text_search tests ---
@@ -154,8 +154,7 @@ async def test_semantic_text_search_returns_solr_response(rag_client, mock_embed
         respx.get(SEMANTIC_ENDPOINT).mock(return_value=httpx.Response(200, json=RAG_SEMANTIC_RESPONSE))
         result = await semantic_text_search("test query", embedder=mock_embedder, client=rag_client, solr_url=SOLR_URL)
 
-    assert result == RAG_SEMANTIC_RESPONSE
-    assert result["response"]["numFound"] == 1
+    assert result.num_found == 1
 
 
 async def test_semantic_text_search_propagates_max_results(rag_client, mock_embedder):

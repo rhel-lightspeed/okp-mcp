@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 import httpx
 
 from .common import rag_query
+from .models import RagResponse
 
 if TYPE_CHECKING:
     from .embeddings import Embedder
@@ -26,7 +27,7 @@ async def semantic_search(
     client: httpx.AsyncClient,
     solr_url: str,
     max_results: int = 10,
-) -> dict:
+) -> RagResponse:
     """Run a KNN vector search against the portal-rag /semantic-search handler.
 
     Accepts a pre-computed 384-dimensional embedding vector. The vector must
@@ -65,7 +66,7 @@ async def semantic_text_search(
     client: httpx.AsyncClient,
     solr_url: str,
     max_results: int = 10,
-) -> dict:
+) -> RagResponse:
     """Embed text and run KNN semantic search against the portal-rag core.
 
     Converts text to a 384-dimensional vector using the embedder, then calls

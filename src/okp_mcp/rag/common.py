@@ -3,17 +3,43 @@
 import httpx
 
 from ..config import logger
+from .models import RagDocument, RagResponse
+
+EMPTY_RAG_RESPONSE = RagResponse(num_found=0, docs=[])
 
 
-def _empty_rag_response() -> dict:
-    """Return a fresh empty RAG response dict (avoids shared-mutable-state bugs)."""
-    return {"response": {"numFound": 0, "docs": []}}
+def _parse_solr_response(data: dict) -> RagResponse:
+    """Validate and parse raw Solr JSON into a RagResponse.
+
+    Args:
+        data: Parsed JSON dict from Solr.
+
+    Returns:
+        RagResponse with parsed docs, or empty RagResponse on validation failure.
+    """
+    if "error" in data:
+        logger.error("RAG query Solr error: %s", data["error"])
+        return RagResponse(num_found=0, docs=[])
+
+    response_data = data.get("response")
+    if not isinstance(response_data, dict):
+        logger.error("RAG query unexpected structure: %s", list(data.keys()))
+        return RagResponse(num_found=0, docs=[])
+
+    num_found = response_data.get("numFound")
+    docs = response_data.get("docs")
+    if not isinstance(num_found, int) or not isinstance(docs, list):
+        logger.error("RAG query unexpected response payload types")
+        return RagResponse(num_found=0, docs=[])
+
+    logger.info("RAG query returned %d result(s)", num_found)
+    return RagResponse(
+        num_found=num_found,
+        docs=[RagDocument(**doc) for doc in docs],
+    )
 
 
-EMPTY_RAG_RESPONSE: dict = _empty_rag_response()
-
-
-async def rag_query(endpoint: str, params: dict, client: httpx.AsyncClient) -> dict:
+async def rag_query(endpoint: str, params: dict, client: httpx.AsyncClient) -> RagResponse:
     """Execute a query against the portal-rag Solr core and return parsed JSON.
 
     Args:
@@ -22,13 +48,13 @@ async def rag_query(endpoint: str, params: dict, client: httpx.AsyncClient) -> d
         client: Shared AsyncClient instance.
 
     Returns:
-        Parsed JSON response or EMPTY_RAG_RESPONSE on error.
+        RagResponse with parsed docs or empty RagResponse on error.
 
     Raises:
         httpx.TimeoutException: If query times out.
         httpx.ConnectError: If connection fails.
         httpx.HTTPStatusError: If HTTP status is not 2xx.
-        httpx.RequestError: On other network errors.
+        httpx.RequestError: On other network requests.
     """
     full_params = {"wt": "json"} | params
     logger.info("RAG query: endpoint=%r q=%r", endpoint, params.get("q"))
@@ -50,14 +76,6 @@ async def rag_query(endpoint: str, params: dict, client: httpx.AsyncClient) -> d
         raise
     except ValueError as e:
         logger.error("RAG query returned non-JSON response: %s", e)
-        return _empty_rag_response()
+        return RagResponse(num_found=0, docs=[])
 
-    if "error" in data:
-        logger.error("RAG query Solr error: %s", data["error"])
-        return _empty_rag_response()
-    if "response" not in data or not isinstance(data.get("response", {}).get("docs"), list):
-        logger.error("RAG query unexpected structure: %s", list(data.keys()))
-        return _empty_rag_response()
-
-    logger.info("RAG query returned %d result(s)", data["response"]["numFound"])
-    return data
+    return _parse_solr_response(data)
