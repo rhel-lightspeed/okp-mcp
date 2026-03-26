@@ -169,3 +169,35 @@ async def test_semantic_text_search_propagates_max_results(rag_client, mock_embe
     call_params = route.calls[0].request.url.params
     assert call_params["rows"] == "25"
     assert "topK=25" in call_params["q"]
+
+
+async def test_semantic_text_search_forwards_fl_to_semantic_search(rag_client, mock_embedder):
+    """semantic_text_search passes fl through to the underlying semantic_search call."""
+    with respx.mock(assert_all_called=True) as router:
+        route = router.get(SEMANTIC_ENDPOINT).mock(return_value=httpx.Response(200, json=RAG_SEMANTIC_RESPONSE))
+        await semantic_text_search(
+            "test query", embedder=mock_embedder, client=rag_client, solr_url=SOLR_URL, fl="doc_id,title"
+        )
+
+    call_params = route.calls[0].request.url.params
+    assert call_params["fl"] == "doc_id,title"
+
+
+async def test_semantic_search_sends_fl_when_provided(rag_client):
+    """semantic_search sends fl param to Solr when explicitly provided."""
+    with respx.mock(assert_all_called=True) as router:
+        route = router.get(SEMANTIC_ENDPOINT).mock(return_value=httpx.Response(200, json=RAG_SEMANTIC_RESPONSE))
+        await semantic_search(VALID_VECTOR, client=rag_client, solr_url=SOLR_URL, fl="doc_id,title,chunk")
+
+    call_params = route.calls[0].request.url.params
+    assert call_params["fl"] == "doc_id,title,chunk"
+
+
+async def test_semantic_search_omits_fl_when_none(rag_client):
+    """semantic_search does not send fl param when fl is None (default)."""
+    with respx.mock(assert_all_called=True) as router:
+        route = router.get(SEMANTIC_ENDPOINT).mock(return_value=httpx.Response(200, json=RAG_SEMANTIC_RESPONSE))
+        await semantic_search(VALID_VECTOR, client=rag_client, solr_url=SOLR_URL)
+
+    call_params = route.calls[0].request.url.params
+    assert "fl" not in call_params

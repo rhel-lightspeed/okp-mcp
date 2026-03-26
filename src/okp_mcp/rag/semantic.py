@@ -27,6 +27,7 @@ async def semantic_search(
     client: httpx.AsyncClient,
     solr_url: str,
     max_results: int = 10,
+    fl: str | None = None,
 ) -> RagResponse:
     """Run a KNN vector search against the portal-rag /semantic-search handler.
 
@@ -39,6 +40,7 @@ async def semantic_search(
         client: Shared AsyncClient instance.
         solr_url: Base Solr URL (e.g. 'http://localhost:8983').
         max_results: Maximum number of results to return (default 10).
+        fl: Field list to return from Solr (optional). If None, Solr defaults are used.
 
     Returns:
         RagResponse with matching document chunks.
@@ -56,6 +58,8 @@ async def semantic_search(
         "rows": max_results,
         "fq": "is_chunk:true",
     }
+    if fl is not None:
+        params["fl"] = fl
     return await rag_query(endpoint, params, client)
 
 
@@ -66,6 +70,7 @@ async def semantic_text_search(
     client: httpx.AsyncClient,
     solr_url: str,
     max_results: int = 10,
+    fl: str | None = None,
 ) -> RagResponse:
     """Embed text and run KNN semantic search against the portal-rag core.
 
@@ -78,9 +83,10 @@ async def semantic_text_search(
         client: Shared AsyncClient instance.
         solr_url: Base Solr URL (e.g. 'http://localhost:8983').
         max_results: Maximum number of results to return (default 10).
+        fl: Field list to return from Solr (optional). Forwarded to semantic_search().
 
     Returns:
         RagResponse with matching document chunks.
     """
     vector = await embedder.encode_async(text)
-    return await semantic_search(vector, client=client, solr_url=solr_url, max_results=max_results)
+    return await semantic_search(vector, client=client, solr_url=solr_url, max_results=max_results, fl=fl)

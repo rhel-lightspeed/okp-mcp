@@ -9,6 +9,11 @@ from .models import RagDocument, RagResponse
 
 EMPTY_RAG_RESPONSE = RagResponse(num_found=0, docs=[])
 
+RAG_FL = (
+    "doc_id,parent_id,title,chunk,headings,online_source_url,"
+    "product,product_version,chunk_index,num_tokens,documentKind,source_path,score"
+)
+
 
 def _split_quoted_and_plain(text: str) -> list[str]:
     """Split text into an ordered list of tokens: raw words and quoted phrases.
