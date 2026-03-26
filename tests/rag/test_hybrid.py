@@ -1,6 +1,7 @@
 """Tests for hybrid search against the portal-rag /hybrid-search handler."""
 
 import httpx
+import pytest
 import respx
 
 from okp_mcp.rag.hybrid import hybrid_search
@@ -111,3 +112,92 @@ async def test_hybrid_search_omits_fl_when_none(rag_client, rag_chunk_response):
 
     call_params = route.calls[0].request.url.params
     assert "fl" not in call_params
+
+
+async def test_hybrid_search_product_boost_sends_bq(rag_client, rag_chunk_response):
+    """hybrid_search with product adds bq boost param to Solr request."""
+    with respx.mock(assert_all_called=True) as router:
+        route = router.get(HYBRID_ENDPOINT).mock(return_value=httpx.Response(200, json=rag_chunk_response))
+        await hybrid_search("selinux", client=rag_client, solr_url=SOLR_URL, product="Red Hat Enterprise Linux")
+
+    call_params = route.calls[0].request.url.params
+    assert "bq" in call_params
+    assert 'product:("Red Hat Enterprise Linux")' in call_params["bq"]
+
+
+async def test_hybrid_search_product_none_no_bq(rag_client, rag_chunk_response):
+    """hybrid_search with product=None does not send bq param."""
+    with respx.mock(assert_all_called=True) as router:
+        route = router.get(HYBRID_ENDPOINT).mock(return_value=httpx.Response(200, json=rag_chunk_response))
+        await hybrid_search("selinux", client=rag_client, solr_url=SOLR_URL)
+
+    call_params = route.calls[0].request.url.params
+    assert "bq" not in call_params
+
+
+async def test_hybrid_search_empty_product_defaults_to_rhel(rag_client, rag_chunk_response):
+    """hybrid_search with empty product defaults bq to RHEL boost."""
+    with respx.mock(assert_all_called=True) as router:
+        route = router.get(HYBRID_ENDPOINT).mock(return_value=httpx.Response(200, json=rag_chunk_response))
+        await hybrid_search("selinux", client=rag_client, solr_url=SOLR_URL, product="")
+
+    call_params = route.calls[0].request.url.params
+    assert "bq" in call_params
+    assert "Red Hat Enterprise Linux" in call_params["bq"]
+
+
+@pytest.mark.parametrize(
+    ("product_input", "expected_bq_product"),
+    [
+        ("RHEL", "Red Hat Enterprise Linux"),
+        ("OCP", "Red Hat OpenShift Container Platform"),
+        ("Fedora", "Fedora"),
+    ],
+    ids=["alias-rhel", "alias-ocp", "unknown-passthrough"],
+)
+async def test_hybrid_search_product_alias_normalization(
+    rag_client, rag_chunk_response, product_input, expected_bq_product
+):
+    """hybrid_search normalizes known aliases and passes unknown products through in bq."""
+    with respx.mock(assert_all_called=True) as router:
+        route = router.get(HYBRID_ENDPOINT).mock(return_value=httpx.Response(200, json=rag_chunk_response))
+        await hybrid_search("test", client=rag_client, solr_url=SOLR_URL, product=product_input)
+
+    call_params = route.calls[0].request.url.params
+    assert f'product:("{expected_bq_product}")' in call_params["bq"]
+
+
+async def test_hybrid_search_product_strips_quotes_to_prevent_injection(rag_client, rag_chunk_response):
+    """hybrid_search strips double quotes from product to prevent Solr query injection."""
+    with respx.mock(assert_all_called=True) as router:
+        route = router.get(HYBRID_ENDPOINT).mock(return_value=httpx.Response(200, json=rag_chunk_response))
+        await hybrid_search("test", client=rag_client, solr_url=SOLR_URL, product='mal")^999 OR (*:*')
+
+    call_params = route.calls[0].request.url.params
+    bq = call_params["bq"]
+    assert bq == 'product:("mal)^999 OR (*:*")^10'
+    assert '")^999' not in bq
+
+
+async def test_hybrid_search_product_strips_backslashes(rag_client, rag_chunk_response):
+    """hybrid_search strips backslashes from product to prevent escaping the closing quote."""
+    with respx.mock(assert_all_called=True) as router:
+        route = router.get(HYBRID_ENDPOINT).mock(return_value=httpx.Response(200, json=rag_chunk_response))
+        await hybrid_search("test", client=rag_client, solr_url=SOLR_URL, product="test\\")
+
+    call_params = route.calls[0].request.url.params
+    bq = call_params["bq"]
+    assert bq == 'product:("test")^10'
+    assert "\\" not in bq
+
+
+async def test_hybrid_search_product_uses_bq_not_fq(rag_client, rag_chunk_response):
+    """hybrid_search uses bq (boost) not fq (filter) for product, so CVEs/errata aren't dropped."""
+    with respx.mock(assert_all_called=True) as router:
+        route = router.get(HYBRID_ENDPOINT).mock(return_value=httpx.Response(200, json=rag_chunk_response))
+        await hybrid_search("test", client=rag_client, solr_url=SOLR_URL, product="RHEL")
+
+    call_params = route.calls[0].request.url.params
+    # fq should only contain is_chunk:true, NOT any product filter
+    assert call_params["fq"] == "is_chunk:true"
+    assert "bq" in call_params
