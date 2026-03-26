@@ -92,6 +92,15 @@ tests/
   functional_cases.py  # FunctionalCase dataclass + parametrized RSPEED test data
   test_functional.py   # Vertex AI functional tests (gated behind -m functional)
   test_*.py            # unit test modules mirror src structure
+  rag/                 # tests for src/okp_mcp/rag/ subpackage
+    conftest.py        # RAG-specific fixtures (rag_chunk_response, rag_client)
+    test_common.py     # rag_query() HTTP handling, error paths, logging
+    test_embeddings.py # Embedder construction, encode, encode_async, cleanup
+    test_hybrid.py     # hybrid_search() params, endpoint, response parsing
+    test_lexical.py    # lexical_search() eDisMax params, chunk filter, defaults
+    test_models.py     # RagDocument + RagResponse construction, extras, equality
+    test_rrf.py        # reciprocal_rank_fusion() merging, scoring, edge cases
+    test_semantic.py   # semantic_search() KNN, dimension validation, text search
   fixtures/
     functional_system_prompt.txt  # LLM system prompt for functional tests
 docs/
@@ -112,7 +121,7 @@ INCORRECT_ANSWER_LOOP.md  # step-by-step workflow for turning RSPEED "incorrect 
 | Change content cleaning | `src/okp_mcp/content.py` | `strip_boilerplate()` regex, `truncate_content()` |
 | Modify config/CLI args | `src/okp_mcp/config.py` | Add field to `ServerConfig`; auto-generates CLI arg via `MCP_` prefix |
 | Add functional test case | `tests/functional_cases.py` | Add `FunctionalCase` to `FUNCTIONAL_TEST_CASES` list |
-| Mock Solr responses | `tests/conftest.py` | `solr_mock` fixture uses respx |
+| Mock Solr responses | `tests/conftest.py` | `solr_mock` fixture uses respx; RAG fixtures in `tests/rag/conftest.py` |
 | Deploy to OpenShift | `openshift/okp-mcp.yml` | Template with params: IMAGE, IMAGE_TAG, REPLICAS, etc. |
 | Solr schema reference | `docs/OKP_RAG_EXPLORATION.md` | RAG container cores, vector embeddings, schema comparison |
 | Legacy Solr reference | `docs/SOLR_EXPLORATION.md` | Historical: original redhat-okp container schema map |
