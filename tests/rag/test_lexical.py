@@ -100,3 +100,23 @@ async def test_lexical_search_returns_rag_response(rag_client, rag_chunk_respons
     assert result.num_found == 1
     assert len(result.docs) == 1
     assert result.docs[0].doc_id == "/security/cve/CVE-2024-42225_chunk_2"
+
+
+async def test_lexical_search_sends_fl_when_provided(rag_client, rag_chunk_response):
+    """lexical_search sends fl param to Solr when explicitly provided."""
+    with respx.mock(assert_all_called=True) as router:
+        route = router.get(LEXICAL_ENDPOINT).mock(return_value=httpx.Response(200, json=rag_chunk_response))
+        await lexical_search("test query", client=rag_client, solr_url=SOLR_URL, fl="doc_id,title,chunk")
+
+    call_params = route.calls[0].request.url.params
+    assert call_params["fl"] == "doc_id,title,chunk"
+
+
+async def test_lexical_search_omits_fl_when_none(rag_client, rag_chunk_response):
+    """lexical_search does not send fl param when fl is None (default)."""
+    with respx.mock(assert_all_called=True) as router:
+        route = router.get(LEXICAL_ENDPOINT).mock(return_value=httpx.Response(200, json=rag_chunk_response))
+        await lexical_search("test query", client=rag_client, solr_url=SOLR_URL)
+
+    call_params = route.calls[0].request.url.params
+    assert "fl" not in call_params
