@@ -10,13 +10,26 @@ tone_instructions: >
 
 reviews:
   profile: chill
-  collapse_walkthrough: true
+  collapse_walkthrough: false
   poem: false
   request_changes_workflow: true
   high_level_summary: false
   high_level_summary_placeholder: "@coderabbitai summary"
   abort_on_close: true
   review_status: true
+  suggested_labels: false
+  suggested_reviewers: false
+  in_progress_fortune: false
+
+  pre_merge_checks:
+    title:
+      mode: error
+      requirements: "Use conventional commits format (e.g., 'feat: add search', 'fix: handle timeout')"
+    docstrings:
+      mode: warning
+      threshold: 80
+    description:
+      mode: warning
 
   auto_review:
     enabled: true
