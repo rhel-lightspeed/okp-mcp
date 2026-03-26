@@ -2,6 +2,42 @@
 
 from .models import RagDocument
 
+# Indexed doc: original position paired with the document for rank-order tracking.
+_IndexedDoc = tuple[int, RagDocument]
+
+
+def _chunk_sort_key(item: _IndexedDoc) -> tuple[int, int]:
+    """Sort key preferring lowest input position, then highest chunk_index."""
+    idx, doc = item
+    return (idx, -(doc.chunk_index or 0))
+
+
+def _passes_token_threshold(doc: RagDocument, min_tokens: int) -> bool:
+    """Return True if the chunk meets the minimum token count (None counts as passing)."""
+    return doc.num_tokens is None or doc.num_tokens >= min_tokens
+
+
+def _partition_by_parent(docs: list[RagDocument]) -> tuple[list[_IndexedDoc], dict[str, list[_IndexedDoc]]]:
+    """Split docs into orphans (no parent_id) and groups keyed by parent_id."""
+    orphans: list[_IndexedDoc] = []
+    groups: dict[str, list[_IndexedDoc]] = {}
+    for idx, doc in enumerate(docs):
+        if doc.parent_id is None:
+            orphans.append((idx, doc))
+        else:
+            groups.setdefault(doc.parent_id, []).append((idx, doc))
+    return orphans, groups
+
+
+def _select_best_per_group(groups: dict[str, list[_IndexedDoc]], min_tokens: int) -> list[_IndexedDoc]:
+    """Pick the top-ranked chunk from each parent group, filtering short chunks first."""
+    selected: list[_IndexedDoc] = []
+    for group in groups.values():
+        filtered = [item for item in group if _passes_token_threshold(item[1], min_tokens)]
+        candidates = filtered or group
+        selected.append(min(candidates, key=_chunk_sort_key))
+    return selected
+
 
 def deduplicate_chunks(
     docs: list[RagDocument],
@@ -31,32 +67,11 @@ def deduplicate_chunks(
     if not docs:
         return []
 
-    none_parent_docs = []
-    parent_groups: dict[str, list[tuple[int, RagDocument]]] = {}
-
-    for idx, doc in enumerate(docs):
-        if doc.parent_id is None:
-            none_parent_docs.append((idx, doc))
-        else:
-            if doc.parent_id not in parent_groups:
-                parent_groups[doc.parent_id] = []
-            parent_groups[doc.parent_id].append((idx, doc))
-
-    selected = []
-
-    for parent_id, group in parent_groups.items():
-        filtered = [(idx, doc) for idx, doc in group if doc.num_tokens is None or doc.num_tokens >= min_tokens]
-
-        if not filtered:
-            filtered = group
-
-        best_idx, best_doc = min(filtered, key=lambda x: (x[0], -(x[1].chunk_index or 0)))
-        selected.append((best_idx, best_doc))
-
-    all_selected = none_parent_docs + selected
-    all_selected.sort(key=lambda x: x[0])
-
-    return [doc for _, doc in all_selected]
+    orphans, groups = _partition_by_parent(docs)
+    selected = _select_best_per_group(groups, min_tokens)
+    merged = orphans + selected
+    merged.sort(key=lambda x: x[0])
+    return [doc for _, doc in merged]
 
 
 def format_rag_result(doc: RagDocument) -> str:
