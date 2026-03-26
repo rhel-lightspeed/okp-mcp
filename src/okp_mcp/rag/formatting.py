@@ -57,3 +57,45 @@ def deduplicate_chunks(
     all_selected.sort(key=lambda x: x[0])
 
     return [doc for _, doc in all_selected]
+
+
+def format_rag_result(doc: RagDocument) -> str:
+    """Format a RagDocument chunk as a markdown result block.
+
+    Produces a structured text block with title (bold), section headings,
+    product info, URL, and chunk content. Lines for missing fields are
+    omitted entirely (no "None" or empty lines).
+
+    Args:
+        doc: RagDocument chunk to format.
+
+    Returns:
+        Formatted markdown string for LLM consumption.
+    """
+    lines: list[str] = []
+
+    # Title (always present, bold)
+    lines.append(f"**{doc.title}**" if doc.title else "**Untitled**")
+
+    # Section from headings (comma-separated in Solr, display with " > ")
+    if doc.headings:
+        section = " > ".join(h.strip() for h in doc.headings.split(","))
+        lines.append(f"Section: {section}")
+
+    # Product + version
+    if doc.product:
+        product_str = ", ".join(doc.product)
+        if doc.product_version:
+            product_str = f"{product_str} {doc.product_version}"
+        lines.append(f"Product: {product_str}")
+
+    # URL
+    if doc.online_source_url:
+        lines.append(f"URL: {doc.online_source_url}")
+
+    # Chunk content (separated by blank line)
+    if doc.chunk:
+        lines.append("")  # blank line before content
+        lines.append(doc.chunk)
+
+    return "\n".join(lines)
