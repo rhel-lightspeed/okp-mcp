@@ -79,8 +79,9 @@ src/okp_mcp/
   content.py     # Boilerplate stripping, content truncation, text cleaning
   formatting.py  # Result annotation, deprecation/replacement detection, sort keys
   rag/           # Query functions for portal-rag Solr core
-    __init__.py  # re-exports: lexical_search, hybrid_search, semantic_search, semantic_text_search, reciprocal_rank_fusion
-    common.py    # lightweight Solr query runner, EMPTY_RAG_RESPONSE constant
+    __init__.py  # re-exports: RagDocument, RagResponse, lexical_search, hybrid_search, semantic_search, semantic_text_search, reciprocal_rank_fusion
+    models.py    # RagDocument + RagResponse Pydantic models for typed Solr responses
+    common.py    # lightweight Solr query runner, returns RagResponse
     lexical.py   # lexical_search() via /select (basic eDisMax)
     hybrid.py    # hybrid_search() via /hybrid-search (server-side boosted eDisMax)
     semantic.py  # semantic_search() (KNN vector) + semantic_text_search() (text -> embed -> KNN)
@@ -118,6 +119,7 @@ INCORRECT_ANSWER_LOOP.md  # step-by-step workflow for turning RSPEED "incorrect 
 | Add a RAG query function | `src/okp_mcp/rag/` | One file per search type; `common.py` for the shared query runner |
 | Add embedding model | `src/okp_mcp/rag/embeddings.py` | Embedder class, ThreadPoolExecutor for async |
 | Add search fusion | `src/okp_mcp/rag/rrf.py` | reciprocal_rank_fusion(), pure function |
+| Use typed Solr response models | `src/okp_mcp/rag/models.py` | `RagDocument` (extra fields allowed) + `RagResponse` (num_found + docs) |
 | Change RAG query execution | `src/okp_mcp/rag/common.py` | `rag_query()` handles HTTP, JSON parsing, and error handling |
 
 ## Boot Sequence
@@ -141,12 +143,13 @@ tools.py    → config, server, solr, content, formatting
 formatting.py → content, solr
 solr.py     → config
 content.py  → (standalone)
-rag/common.py     → config (logger only)
-rag/lexical.py    → rag.common
-rag/hybrid.py     → rag.common
-rag/semantic.py   → rag.common, rag.embeddings (TYPE_CHECKING only, not at runtime)
+rag/models.py     → (standalone, pydantic only)
+rag/common.py     → config (logger only), rag.models
+rag/lexical.py    → rag.common, rag.models
+rag/hybrid.py     → rag.common, rag.models
+rag/semantic.py   → rag.common, rag.models, rag.embeddings (TYPE_CHECKING only, not at runtime)
 rag/embeddings.py → sentence_transformers, torch (isolated here only)
-rag/rrf.py        → (standalone, no imports)
+rag/rrf.py        → rag.models
 ```
 
 No circular imports. `content.py` has zero internal dependencies.
