@@ -18,7 +18,7 @@ async def hybrid_search(
     The /hybrid-search Solr handler has server-side eDisMax configuration with
     field boosts (title^30, chunk^20, headings_txt^15), phrase boosting, recency
     bias, and document-type weighting. Only q, rows, and fq are sent from the
-    client. Returns the raw Solr JSON response.
+    client.
 
     Args:
         query: Search query string.
@@ -27,7 +27,7 @@ async def hybrid_search(
         max_results: Maximum number of results to return (default 10).
 
     Returns:
-        Raw Solr JSON response dict.
+        RagResponse with matching document chunks.
     """
     endpoint = f"{solr_url}/solr/portal-rag/hybrid-search"
     params = {

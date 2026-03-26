@@ -41,7 +41,7 @@ async def semantic_search(
         max_results: Maximum number of results to return (default 10).
 
     Returns:
-        Raw Solr JSON response dict.
+        RagResponse with matching document chunks.
 
     Raises:
         ValueError: If vector length is not 384.
@@ -80,7 +80,7 @@ async def semantic_text_search(
         max_results: Maximum number of results to return (default 10).
 
     Returns:
-        Raw Solr JSON response dict (same shape as semantic_search).
+        RagResponse with matching document chunks.
     """
     vector = await embedder.encode_async(text)
     return await semantic_search(vector, client=client, solr_url=solr_url, max_results=max_results)
