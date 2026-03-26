@@ -13,6 +13,15 @@ class RagDocument(BaseModel):
     title: str | None = None
     chunk: str | None = None
     rrf_score: float | None = None
+    headings: str | None = None
+    online_source_url: str | None = None
+    product: list[str] | None = None
+    product_version: str | None = None
+    chunk_index: int | None = None
+    num_tokens: int | None = None
+    source_path: str | None = None
+    documentKind: str | None = None
+    score: float | None = None
 
 
 class RagResponse(BaseModel):
