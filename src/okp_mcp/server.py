@@ -35,8 +35,10 @@ async def _app_lifespan(server: FastMCP) -> AsyncIterator[dict[str, AppContext]]
     solr_endpoint = cfg.solr_endpoint
     max_response_chars = cfg.max_response_chars
     rag_solr_url = cfg.rag_solr_url or cfg.solr_url
-    if cfg.rag_solr_url is None:
+    if not cfg.rag_solr_url:
         logger.warning("MCP_RAG_SOLR_URL not set; falling back to solr_url (%s) for RAG queries", cfg.solr_url)
+        mcp.disable(tags={"rag"})
+        logger.info("RAG tools disabled: MCP_RAG_SOLR_URL not set")
     logger.info("SOLR endpoint: %s", solr_endpoint)
     logger.info("RAG Solr URL: %s", rag_solr_url)
     client = httpx.AsyncClient(timeout=30.0)
