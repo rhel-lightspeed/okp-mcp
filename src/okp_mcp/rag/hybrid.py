@@ -3,6 +3,7 @@
 import httpx
 
 from .common import rag_query
+from .models import RagResponse
 
 
 async def hybrid_search(
@@ -11,7 +12,7 @@ async def hybrid_search(
     client: httpx.AsyncClient,
     solr_url: str,
     max_results: int = 10,
-) -> dict:
+) -> RagResponse:
     """Run a boosted lexical search against the portal-rag /hybrid-search handler.
 
     The /hybrid-search Solr handler has server-side eDisMax configuration with

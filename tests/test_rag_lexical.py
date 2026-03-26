@@ -4,6 +4,7 @@ import httpx
 import respx
 
 from okp_mcp.rag.lexical import lexical_search
+from okp_mcp.rag.models import RagResponse
 
 LEXICAL_ENDPOINT = "http://localhost:8983/solr/portal-rag/select"
 SOLR_URL = "http://localhost:8983"
@@ -16,7 +17,7 @@ async def test_lexical_search_sends_get_to_select_endpoint(rag_client, rag_chunk
         result = await lexical_search("kernel panic", client=rag_client, solr_url=SOLR_URL)
 
     assert route.called
-    assert result == rag_chunk_response
+    assert result.num_found == 1
 
 
 async def test_lexical_search_includes_deftype_edismax(rag_client, rag_chunk_response):
@@ -89,14 +90,13 @@ async def test_lexical_search_passes_empty_query_as_is(rag_client, rag_chunk_res
     assert call_params["q"] == ""
 
 
-async def test_lexical_search_returns_raw_dict_from_rag_query(rag_client, rag_chunk_response):
-    """lexical_search returns raw dict from rag_query()."""
+async def test_lexical_search_returns_rag_response(rag_client, rag_chunk_response):
+    """lexical_search returns RagResponse from rag_query()."""
     with respx.mock(assert_all_called=True) as router:
         router.get(LEXICAL_ENDPOINT).mock(return_value=httpx.Response(200, json=rag_chunk_response))
         result = await lexical_search("test query", client=rag_client, solr_url=SOLR_URL)
 
-    assert isinstance(result, dict)
-    assert "response" in result
-    assert result["response"]["numFound"] == 1
-    assert len(result["response"]["docs"]) == 1
-    assert result["response"]["docs"][0]["doc_id"] == "/security/cve/CVE-2024-42225_chunk_2"
+    assert isinstance(result, RagResponse)
+    assert result.num_found == 1
+    assert len(result.docs) == 1
+    assert result.docs[0].doc_id == "/security/cve/CVE-2024-42225_chunk_2"
