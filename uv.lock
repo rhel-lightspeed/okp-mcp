@@ -1130,7 +1130,7 @@ dev = [
     { name = "pytest-xdist", specifier = ">=3.8.0" },
     { name = "radon", specifier = ">=6.0.1" },
     { name = "respx", specifier = ">=0.22" },
-    { name = "ruff", specifier = ">=0.15.6" },
+    { name = "ruff", specifier = ">=0.15.7" },
     { name = "ty", specifier = ">=0.0.23" },
 ]
 
