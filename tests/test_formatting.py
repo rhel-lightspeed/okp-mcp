@@ -143,7 +143,7 @@ class TestFormatResultProductPassthrough:
             "main_content": "Deploy on Red Hat Virtualization or VMware for storage.",
         }
         data: dict = {"highlighting": {}}
-        result, sort_key = await _format_result(doc, data, include_content=True, query="odf troubleshoot")
+        _, sort_key = await _format_result(doc, data, include_content=True, query="odf troubleshoot")
         assert sort_key != SORT_EOL_PRODUCT
 
     async def test_format_result_eol_product_still_demoted(self):
@@ -157,5 +157,5 @@ class TestFormatResultProductPassthrough:
             "main_content": "Red Hat Virtualization Manager installation steps.",
         }
         data: dict = {"highlighting": {}}
-        result, sort_key = await _format_result(doc, data, include_content=True, query="install rhv")
+        _, sort_key = await _format_result(doc, data, include_content=True, query="install rhv")
         assert sort_key == SORT_EOL_PRODUCT
