@@ -246,7 +246,7 @@ Two new embedding fields: `embedding_model` (default: `"ibm-granite/granite-embe
 
 - Use `Containerfile` (not Dockerfile), build with `podman`
 - Multi-stage build: UBI 10 builder + minimal UBI 10 Python 3.12 runtime
-- `podman-compose up -d` to run with Solr (uses `rhokp-rag` image from `images.paas.redhat.com`)
+- `podman-compose up -d` to run with Solr (default: `rhokp-rhel9` from `registry.redhat.io`; RAG variant on port 8984 from `images.paas.redhat.com`)
 - Embedding model (`ibm-granite/granite-embedding-30m-english`) is pre-cached in the builder stage via `huggingface_hub.snapshot_download()` to `/build/models`, then copied to `/app/models` in the runtime image
 - `HF_HUB_CACHE=/app/models` points sentence-transformers to the cached model; `HF_HUB_OFFLINE=1` prevents network calls at runtime
 
