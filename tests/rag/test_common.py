@@ -7,7 +7,7 @@ import httpx
 import pytest
 import respx
 
-from okp_mcp.rag.common import rag_query
+from okp_mcp.rag.common import clean_rag_query, rag_query
 
 RAG_ENDPOINT = "http://localhost:8983/solr/portal-rag/select"
 
@@ -80,3 +80,29 @@ async def test_rag_query_logs_at_info_level(rag_client, caplog):
     assert route.called
     assert result.num_found == 2
     assert any("RAG query" in record.message for record in caplog.records if record.levelno == logging.INFO)
+
+
+@pytest.mark.parametrize(
+    "input_query, expected",
+    [
+        ("the red hat enterprise linux", "red hat enterprise linux"),  # stopword removal
+        ("rpm-ostree update", '"rpm-ostree" update'),  # hyphenated quoting
+        ("RHEL 9.4 kernel", "RHEL 9.4 kernel"),  # numeric preservation
+        ("the and or", "the and or"),  # all-stopwords fallback -> original
+        ("the and ?", "the and ?"),  # punctuation-only token stripped, fallback to original
+        ("", ""),  # empty string
+        ('"exact phrase" kernel', '"exact phrase" kernel'),  # quoted preservation
+    ],
+    ids=["stopwords", "hyphenated", "numeric", "all-stopwords", "punctuation-only", "empty", "quoted-phrase"],
+)
+def test_clean_rag_query(input_query, expected):
+    """clean_rag_query produces Solr-optimized tokens."""
+    assert clean_rag_query(input_query) == expected
+
+
+def test_clean_rag_query_short_hyphenated_not_quoted():
+    """clean_rag_query leaves short hyphenated tokens (<=3 chars) unquoted."""
+    # "A-B" has length 3, should NOT be wrapped in quotes
+    result = clean_rag_query("A-B test")
+    assert '"A-B"' not in result
+    assert "A-B" in result

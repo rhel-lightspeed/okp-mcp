@@ -1,11 +1,87 @@
 """Query runner and shared constants for the portal-rag Solr core."""
 
+import re
+
 import httpx
 
-from ..config import logger
+from ..config import STOP_WORDS, logger
 from .models import RagDocument, RagResponse
 
 EMPTY_RAG_RESPONSE = RagResponse(num_found=0, docs=[])
+
+
+def _split_quoted_and_plain(text: str) -> list[str]:
+    """Split text into an ordered list of tokens: raw words and quoted phrases.
+
+    Quoted phrases are preserved as-is (including the double-quote delimiters).
+    Empty quoted phrases ('""') are skipped.
+    Unmatched opening quotes cause remaining text to be treated as plain words.
+    """
+    tokens: list[str] = []
+    remainder = text
+    while '"' in remainder:
+        before, _, rest = remainder.partition('"')
+        tokens.extend(before.split())
+        if '"' not in rest:
+            tokens.extend(rest.split())
+            remainder = ""
+            break
+        phrase, _, remainder = rest.partition('"')
+        if phrase:
+            tokens.append(f'"{phrase}"')
+    tokens.extend(remainder.split())
+    return tokens
+
+
+def _quote_hyphenated_compounds(tokens: list[str]) -> list[str]:
+    """Wrap hyphenated compound terms in double quotes for SOLR phrase matching.
+
+    Solr's standard tokenizer splits on hyphens, so ``rpm-ostree`` becomes two
+    independent tokens ``rpm`` and ``ostree``.  Quoting forces Solr to match the
+    full compound as a phrase, preventing generic ``rpm`` matches from drowning
+    out specific ``rpm-ostree`` content.
+
+    Already-quoted tokens and short fragments (<=3 chars) are left untouched.
+    """
+    return [f'"{t}"' if "-" in t and not t.startswith('"') and len(t) > 3 else t for t in tokens]
+
+
+_TERM_TRIM_CHARS = "?.,!"
+
+
+def _normalize_query_token(token: str) -> str:
+    """Strip trailing punctuation and lowercase a query token for BM25 matching."""
+    return token.lower().strip(_TERM_TRIM_CHARS)
+
+
+def _is_numeric(token: str) -> bool:
+    """Return True for numeric version tokens (e.g. '10', '9', '9.4', '4.16')."""
+    return bool(re.fullmatch(r"\d+(?:\.\d+)*", _normalize_query_token(token)))
+
+
+def clean_rag_query(query: str) -> str:
+    """Clean a query string for RAG Solr search.
+
+    Strips English stopwords, quotes hyphenated compounds for phrase
+    matching, and preserves numeric tokens (e.g. version numbers).
+    Falls back to the original query if all tokens are stopwords.
+
+    Args:
+        query: Raw user query string.
+
+    Returns:
+        Cleaned query string optimized for Solr eDisMax search.
+    """
+    tokens = _split_quoted_and_plain(query)
+    parts = [
+        t
+        for t in tokens
+        if t.startswith('"')
+        or _is_numeric(t)
+        or (_normalize_query_token(t) and _normalize_query_token(t) not in STOP_WORDS)
+    ]
+    parts = _quote_hyphenated_compounds(parts)
+    return " ".join(parts) if parts else query
 
 
 def _parse_solr_response(data: dict) -> RagResponse:
