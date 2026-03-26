@@ -1,6 +1,8 @@
 """Tests for RAG result deduplication and formatting utilities."""
 
-from okp_mcp.rag.formatting import deduplicate_chunks
+import pytest
+
+from okp_mcp.rag.formatting import deduplicate_chunks, format_rag_result
 from okp_mcp.rag.models import RagDocument
 
 
@@ -103,3 +105,91 @@ def test_deduplicate_chunks_preserves_rank_order():
     result = deduplicate_chunks(docs)
     assert len(result) == 3
     assert [d.doc_id for d in result] == ["b_1", "a_1", "c_1"]
+
+
+def test_format_rag_result_full():
+    """format_rag_result with all fields produces complete markdown block."""
+    doc = RagDocument(
+        title="RHEL 9 Security Guide - Configuring SELinux",
+        headings="SELinux,Configuring SELinux,Changing SELinux Modes",
+        product=["Red Hat Enterprise Linux"],
+        product_version="9",
+        online_source_url="https://docs.redhat.com/en/documentation/configuring-selinux",
+        chunk="To change the SELinux mode to enforcing: Edit the /etc/selinux/config file.",
+    )
+    result = format_rag_result(doc)
+    assert "**RHEL 9 Security Guide - Configuring SELinux**" in result
+    assert "Section: SELinux > Configuring SELinux > Changing SELinux Modes" in result
+    assert "Product: Red Hat Enterprise Linux 9" in result
+    assert "URL: https://docs.redhat.com/en/documentation/configuring-selinux" in result
+    assert "To change the SELinux mode to enforcing" in result
+
+
+def test_format_rag_result_minimal():
+    """format_rag_result with only title and chunk omits optional lines."""
+    doc = RagDocument(title="Test Page", chunk="Some content here.")
+    result = format_rag_result(doc)
+    assert "**Test Page**" in result
+    assert "Some content here." in result
+    assert "Section:" not in result
+    assert "Product:" not in result
+    assert "URL:" not in result
+
+
+def test_format_rag_result_headings_parsing():
+    """format_rag_result converts comma-separated headings to ' > ' separated."""
+    doc = RagDocument(title="CVE Page", headings="CVE-2024-42225,Description,Impact")
+    result = format_rag_result(doc)
+    assert "Section: CVE-2024-42225 > Description > Impact" in result
+
+
+@pytest.mark.parametrize(
+    ("field_kwargs", "absent_label"),
+    [
+        ({"headings": None}, "Section:"),
+        ({"product": None}, "Product:"),
+        ({"online_source_url": None}, "URL:"),
+    ],
+    ids=["no-headings", "no-product", "no-url"],
+)
+def test_format_rag_result_omits_line_for_none_field(field_kwargs, absent_label):
+    """format_rag_result omits the corresponding line when an optional field is None."""
+    doc = RagDocument(title="Page", **field_kwargs)
+    result = format_rag_result(doc)
+    assert absent_label not in result
+
+
+def test_format_rag_result_product_display():
+    """format_rag_result displays single product correctly."""
+    doc = RagDocument(title="Page", product=["Red Hat Enterprise Linux"])
+    result = format_rag_result(doc)
+    assert "Product: Red Hat Enterprise Linux" in result
+
+
+def test_format_rag_result_multi_product():
+    """format_rag_result joins multiple products with comma."""
+    doc = RagDocument(title="Page", product=["RHEL", "OpenShift"])
+    result = format_rag_result(doc)
+    assert "Product: RHEL, OpenShift" in result
+
+
+def test_format_rag_result_none_chunk():
+    """format_rag_result omits content body when chunk is None."""
+    doc = RagDocument(title="Page", chunk=None)
+    result = format_rag_result(doc)
+    # Should just have the title, no trailing blank line + content
+    assert result.strip() == "**Page**"
+
+
+def test_format_rag_result_product_with_version():
+    """format_rag_result appends version after product on same line."""
+    doc = RagDocument(title="Page", product=["Red Hat Enterprise Linux"], product_version="9.4")
+    result = format_rag_result(doc)
+    assert "Product: Red Hat Enterprise Linux 9.4" in result
+
+
+def test_format_rag_result_no_title():
+    """format_rag_result uses 'Untitled' when title is None."""
+    doc = RagDocument(title=None, chunk="Some content.")
+    result = format_rag_result(doc)
+    assert "**Untitled**" in result
