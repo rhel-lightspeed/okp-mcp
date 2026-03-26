@@ -16,7 +16,7 @@ async def lexical_search(
     """Run a lexical search against the portal-rag /select handler.
 
     Uses basic eDisMax with title and chunk field boosts. Filters to chunk
-    documents only (is_chunk:true). Returns the raw Solr JSON response.
+    documents only (is_chunk:true).
 
     Args:
         query: Search query string.
@@ -25,7 +25,7 @@ async def lexical_search(
         max_results: Maximum number of results to return (default 10).
 
     Returns:
-        Raw Solr JSON response dict.
+        RagResponse with matching document chunks.
     """
     endpoint = f"{solr_url}/solr/portal-rag/select"
     params = {

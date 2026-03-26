@@ -2,8 +2,8 @@
 
 import pytest
 
-from okp_mcp.rag.models import RagDocument, RagResponse  # pyright: ignore[reportMissingImports]
-from okp_mcp.rag.rrf import reciprocal_rank_fusion  # pyright: ignore[reportMissingImports]
+from okp_mcp.rag.models import RagDocument, RagResponse
+from okp_mcp.rag.rrf import reciprocal_rank_fusion
 
 
 def _solr_response(*docs: RagDocument) -> RagResponse:

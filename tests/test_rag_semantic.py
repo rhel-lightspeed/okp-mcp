@@ -148,8 +148,8 @@ async def test_semantic_text_search_passes_vector_from_embedder_to_semantic_sear
     assert "0.01" in call_params["q"]
 
 
-async def test_semantic_text_search_returns_solr_response(rag_client, mock_embedder):
-    """semantic_text_search returns the raw Solr response dict."""
+async def test_semantic_text_search_returns_rag_response(rag_client, mock_embedder):
+    """semantic_text_search returns a RagResponse with parsed results."""
     with respx.mock:
         respx.get(SEMANTIC_ENDPOINT).mock(return_value=httpx.Response(200, json=RAG_SEMANTIC_RESPONSE))
         result = await semantic_text_search("test query", embedder=mock_embedder, client=rag_client, solr_url=SOLR_URL)
