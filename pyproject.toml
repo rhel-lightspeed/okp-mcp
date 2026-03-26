@@ -10,7 +10,7 @@ dependencies = [
     "httpx",
     "pydantic-settings>=2.13.1",
     "rank-bm25",
-    "sentence-transformers>=3.0.0",
+    "sentence-transformers>=3.4.1",
     "stop-words>=2025.11.4",
     "torch>=2.1.0",
 ]

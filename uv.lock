@@ -1114,9 +1114,9 @@ requires-dist = [
     { name = "httpx" },
     { name = "pydantic-settings", specifier = ">=2.13.1" },
     { name = "rank-bm25" },
-    { name = "sentence-transformers" },
+    { name = "sentence-transformers", specifier = ">=3.4.1" },
     { name = "stop-words", specifier = ">=2025.11.4" },
-    { name = "torch", index = "https://download.pytorch.org/whl/cpu" },
+    { name = "torch", specifier = ">=2.1.0", index = "https://download.pytorch.org/whl/cpu" },
 ]
 
 [package.metadata.requires-dev]
