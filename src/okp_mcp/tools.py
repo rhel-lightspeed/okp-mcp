@@ -108,7 +108,7 @@ def _build_search_queries(
 
     Returns (doc_params, sol_params, dep_params) ready to be passed to _solr_query().
     """
-    product_fq = f'(product:"{product}" OR (*:* -product:[* TO *]))'
+    product_fq = f'(product:"{product}"* OR (*:* -product:[* TO *]))'
     eol_fq = " AND ".join(f'-product:"{p}"' for p in _EOL_PRODUCTS)
     doc_filters = ["documentKind:(documentation OR access-drupal10-node-type-page)", product_fq, eol_fq]
     sol_filters = ["documentKind:(solution OR article)", product_fq, eol_fq]
