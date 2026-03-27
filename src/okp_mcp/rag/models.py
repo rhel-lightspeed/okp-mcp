@@ -32,6 +32,8 @@ class RagDocument(BaseModel):
     source_path: str | None = None
     documentKind: str | None = None
     score: float | None = None
+    total_chunks: int | None = None
+    total_tokens: int | None = None
 
 
 class RagResponse(BaseModel):
