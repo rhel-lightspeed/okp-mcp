@@ -12,7 +12,8 @@ from .common import RAG_FL, clean_rag_query
 from .context import expand_chunks
 from .formatting import deduplicate_chunks, format_rag_result
 from .hybrid import hybrid_search
-from .models import RagDocument, RagResponse
+from .models import PortalResponse, RagDocument, RagResponse
+from .portal import PORTAL_FL, portal_highlights_to_rag_results, portal_search
 from .rrf import reciprocal_rank_fusion
 from .semantic import semantic_text_search
 
@@ -58,26 +59,25 @@ async def _run_fused_search(
     max_results: int,
     product: str,
 ) -> RagResponse:
-    """Run hybrid and semantic search in parallel, merge via reciprocal rank fusion.
+    """Run hybrid, semantic (if available), and portal search in parallel, merged via RRF.
 
     Hybrid search uses the cleaned (stopword-stripped) query for BM25 precision.
     Semantic search uses the raw query for natural-language embedding quality.
-    If semantic fails, logs a warning and falls back to hybrid results only.
+    Portal search uses the cleaned query (same as hybrid, since it uses eDisMax BM25).
+    Semantic and portal failures are supplementary (warning + exclude from fusion).
     If hybrid fails, re-raises immediately (hybrid is the primary path).
+    When embedder is None, runs hybrid + portal only.
 
     Args:
         query: Original raw user query (for semantic search).
-        cleaned: Stopword-stripped query (for hybrid BM25 search).
+        cleaned: Stopword-stripped query (for hybrid BM25 search and portal search).
         app: Application context with HTTP client, Solr URL, and embedder.
         max_results: Row count to request from each search backend.
         product: Product filter/boost string.
 
     Returns:
-        RagResponse with merged, RRF-scored results (or hybrid-only on semantic failure).
+        RagResponse with merged, RRF-scored results.
     """
-    if app.embedder is None:
-        raise ValueError("Embedder is required for fused search")
-
     hybrid_coro = hybrid_search(
         cleaned,
         client=app.http_client,
@@ -86,21 +86,48 @@ async def _run_fused_search(
         fl=RAG_FL,
         product=product,
     )
-    semantic_coro = semantic_text_search(
-        query,
-        embedder=app.embedder,
+    portal_coro = portal_search(
+        cleaned,
         client=app.http_client,
         solr_url=app.rag_solr_url,
         max_results=max_results,
-        fl=RAG_FL,
+        fl=PORTAL_FL,
     )
-    hybrid_result, semantic_result = await asyncio.gather(hybrid_coro, semantic_coro, return_exceptions=True)
+
+    if app.embedder is not None:
+        semantic_coro = semantic_text_search(
+            query,
+            embedder=app.embedder,
+            client=app.http_client,
+            solr_url=app.rag_solr_url,
+            max_results=max_results,
+            fl=RAG_FL,
+        )
+        hybrid_result, semantic_result, portal_result = await asyncio.gather(
+            hybrid_coro, semantic_coro, portal_coro, return_exceptions=True
+        )
+    else:
+        hybrid_result, portal_result = await asyncio.gather(hybrid_coro, portal_coro, return_exceptions=True)
+        semantic_result = None
+
     if isinstance(hybrid_result, Exception):
         raise hybrid_result
+
+    rag_results: list[RagResponse] = [cast(RagResponse, hybrid_result)]
+
     if isinstance(semantic_result, Exception):
-        logger.warning("Semantic search failed, using hybrid results only", exc_info=semantic_result)
-        return cast(RagResponse, hybrid_result)
-    return reciprocal_rank_fusion(cast(RagResponse, hybrid_result), cast(RagResponse, semantic_result))
+        logger.warning("Semantic search failed, excluding from fusion", exc_info=semantic_result)
+    elif semantic_result is not None:
+        rag_results.append(cast(RagResponse, semantic_result))
+
+    if isinstance(portal_result, Exception):
+        logger.warning("Portal search failed, excluding from fusion", exc_info=portal_result)
+    else:
+        portal_rag = portal_highlights_to_rag_results(cast(PortalResponse, portal_result))
+        if portal_rag.docs:
+            rag_results.append(portal_rag)
+
+    return reciprocal_rank_fusion(*rag_results)
 
 
 @mcp.tool(tags={"rag"})
@@ -115,10 +142,10 @@ async def search_rag(
     Uses the portal-rag knowledge base, which provides higher-fidelity chunks
     from Red Hat documentation, CVEs, and errata than the portal search tools.
 
-    Coverage gaps: Does not include Red Hat solutions or articles. For
-    troubleshooting guides, use search_documentation or search_solutions instead.
-    Graceful degradation and context expansion: semantic failures fall back to
-    hybrid-only retrieval, and all results are context-expanded before formatting.
+    Also searches Red Hat solutions and articles from the portal core,
+    fused with documentation results via reciprocal rank fusion.
+    Graceful degradation: semantic or portal failures are excluded from fusion
+    (warning logged), and all results are context-expanded before formatting.
 
     When to prefer this tool:
     - Looking up CVE details, errata advisories, or documentation excerpts
@@ -140,17 +167,7 @@ async def search_rag(
     try:
         app = get_app_context(ctx)
         cleaned = clean_rag_query(query)
-        if app.embedder is not None:
-            response = await _run_fused_search(query, cleaned, app=app, max_results=max_results * 3, product=product)
-        else:
-            response = await hybrid_search(
-                cleaned,
-                client=app.http_client,
-                solr_url=app.rag_solr_url,
-                max_results=max_results * 3,
-                fl=RAG_FL,
-                product=product,
-            )
+        response = await _run_fused_search(query, cleaned, app=app, max_results=max_results * 3, product=product)
 
         if not response.docs:
             return f"No results found for: {query}"

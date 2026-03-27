@@ -8,7 +8,7 @@ import respx
 from fastmcp import Context
 
 from okp_mcp.rag.embeddings import Embedder
-from okp_mcp.rag.models import RagDocument, RagResponse
+from okp_mcp.rag.models import PortalDocument, PortalResponse, RagDocument, RagResponse
 from okp_mcp.rag.tools import search_rag
 from okp_mcp.server import AppContext
 
@@ -231,9 +231,11 @@ async def test_search_rag_fused_uses_raw_query_for_semantic(rag_client):
     )
     rrf_resp = RagResponse(num_found=2, docs=hybrid_resp.docs + semantic_resp.docs)
 
+    portal_resp = PortalResponse(num_found=0, docs=[], highlights={})
     with (
         patch("okp_mcp.rag.tools.hybrid_search", return_value=hybrid_resp) as mock_hybrid,
         patch("okp_mcp.rag.tools.semantic_text_search", return_value=semantic_resp) as mock_semantic,
+        patch("okp_mcp.rag.tools.portal_search", return_value=portal_resp),
         patch("okp_mcp.rag.tools.reciprocal_rank_fusion", return_value=rrf_resp),
     ):
         app = _make_app_context(rag_client, embedder=embedder)
@@ -258,9 +260,11 @@ async def test_search_rag_falls_back_to_hybrid_on_semantic_failure(rag_client, c
         docs=[RagDocument(doc_id="/h1", parent_id="/p1", chunk="hybrid only content", num_tokens=50)],
     )
 
+    portal_resp = PortalResponse(num_found=0, docs=[], highlights={})
     with (
         patch("okp_mcp.rag.tools.hybrid_search", return_value=hybrid_resp),
         patch("okp_mcp.rag.tools.semantic_text_search", side_effect=httpx.ConnectError("semantic down")),
+        patch("okp_mcp.rag.tools.portal_search", return_value=portal_resp),
         caplog.at_level(logging.WARNING),
     ):
         app = _make_app_context(rag_client, embedder=embedder)
@@ -275,17 +279,26 @@ async def test_search_rag_falls_back_to_hybrid_on_semantic_failure(rag_client, c
 
 
 async def test_search_rag_hybrid_only_when_no_embedder(rag_client, rag_chunk_response):
-    """search_rag uses hybrid-only path when AppContext.embedder is None."""
+    """search_rag calls hybrid and portal but NOT semantic when AppContext.embedder is None."""
+    portal_resp = PortalResponse(num_found=0, docs=[], highlights={})
     with (
-        respx.mock() as router,
+        patch(
+            "okp_mcp.rag.tools.hybrid_search",
+            return_value=RagResponse(
+                num_found=1,
+                docs=[RagDocument(doc_id="/h1", parent_id="/p1", chunk="hybrid result", num_tokens=50)],
+            ),
+        ),
+        patch("okp_mcp.rag.tools.portal_search", return_value=portal_resp) as mock_portal,
         patch("okp_mcp.rag.tools.semantic_text_search") as mock_semantic,
     ):
-        router.get(HYBRID_ENDPOINT).mock(return_value=httpx.Response(200, json=rag_chunk_response))
         app = _make_app_context(rag_client)  # embedder=None by default
         ctx = _make_ctx(app)
-        await search_rag(ctx, "firewall")
+        result = await search_rag(ctx, "firewall")
 
     mock_semantic.assert_not_called()
+    mock_portal.assert_called_once()
+    assert "Found" in result
 
 
 async def test_search_rag_calls_expand_chunks_after_dedup(rag_client, rag_chunk_response):
@@ -312,13 +325,144 @@ async def test_search_rag_calls_expand_chunks_after_dedup(rag_client, rag_chunk_
 async def test_search_rag_handles_hybrid_failure_in_fused_path(rag_client):
     """search_rag returns user-friendly message when hybrid fails in fused path."""
     embedder = MagicMock(spec=Embedder)
+    portal_resp = PortalResponse(num_found=0, docs=[], highlights={})
 
     with (
         patch("okp_mcp.rag.tools.hybrid_search", side_effect=httpx.ConnectError("solr down")),
         patch("okp_mcp.rag.tools.semantic_text_search", side_effect=httpx.ConnectError("semantic down")),
+        patch("okp_mcp.rag.tools.portal_search", return_value=portal_resp),
     ):
         app = _make_app_context(rag_client, embedder=embedder)
         ctx = _make_ctx(app)
         result = await search_rag(ctx, "test query")
 
     assert "unavailable" in result.lower()
+
+
+# --- Portal search integration tests ---
+
+
+async def test_search_rag_includes_portal_search(rag_client, caplog):
+    """search_rag calls portal_search and portal highlight results appear in output."""
+    embedder = MagicMock(spec=Embedder)
+    hybrid_resp = RagResponse(
+        num_found=1,
+        docs=[RagDocument(doc_id="/h1", parent_id="/p1", chunk="hybrid content", num_tokens=50)],
+    )
+    semantic_resp = RagResponse(num_found=0, docs=[])
+    portal_response = PortalResponse(
+        num_found=1,
+        docs=[
+            PortalDocument(
+                id="/solutions/123/index.html",
+                title="Portal Solution",
+                documentKind="solution",
+                url_slug="123",
+                score=0.8,
+            )
+        ],
+        highlights={"/solutions/123/index.html": ["Portal highlight snippet here."]},
+    )
+
+    with (
+        patch("okp_mcp.rag.tools.hybrid_search", return_value=hybrid_resp),
+        patch("okp_mcp.rag.tools.semantic_text_search", return_value=semantic_resp),
+        patch("okp_mcp.rag.tools.portal_search", return_value=portal_response) as mock_portal,
+    ):
+        app = _make_app_context(rag_client, embedder=embedder)
+        ctx = _make_ctx(app)
+        result = await search_rag(ctx, "test query")
+
+    mock_portal.assert_called_once()
+    assert "Found" in result
+    assert "Portal highlight snippet here." in result
+
+
+async def test_search_rag_portal_failure_graceful(rag_client, caplog):
+    """search_rag returns hybrid+semantic results when portal raises ConnectError."""
+    embedder = MagicMock(spec=Embedder)
+    hybrid_resp = RagResponse(
+        num_found=1,
+        docs=[RagDocument(doc_id="/h1", parent_id="/p1", chunk="hybrid result", num_tokens=50)],
+    )
+    semantic_resp = RagResponse(num_found=0, docs=[])
+
+    with (
+        patch("okp_mcp.rag.tools.hybrid_search", return_value=hybrid_resp),
+        patch("okp_mcp.rag.tools.semantic_text_search", return_value=semantic_resp),
+        patch("okp_mcp.rag.tools.portal_search", side_effect=httpx.ConnectError("portal down")),
+        caplog.at_level(logging.WARNING),
+    ):
+        app = _make_app_context(rag_client, embedder=embedder)
+        ctx = _make_ctx(app)
+        result = await search_rag(ctx, "firewall configuration")
+
+    assert "Found" in result
+    assert "hybrid result" in result
+    assert any("Portal search failed" in r.message for r in caplog.records)
+
+
+async def test_search_rag_no_embedder_with_portal(rag_client):
+    """When embedder=None, hybrid and portal are both called, semantic is not."""
+    hybrid_resp = RagResponse(
+        num_found=1,
+        docs=[RagDocument(doc_id="/h1", parent_id="/p1", chunk="hybrid result", num_tokens=50)],
+    )
+    portal_response = PortalResponse(
+        num_found=1,
+        docs=[
+            PortalDocument(
+                id="/solutions/456/index.html",
+                title="Solution",
+                documentKind="solution",
+                url_slug="456",
+                score=0.7,
+            )
+        ],
+        highlights={"/solutions/456/index.html": ["Portal content here."]},
+    )
+
+    with (
+        patch("okp_mcp.rag.tools.hybrid_search", return_value=hybrid_resp) as mock_hybrid,
+        patch("okp_mcp.rag.tools.portal_search", return_value=portal_response) as mock_portal,
+        patch("okp_mcp.rag.tools.semantic_text_search") as mock_semantic,
+    ):
+        app = _make_app_context(rag_client)  # embedder=None by default
+        ctx = _make_ctx(app)
+        result = await search_rag(ctx, "test query")
+
+    mock_hybrid.assert_called_once()
+    mock_portal.assert_called_once()
+    mock_semantic.assert_not_called()
+    assert "Found" in result
+    assert "Portal content here." in result
+
+
+async def test_search_rag_portal_no_highlights(rag_client):
+    """Portal returns docs but no highlights: portal excluded from fusion."""
+    embedder = MagicMock(spec=Embedder)
+    hybrid_resp = RagResponse(
+        num_found=1,
+        docs=[RagDocument(doc_id="/h1", parent_id="/p1", chunk="hybrid result", num_tokens=50)],
+    )
+    semantic_resp = RagResponse(num_found=0, docs=[])
+    portal_response = PortalResponse(
+        num_found=1,
+        docs=[PortalDocument(id="/solutions/789/index.html", title="No highlights")],
+        highlights={},
+    )
+
+    with (
+        patch("okp_mcp.rag.tools.hybrid_search", return_value=hybrid_resp),
+        patch("okp_mcp.rag.tools.semantic_text_search", return_value=semantic_resp),
+        patch("okp_mcp.rag.tools.portal_search", return_value=portal_response),
+        patch("okp_mcp.rag.tools.reciprocal_rank_fusion") as mock_rrf,
+    ):
+        mock_rrf.return_value = hybrid_resp
+        app = _make_app_context(rag_client, embedder=embedder)
+        ctx = _make_ctx(app)
+        await search_rag(ctx, "test query")
+
+    # reciprocal_rank_fusion should NOT receive portal results (empty highlights)
+    rag_results_passed = mock_rrf.call_args[0]
+    assert len(rag_results_passed) == 2  # hybrid + semantic (empty), no portal
