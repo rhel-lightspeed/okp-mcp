@@ -2,6 +2,10 @@
 
 MCP server bridging LLM tool calls to a Solr-indexed Red Hat knowledge base (docs, CVEs, errata, solutions). Built on FastMCP + httpx + pydantic-settings.
 
+## Maintenance Rule
+
+After any code change, verify that this file and any subpackage `AGENTS.md` files (e.g., `src/okp_mcp/rag/AGENTS.md`) are still accurate. Update them in the same PR if anything has drifted: new modules, changed function signatures, removed features, renamed files, new dependencies, etc.
+
 ## Build & Run
 
 ```bash
@@ -78,16 +82,7 @@ src/okp_mcp/
   solr.py        # Solr query builder, BM25 paragraph extraction, RHV filtering
   content.py     # Boilerplate stripping, content truncation, text cleaning
   formatting.py  # Result annotation, deprecation/replacement detection, sort keys
-  rag/           # Query functions for portal-rag Solr core
-    __init__.py  # re-exports: RagDocument, RagResponse, lexical_search, hybrid_search, semantic_search, semantic_text_search, reciprocal_rank_fusion
-    models.py    # RagDocument + RagResponse Pydantic models for typed Solr responses
-    common.py    # lightweight Solr query runner, returns RagResponse
-    lexical.py   # lexical_search() via /select (basic eDisMax)
-    hybrid.py    # hybrid_search() via /hybrid-search (server-side boosted eDisMax)
-    semantic.py  # semantic_search() (KNN vector) + semantic_text_search() (text -> embed -> KNN)
-    embeddings.py  # Embedder class: text-to-vector via granite-embedding-30m-english (ThreadPoolExecutor)
-    rrf.py       # reciprocal_rank_fusion() for merging lexical + semantic result sets
-    tools.py     # @mcp.tool definitions for RAG search (search_rag)
+  rag/           # RAG search pipeline (see rag/AGENTS.md for module details)
 tests/
   conftest.py          # shared fixtures (solr mocks, sample responses) + functional marker deselection
   functional_cases.py  # FunctionalCase dataclass + parametrized RSPEED test data
@@ -127,12 +122,7 @@ INCORRECT_ANSWER_LOOP.md  # step-by-step workflow for turning RSPEED "incorrect 
 | Deploy to OpenShift | `openshift/okp-mcp.yml` | Template with params: IMAGE, IMAGE_TAG, REPLICAS, etc. |
 | Solr schema reference | `docs/OKP_RAG_EXPLORATION.md` | RAG container cores, vector embeddings, schema comparison |
 | Legacy Solr reference | `docs/SOLR_EXPLORATION.md` | Historical: original redhat-okp container schema map |
-| Add a RAG query function | `src/okp_mcp/rag/` | One file per search type; `common.py` for the shared query runner |
-| Add a RAG MCP tool | `src/okp_mcp/rag/tools.py` | `@mcp.tool` with `tags={"rag"}`; conditionally disabled when `MCP_RAG_SOLR_URL` not set |
-| Add embedding model | `src/okp_mcp/rag/embeddings.py` | Embedder class, ThreadPoolExecutor for async |
-| Add search fusion | `src/okp_mcp/rag/rrf.py` | reciprocal_rank_fusion(), pure function |
-| Use typed Solr response models | `src/okp_mcp/rag/models.py` | `RagDocument` (extra fields allowed) + `RagResponse` (num_found + docs) |
-| Change RAG query execution | `src/okp_mcp/rag/common.py` | `rag_query()` handles HTTP, JSON parsing, and error handling |
+| Any RAG task | `src/okp_mcp/rag/AGENTS.md` | Has its own module layout, "Where to Look", gotchas |
 
 ## Boot Sequence
 
@@ -156,14 +146,7 @@ tools.py    → config, server, solr, content, formatting
 formatting.py → content, solr
 solr.py     → config
 content.py  → (standalone)
-rag/models.py     → (standalone, pydantic only)
-rag/common.py     → config (logger only), rag.models
-rag/lexical.py    → rag.common, rag.models
-rag/hybrid.py     → rag.common, rag.models
-rag/semantic.py   → rag.common, rag.models, rag.embeddings (TYPE_CHECKING only, not at runtime)
-rag/embeddings.py → sentence_transformers, torch (isolated here only)
-rag/rrf.py        → rag.models
-rag/tools.py      → server (mcp, get_app_context), rag.common (clean_rag_query, RAG_FL), rag.formatting, rag.hybrid
+rag/*             → see rag/AGENTS.md for internal dependency graph
 ```
 
 No circular imports. `content.py` has zero internal dependencies.
