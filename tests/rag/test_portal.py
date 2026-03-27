@@ -4,8 +4,8 @@ import httpx
 import pytest
 import respx
 
-from okp_mcp.rag.models import PortalResponse
-from okp_mcp.rag.portal import PORTAL_FL, portal_search
+from okp_mcp.rag.models import PortalDocument, PortalResponse, RagResponse
+from okp_mcp.rag.portal import PORTAL_FL, portal_highlights_to_rag_results, portal_search
 
 PORTAL_ENDPOINT = "http://localhost:8984/solr/portal/select"
 SOLR_URL = "http://localhost:8984"
@@ -267,3 +267,135 @@ async def test_parse_portal_response_highlight_no_main_content(rag_client):
         result = await portal_search("test query", client=rag_client, solr_url=SOLR_URL)
 
     assert result.highlights == {}
+
+
+# ---- portal_highlights_to_rag_results tests ----
+
+
+def _make_portal_response(
+    doc_id: str = "/solutions/123/index.html",
+    title: str = "Test Solution",
+    documentKind: str = "solution",
+    url_slug: str | None = "123",
+    heading_h1: list[str] | None = None,
+    heading_h2: list[str] | None = None,
+    score: float = 0.9,
+    highlights: dict | None = None,
+) -> PortalResponse:
+    """Build a minimal PortalResponse for conversion tests."""
+    doc = PortalDocument(
+        id=doc_id,
+        title=title,
+        documentKind=documentKind,
+        url_slug=url_slug,
+        heading_h1=heading_h1,
+        heading_h2=heading_h2,
+        score=score,
+    )
+    return PortalResponse(
+        num_found=1,
+        docs=[doc],
+        highlights=highlights
+        if highlights is not None
+        else {doc_id: ["Snippet one.", "Snippet two.", "Snippet three."]},
+    )
+
+
+def test_portal_highlights_to_rag_basic():
+    """1 portal doc with 3 snippets produces 3 RagDocuments with correct fields."""
+    response = _make_portal_response()
+    result = portal_highlights_to_rag_results(response)
+
+    assert result.num_found == 3
+    assert len(result.docs) == 3
+    assert result.docs[0].doc_id == "/solutions/123/index.html_hl_0"
+    assert result.docs[1].doc_id == "/solutions/123/index.html_hl_1"
+    assert result.docs[2].doc_id == "/solutions/123/index.html_hl_2"
+    assert result.docs[0].parent_id == "/solutions/123/index.html"
+    assert result.docs[0].chunk_index == 0
+    assert result.docs[1].chunk_index == 1
+    assert result.docs[0].title == "Test Solution"
+
+
+def test_portal_highlights_strips_html_tags():
+    """Highlight snippets with <em> tags produce clean chunk text."""
+    response = _make_portal_response(highlights={"/solutions/123/index.html": ["Found <em>matched</em> content here."]})
+    result = portal_highlights_to_rag_results(response)
+
+    assert result.num_found == 1
+    assert result.docs[0].chunk == "Found matched content here."
+
+
+def test_portal_highlights_builds_url_solution():
+    """documentKind=solution produces https://access.redhat.com/solutions/{slug}."""
+    response = _make_portal_response(documentKind="solution", url_slug="7041631")
+    result = portal_highlights_to_rag_results(response)
+
+    assert result.docs[0].online_source_url == "https://access.redhat.com/solutions/7041631"
+
+
+def test_portal_highlights_builds_url_article():
+    """documentKind=article produces https://access.redhat.com/articles/{slug}."""
+    response = _make_portal_response(
+        doc_id="/articles/12345/index.html",
+        documentKind="article",
+        url_slug="12345",
+        highlights={"/articles/12345/index.html": ["Article content."]},
+    )
+    result = portal_highlights_to_rag_results(response)
+
+    assert result.docs[0].online_source_url == "https://access.redhat.com/articles/12345"
+
+
+def test_portal_highlights_no_url_slug():
+    """Missing url_slug produces online_source_url=None."""
+    response = _make_portal_response(url_slug=None)
+    result = portal_highlights_to_rag_results(response)
+
+    assert result.docs[0].online_source_url is None
+
+
+def test_portal_highlights_builds_headings():
+    """heading_h1 + heading_h2 are concatenated into a comma-separated string."""
+    response = _make_portal_response(
+        heading_h1=["SELinux"],
+        heading_h2=["Configuring"],
+    )
+    result = portal_highlights_to_rag_results(response)
+
+    assert result.docs[0].headings == "SELinux, Configuring"
+
+
+def test_portal_highlights_no_headings():
+    """Both heading fields None produces headings=None."""
+    response = _make_portal_response(heading_h1=None, heading_h2=None)
+    result = portal_highlights_to_rag_results(response)
+
+    assert result.docs[0].headings is None
+
+
+def test_portal_highlights_skips_doc_without_highlights():
+    """Portal doc with no corresponding highlight entry produces zero RagDocuments."""
+    doc = PortalDocument(id="/solutions/999/index.html", title="No highlights doc")
+    response = PortalResponse(num_found=1, docs=[doc], highlights={})
+    result = portal_highlights_to_rag_results(response)
+
+    assert result.num_found == 0
+    assert result.docs == []
+
+
+def test_portal_highlights_empty_response():
+    """Empty PortalResponse produces empty RagResponse."""
+    response = PortalResponse(num_found=0, docs=[], highlights={})
+    result = portal_highlights_to_rag_results(response)
+
+    assert result == RagResponse(num_found=0, docs=[])
+
+
+def test_portal_highlights_num_tokens_approximate():
+    """num_tokens is set to whitespace-split word count of cleaned chunk text."""
+    chunk_text = "This is a five word chunk"
+    response = _make_portal_response(highlights={"/solutions/123/index.html": [chunk_text]})
+    result = portal_highlights_to_rag_results(response)
+
+    assert result.docs[0].num_tokens == 6  # "This is a five word chunk" = 6 words

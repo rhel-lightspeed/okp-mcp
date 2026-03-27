@@ -1,12 +1,13 @@
 """Portal core search for solutions and articles missing from the portal-rag core."""
 
+import re
 from typing import Literal
 
 import httpx
 from pydantic import ValidationError
 
 from ..config import logger
-from .models import PortalDocument, PortalResponse
+from .models import PortalDocument, PortalResponse, RagDocument, RagResponse
 
 PortalDocumentKind = Literal["solution", "article"]
 DEFAULT_DOCUMENT_KINDS: tuple[PortalDocumentKind, ...] = ("solution", "article")
@@ -191,3 +192,94 @@ async def portal_search(
     if fl is not None:
         params["fl"] = fl
     return await _portal_query(endpoint, params, client)
+
+
+def _build_headings(doc: PortalDocument) -> str | None:
+    """Build a comma-separated headings string from portal document heading fields.
+
+    Concatenates non-empty heading_h1 and heading_h2 lists into a single
+    comma-separated string matching the headings format used by portal-rag chunks.
+
+    Args:
+        doc: PortalDocument to extract headings from.
+
+    Returns:
+        Comma-separated heading string, or None if no headings are present.
+    """
+    parts: list[str] = []
+    if doc.heading_h1:
+        parts.extend(doc.heading_h1)
+    if doc.heading_h2:
+        parts.extend(doc.heading_h2)
+    return ", ".join(parts) if parts else None
+
+
+def _build_url(doc: PortalDocument, base_url: str) -> str | None:
+    """Build an access.redhat.com URL for a portal document.
+
+    Constructs a full URL from the document's url_slug and documentKind.
+    Returns None if url_slug is missing or documentKind is unrecognized.
+
+    Args:
+        doc: PortalDocument with url_slug and documentKind fields.
+        base_url: Base URL (e.g. 'https://access.redhat.com').
+
+    Returns:
+        Full URL string, or None if URL cannot be constructed.
+    """
+    if not doc.url_slug:
+        return None
+    kind_path = {
+        "solution": "solutions",
+        "article": "articles",
+    }
+    path = kind_path.get(doc.documentKind or "", "")
+    if not path:
+        return None
+    return f"{base_url}/{path}/{doc.url_slug}"
+
+
+def portal_highlights_to_rag_results(
+    response: PortalResponse,
+    *,
+    base_url: str = "https://access.redhat.com",
+) -> RagResponse:
+    """Convert portal search results with highlights into chunk-sized RagDocuments.
+
+    Each highlight snippet from a portal document becomes a separate RagDocument,
+    mimicking the chunked structure of portal-rag results. Documents without
+    highlights are skipped entirely.
+
+    Args:
+        response: PortalResponse with highlights from portal_search().
+        base_url: Base URL for constructing document links (default: access.redhat.com).
+
+    Returns:
+        RagResponse with one RagDocument per highlight snippet. Returns empty
+        RagResponse if no documents have highlights.
+    """
+    all_docs: list[RagDocument] = []
+
+    for portal_doc in response.docs:
+        snippets = response.highlights.get(portal_doc.id or "", [])
+        if not snippets:
+            continue
+
+        for i, snippet in enumerate(snippets):
+            chunk = re.sub(r"<[^>]+>", "", snippet).strip()
+            all_docs.append(
+                RagDocument(
+                    doc_id=f"{portal_doc.id}_hl_{i}",
+                    parent_id=portal_doc.id,
+                    title=portal_doc.title,
+                    chunk=chunk,
+                    chunk_index=i,
+                    num_tokens=len(chunk.split()),
+                    headings=_build_headings(portal_doc),
+                    online_source_url=_build_url(portal_doc, base_url),
+                    documentKind=portal_doc.documentKind,
+                    score=portal_doc.score,
+                )
+            )
+
+    return RagResponse(num_found=len(all_docs), docs=all_docs)
