@@ -23,7 +23,7 @@ reviews:
 
   pre_merge_checks:
     title:
-      mode: disabled
+      mode: "off"
     docstrings:
       mode: warning
       threshold: 80
