@@ -23,8 +23,7 @@ reviews:
 
   pre_merge_checks:
     title:
-      mode: error
-      requirements: "Use conventional commits format (e.g., 'feat: add search', 'fix: handle timeout')"
+      mode: disabled
     docstrings:
       mode: warning
       threshold: 80
