@@ -30,21 +30,18 @@ def _accumulate_scores(
 
 
 def reciprocal_rank_fusion(
-    results_a: RagResponse,
-    results_b: RagResponse,
-    *,
+    *results: RagResponse,
     k: int = 60,
     doc_key: str = "doc_id",
 ) -> RagResponse:
-    """Merge two Solr result sets using reciprocal rank fusion (RRF).
+    """Merge any number of Solr result sets using reciprocal rank fusion (RRF).
 
-    Combines two result lists by computing RRF scores: for each unique document,
+    Combines multiple result lists by computing RRF scores: for each unique document,
     sums 1/(k + rank) across all lists where it appears (rank is 0-indexed position).
-    Documents appearing in both lists score higher than single-list documents.
+    Documents appearing in more lists score higher than single-list documents.
 
     Args:
-        results_a: First RagResponse to merge.
-        results_b: Second RagResponse to merge.
+        *results: Any number of RagResponse inputs to merge.
         k: RRF constant (default 60, per Cormack et al. 2009).
         doc_key: Field name used as the unique document identifier (default "doc_id").
 
@@ -55,14 +52,17 @@ def reciprocal_rank_fusion(
     if k <= 0:
         raise ValueError("k must be greater than 0")
 
-    docs_a = results_a.docs
-    docs_b = results_b.docs
+    if not results:
+        return RagResponse(num_found=0, docs=[])
+
+    if len(results) == 1:
+        return results[0]
 
     scores: dict[str, float] = {}
     doc_map: dict[str, RagDocument] = {}
 
-    _accumulate_scores(docs_a, scores, doc_map, k, doc_key)
-    _accumulate_scores(docs_b, scores, doc_map, k, doc_key)
+    for result in results:
+        _accumulate_scores(result.docs, scores, doc_map, k, doc_key)
 
     sorted_docs = [
         doc_map[identifier].model_copy(update={"rrf_score": score})
