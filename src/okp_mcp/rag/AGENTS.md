@@ -40,8 +40,8 @@ portal.py       -> config (logger), models
 rrf.py          -> models
 context.py      -> common (RAG_FL, rag_query), models
 formatting.py   -> models
-tools.py        -> server (mcp, get_app_context), common (RAG_FL, clean_rag_query),
-                   formatting, hybrid, models
+tools.py        -> server (AppContext, mcp, get_app_context), common (RAG_FL, clean_rag_query),
+                   asyncio, context, formatting, hybrid, semantic, rrf, models
 ```
 
 No circular imports. `models.py`, `rrf.py`, and `formatting.py` have no dependencies outside the subpackage. `embeddings.py` is the only module that imports ML libraries (sentence_transformers, torch).
