@@ -262,3 +262,28 @@ async def test_lifespan_logs_warning_on_embedder_init_failure(caplog):
         server_module._server_config = original
 
     assert "Embedding model unavailable" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_lifespan_logs_warning_with_traceback_on_embedder_close_failure(caplog):
+    """Lifespan logs a warning with exc_info when embedder.close() fails."""
+    from okp_mcp import server as server_module
+    from okp_mcp.config import ServerConfig
+
+    mock_embedder = MagicMock()
+    mock_embedder.close.side_effect = OSError("device busy")
+    mock_client = AsyncMock(spec=httpx.AsyncClient)
+    original = server_module._server_config
+    try:
+        server_module._server_config = ServerConfig(rag_solr_url="http://rag-test:8984")
+        with (
+            patch("okp_mcp.server.Embedder", return_value=mock_embedder),
+            patch("okp_mcp.server.httpx.AsyncClient", return_value=mock_client),
+        ):
+            async with _app_lifespan(mcp):
+                pass
+    finally:
+        server_module._server_config = original
+
+    assert "Failed to close embedder cleanly" in caplog.text
+    assert "device busy" in caplog.text
