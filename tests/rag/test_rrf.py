@@ -110,3 +110,45 @@ class TestReciprocalRankFusion:
         assert len(docs) == 1
         assert docs[0].parent_id == "parent_1"
         assert docs[0].rrf_score == pytest.approx(1 / 60 + 1 / 60)
+
+    def test_zero_inputs_returns_empty(self):
+        """reciprocal_rank_fusion() with no args returns empty RagResponse."""
+        merged = reciprocal_rank_fusion()
+        assert merged == RagResponse(num_found=0, docs=[])
+
+    def test_single_input_returns_unchanged(self):
+        """reciprocal_rank_fusion(response_a) returns response_a unchanged (no rrf_score)."""
+        response_a = _solr_response(_doc("x1"), _doc("x2"))
+        result = reciprocal_rank_fusion(response_a)
+        assert result is response_a
+
+    def test_three_way_fusion_scores(self):
+        """Doc in all 3 lists scores highest; doc in 2 scores middle; doc in 1 scores lowest."""
+        shared = _doc("shared")
+        two_list = _doc("two_list")
+        one_list = _doc("one_list")
+
+        results_a = _solr_response(shared, two_list, one_list)
+        results_b = _solr_response(shared, two_list)
+        results_c = _solr_response(shared)
+
+        merged = reciprocal_rank_fusion(results_a, results_b, results_c)
+        scores = {d.doc_id: d.rrf_score for d in merged.docs}
+
+        assert scores["shared"] is not None
+        assert scores["two_list"] is not None
+        assert scores["one_list"] is not None
+        assert scores["shared"] > scores["two_list"]
+        assert scores["two_list"] > scores["one_list"]
+
+    def test_three_way_disjoint(self):
+        """Three result sets with no overlap all appear in output."""
+        results_a = _solr_response(_doc("a1"), _doc("a2"))
+        results_b = _solr_response(_doc("b1"), _doc("b2"))
+        results_c = _solr_response(_doc("c1"), _doc("c2"))
+
+        merged = reciprocal_rank_fusion(results_a, results_b, results_c)
+
+        doc_ids = {d.doc_id for d in merged.docs}
+        assert doc_ids == {"a1", "a2", "b1", "b2", "c1", "c2"}
+        assert merged.num_found == 6
