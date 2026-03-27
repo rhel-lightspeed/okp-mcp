@@ -160,6 +160,9 @@ def _build_search_queries(
 
     dep_bq = (
         'allTitle:(deprecated OR removed OR "no longer" OR "end of life")^20 '
+        # Boost release notes and adoption guides — they carry authoritative deprecation notices
+        # that rank poorly due to large document size.
+        'allTitle:("release notes" OR "considerations in adopting")^15 '
         'main_content:(deprecated OR removed OR "no longer available")^10'
     )
     if vm_intent and extra_bq:
@@ -171,6 +174,8 @@ def _build_search_queries(
         "rows": 3,
         "bq": dep_bq,
     }
+    if vm_intent:
+        dep_params["hl.q"] = f"{cleaned} {_VM_HIGHLIGHT_TERMS}"
 
     return doc_params, sol_params, dep_params
 
