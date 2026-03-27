@@ -70,7 +70,7 @@ async def _app_lifespan(server: FastMCP) -> AsyncIterator[dict[str, AppContext]]
             try:
                 embedder.close()
             except Exception:
-                logger.warning("Failed to close embedder cleanly")
+                logger.warning("Failed to close embedder cleanly", exc_info=True)
 
 
 def get_app_context(ctx: Context) -> AppContext:
