@@ -17,14 +17,45 @@ DEFAULT_DOCUMENT_KINDS: tuple[PortalDocumentKind, ...] = ("solution", "article")
 PORTAL_FL = "id,resourceName,title,main_content,url_slug,documentKind,heading_h1,heading_h2,lastModifiedDate,score"
 
 
+def _extract_highlights(data: dict) -> dict[str, list[str]]:
+    """Extract and flatten Solr highlighting into a doc_id-to-snippets mapping.
+
+    Solr returns highlighting as ``{doc_id: {field: [snippets]}}``.  This
+    flattens it to ``{doc_id: [snippets]}`` for the ``main_content`` field,
+    validating types defensively so malformed payloads are silently skipped.
+
+    Args:
+        data: Full parsed Solr JSON response dict.
+
+    Returns:
+        Mapping of document IDs to their main_content highlight snippet lists.
+    """
+    raw_hl = data.get("highlighting")
+    if raw_hl is None:
+        return {}
+    if not isinstance(raw_hl, dict):
+        logger.error("Portal query unexpected highlighting payload type: %s", type(raw_hl).__name__)
+        return {}
+    highlights: dict[str, list[str]] = {}
+    for doc_key, fields in raw_hl.items():
+        if not isinstance(fields, dict):
+            continue
+        snippets = fields.get("main_content")
+        if isinstance(snippets, list) and snippets:
+            highlights[doc_key] = snippets
+    return highlights
+
+
 def _parse_portal_response(data: dict) -> PortalResponse:
     """Validate and parse raw Solr JSON into a PortalResponse.
+
+    Extracts documents and highlighting data from the Solr response.
 
     Args:
         data: Parsed JSON dict from Solr.
 
     Returns:
-        PortalResponse with parsed docs, or empty response on validation failure.
+        PortalResponse with parsed docs and highlights, or empty response on validation failure.
     """
     if "error" in data:
         logger.error("Portal query Solr error: %s", data["error"])
@@ -48,7 +79,7 @@ def _parse_portal_response(data: dict) -> PortalResponse:
         return PortalResponse(num_found=0, docs=[])
 
     logger.info("Portal query returned %d result(s)", num_found)
-    return PortalResponse(num_found=num_found, docs=parsed_docs)
+    return PortalResponse(num_found=num_found, docs=parsed_docs, highlights=_extract_highlights(data))
 
 
 async def _portal_query(endpoint: str, params: dict, client: httpx.AsyncClient) -> PortalResponse:
@@ -140,6 +171,22 @@ async def portal_search(
         "qf": "url_slug^20 title^15 main_content^10 heading_h2^3 heading_h1^3 all_content^2",
         "rows": max_results,
         "fq": kind_filter,
+        # Highlighting: extract chunk-sized passages from main_content
+        "hl": "on",
+        "hl.fl": "main_content",
+        "hl.method": "unified",
+        "hl.snippets": "5",
+        "hl.fragsize": "800",
+        "hl.fragsizeIsMinimum": "false",
+        "hl.fragAlignRatio": "0.5",
+        "hl.bs.type": "SENTENCE",
+        "hl.bs.language": "en",
+        "hl.defaultSummary": "true",
+        "hl.weightMatches": "true",
+        "hl.maxAnalyzedChars": "512000",
+        "hl.score.k1": "1.0",
+        "hl.score.b": "0.65",
+        "hl.score.pivot": "200",
     }
     if fl is not None:
         params["fl"] = fl

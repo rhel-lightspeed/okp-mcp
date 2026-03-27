@@ -1,6 +1,6 @@
 """Pydantic response models for portal-rag and portal Solr core query results."""
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 # --- portal-rag core models (chunked documents with vector embeddings) ---
 
@@ -69,7 +69,15 @@ class PortalDocument(BaseModel):
 
 
 class PortalResponse(BaseModel):
-    """Parsed response from the portal Solr core."""
+    """Parsed response from the portal Solr core.
+
+    Attributes:
+        num_found: Total matching document count from Solr.
+        docs: List of parsed portal documents.
+        highlights: Solr highlighting data keyed by document ID, mapping to
+            lists of highlighted snippet strings extracted from main_content.
+    """
 
     num_found: int
     docs: list[PortalDocument]
+    highlights: dict[str, list[str]] = Field(default_factory=dict)
