@@ -23,7 +23,10 @@ services:
     environment:
       ACCESS_KEY: ${OKP_ACCESS_KEY}
       SOLR_JETTY_HOST: "0.0.0.0"
+      # This is the SOLR recommended method for setting the port
       SOLR_PORT_LISTEN: 8984
+      # But this is the only method that works for OKP 😆
+      SOLR_PORT: 8984
     volumes:
       - redhat-okp-rag-data:/opt/solr/server/solr/portal/data
     restart: unless-stopped
