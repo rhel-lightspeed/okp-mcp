@@ -125,6 +125,8 @@ class TestContextExpansionFunctional:
             if len(diverse_chunks) >= 3:
                 break
 
+        assert diverse_chunks, "Solr returned no chunks with distinct parents for this query"
+
         expanded = await expand_chunks(diverse_chunks, client=client, solr_url=RAG_SOLR_URL)
 
         assert len(expanded) == len(diverse_chunks)
