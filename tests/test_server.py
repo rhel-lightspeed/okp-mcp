@@ -98,6 +98,7 @@ def test_get_app_context_returns_lifespan_app_context():
         http_client=AsyncMock(spec=httpx.AsyncClient),
         solr_endpoint="http://localhost:8983/solr/portal/select",
         max_response_chars=30_000,
+        rag_solr_url="http://localhost:8983",
     )
     ctx = cast(Context, SimpleNamespace(lifespan_context={"app": expected_context}))
 
@@ -129,3 +130,27 @@ def test_server_config_assignment_propagates_to_lifespan():
         assert server_module._server_config is cfg
     finally:
         server_module._server_config = original
+
+
+@pytest.mark.asyncio
+async def test_lifespan_rag_solr_url_falls_back_to_solr_url():
+    """When MCP_RAG_SOLR_URL not set, lifespan falls back to solr_url."""
+    async with _app_lifespan(mcp) as lifespan_context:
+        app_context = lifespan_context["app"]
+        assert app_context.rag_solr_url == "http://localhost:8983"
+
+
+@pytest.mark.asyncio
+async def test_lifespan_uses_explicit_rag_solr_url():
+    """When MCP_RAG_SOLR_URL is set, lifespan uses it directly."""
+    with patch.dict("os.environ", {"MCP_RAG_SOLR_URL": "http://rag-instance:8984"}):
+        from okp_mcp import server as server_module
+
+        original = server_module._server_config
+        try:
+            server_module._server_config = None  # force fresh config load
+            async with _app_lifespan(mcp) as lifespan_context:
+                app_context = lifespan_context["app"]
+                assert app_context.rag_solr_url == "http://rag-instance:8984"
+        finally:
+            server_module._server_config = original

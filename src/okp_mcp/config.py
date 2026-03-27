@@ -49,6 +49,10 @@ class ServerConfig(BaseSettings):
         default="http://localhost:8983",
         description="Base URL of the Solr instance",
     )
+    rag_solr_url: str | None = Field(
+        default=None,
+        description="Base URL of the RAG Solr instance (portal-rag core). Falls back to solr_url if not set.",
+    )
     max_response_chars: int = Field(
         default=30_000,
         ge=1,
