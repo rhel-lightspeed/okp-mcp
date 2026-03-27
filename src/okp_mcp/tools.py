@@ -312,7 +312,10 @@ async def search_documentation(
 ) -> str:
     """Search Red Hat knowledge base: documentation, solutions, articles, and support policies.
 
-    This is the primary search tool. Always use this first for any RHEL question.
+    Use this tool when you need official Red Hat documentation to answer accurately,
+    especially for version-specific details, lifecycle dates, deprecation status,
+    or changes after 2024. For well-known Linux concepts (e.g. vi commands,
+    systemd units, common CLI tools) you may answer directly without searching.
     Covers how-to guides, troubleshooting, deprecation notices, compatibility
     matrices, lifecycle policies, known issues, and best practices.
 
