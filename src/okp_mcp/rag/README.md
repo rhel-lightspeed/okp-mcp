@@ -71,7 +71,7 @@ Four search strategies exist because no single approach covers everything.
 
 ### Hybrid Search (primary path)
 
-The `search_rag` MCP tool uses hybrid search exclusively. It hits the
+The `search_rag` MCP tool always runs hybrid retrieval. It hits the
 `/hybrid-search` Solr request handler, which has server-side eDisMax config
 with field boosts (title^30, chunk^20, headings_txt^15), phrase boosting,
 recency bias, and document-type weighting baked in. The client sends only the
@@ -96,7 +96,10 @@ text-to-vector path runs the embedding model asynchronously via a
 `ThreadPoolExecutor` with `max_workers=1` to serialize the non-thread-safe
 Rust tokenizer.
 
-Not wired into the MCP tool yet, but available for fusion pipelines.
+When an embedder is available in `AppContext`, `search_rag` runs semantic text
+search in parallel with hybrid search, then merges both result sets using
+reciprocal rank fusion. If semantic search fails, the tool logs a warning and
+gracefully falls back to hybrid-only results.
 
 ### Portal Search
 
