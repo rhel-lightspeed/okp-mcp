@@ -209,3 +209,61 @@ async def test_portal_search_rejects_empty_document_kinds(rag_client):
     """portal_search raises ValueError when document_kinds is an empty list."""
     with pytest.raises(ValueError, match="document_kinds must not be empty"):
         await portal_search("test query", client=rag_client, solr_url=SOLR_URL, document_kinds=[])
+
+
+async def test_portal_search_sends_highlight_params(rag_client, portal_solution_response):
+    """portal_search sends Solr highlighting params in request."""
+    with respx.mock(assert_all_called=True) as router:
+        route = router.get(PORTAL_ENDPOINT).mock(return_value=httpx.Response(200, json=portal_solution_response))
+        await portal_search("test query", client=rag_client, solr_url=SOLR_URL)
+
+    params = route.calls[0].request.url.params
+    assert params["hl"] == "on"
+    assert params["hl.fl"] == "main_content"
+    assert params["hl.method"] == "unified"
+    assert params["hl.snippets"] == "5"
+    assert params["hl.fragsize"] == "800"
+
+
+async def test_parse_portal_response_extracts_highlights(rag_client):
+    """_parse_portal_response extracts highlights from Solr highlighting section."""
+    response_with_highlights = {
+        "response": {
+            "numFound": 1,
+            "docs": [{"id": "/solutions/123/index.html", "documentKind": "solution"}],
+        },
+        "highlighting": {
+            "/solutions/123/index.html": {"main_content": ["First <em>matched</em> snippet.", "Second snippet."]}
+        },
+    }
+    with respx.mock(assert_all_called=True) as router:
+        router.get(PORTAL_ENDPOINT).mock(return_value=httpx.Response(200, json=response_with_highlights))
+        result = await portal_search("test query", client=rag_client, solr_url=SOLR_URL)
+
+    assert result.highlights == {"/solutions/123/index.html": ["First <em>matched</em> snippet.", "Second snippet."]}
+
+
+async def test_parse_portal_response_empty_highlights(rag_client, portal_solution_response):
+    """_parse_portal_response sets highlights to empty dict when no highlighting section."""
+    # portal_solution_response has no "highlighting" key
+    with respx.mock(assert_all_called=True) as router:
+        router.get(PORTAL_ENDPOINT).mock(return_value=httpx.Response(200, json=portal_solution_response))
+        result = await portal_search("test query", client=rag_client, solr_url=SOLR_URL)
+
+    assert result.highlights == {}
+
+
+async def test_parse_portal_response_highlight_no_main_content(rag_client):
+    """highlights is empty when highlighting section exists but lacks main_content."""
+    response_no_main_content = {
+        "response": {
+            "numFound": 1,
+            "docs": [{"id": "/solutions/456/index.html", "documentKind": "solution"}],
+        },
+        "highlighting": {"/solutions/456/index.html": {"other_field": ["some snippet"]}},
+    }
+    with respx.mock(assert_all_called=True) as router:
+        router.get(PORTAL_ENDPOINT).mock(return_value=httpx.Response(200, json=response_no_main_content))
+        result = await portal_search("test query", client=rag_client, solr_url=SOLR_URL)
+
+    assert result.highlights == {}
