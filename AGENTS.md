@@ -150,7 +150,7 @@ formatting.py → content, solr
 solr.py     → config
 server.py   → config, rag.embeddings
 content.py  → (standalone)
-rag/*             → see rag/AGENTS.md for internal dependency graph
+rag/*             → see rag/AGENTS.md for internal dependency graph (rag/tools.py imports portal.py for portal search fusion)
 ```
 
 No circular imports. `content.py` has zero internal dependencies.

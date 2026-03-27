@@ -33,6 +33,8 @@ search_rag (tools.py)
     |
     +-- 2. search (hybrid.py / lexical.py / semantic.py / portal.py)
     |       hit Solr, get back typed response models
+    |       portal.py: Solr highlighting -> chunk-sized RagDocuments
+    |       N-way RRF fuses all result sets (hybrid + semantic + portal)
     |
     +-- 3. deduplicate (formatting.py)
     |       collapse multiple chunks from the same parent doc
@@ -97,25 +99,40 @@ text-to-vector path runs the embedding model asynchronously via a
 Rust tokenizer.
 
 When an embedder is available in `AppContext`, `search_rag` runs semantic text
-search in parallel with hybrid search, then merges both result sets using
-reciprocal rank fusion. If semantic search fails, the tool logs a warning and
-gracefully falls back to hybrid-only results.
+search in parallel with hybrid search and portal search, then merges all result
+sets using N-way reciprocal rank fusion. If semantic search fails, the tool logs
+a warning and excludes it from fusion; hybrid and portal results are still used.
 
 ### Portal Search
 
 Solutions and articles live in the legacy **portal** core, not portal-rag.
-`portal_search()` queries `/solr/portal/select` with its own eDisMax boosts
-and `PortalDocument`/`PortalResponse` models. It has a separate query runner
-(`_portal_query()`) to avoid coupling with the chunk-based portal-rag models.
+`portal_search()` queries `/solr/portal/select` with eDisMax boosts and Solr
+Unified Highlighter enabled (`hl.method=unified`, `hl.fragsize=800`). The
+highlighter extracts up to 5 passage-sized snippets per document that match the
+query -- sentence-aligned fragments of roughly 400-1200 characters (100-300 tokens).
+
+`portal_highlights_to_rag_results()` converts the `PortalResponse` into chunk-sized
+`RagDocument` instances: one `RagDocument` per highlight snippet, with HTML tags
+stripped, `parent_id` set to the source portal document, and URLs constructed from
+`url_slug` and `documentKind`. These chunks flow through the existing deduplication,
+context expansion, and formatting stages unchanged.
+
+Portal search runs in parallel with hybrid and semantic via `asyncio.gather()`. Portal
+failures are supplementary: a warning is logged and the failing strategy is excluded
+from fusion (hybrid failure is always fatal).
 
 ### Result Fusion
 
-`reciprocal_rank_fusion()` merges any two `RagResponse` sets. For each
-document, it sums `1/(k + rank)` across all lists where it appears (k=60 by
-default). Documents appearing in both lists naturally score higher. The output
-is a single `RagResponse` sorted by fused score, with each doc carrying an
-`rrf_score` field. This is a pure function with no Solr dependency; it only
-reshuffles existing results.
+`reciprocal_rank_fusion()` merges any number of `RagResponse` sets (N-way
+fusion). For each document, it sums `1/(k + rank)` across all lists where it
+appears (k=60 by default). Documents appearing in more lists score higher than
+single-list documents. The output is a single `RagResponse` sorted by fused
+score, with each doc carrying an `rrf_score` field. This is a pure function with
+no Solr dependency; it only reshuffles existing results.
+
+`search_rag` always passes all available result sets to RRF: hybrid (always),
+semantic (when embedder is available), and portal (when highlights are returned).
+With a single result set, RRF returns it unchanged.
 
 ## Stage 3: Deduplication
 

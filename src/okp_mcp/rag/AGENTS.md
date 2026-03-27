@@ -19,7 +19,7 @@ rag/
   lexical.py        # lexical_search() via /select (basic eDisMax)
   semantic.py       # semantic_search() (KNN vector), semantic_text_search() (text->embed->KNN)
   embeddings.py     # Embedder class wrapping granite-embedding-30m-english
-  portal.py         # portal_search() for solutions/articles from the portal core
+  portal.py         # portal_search(), portal_highlights_to_rag_results() for solutions/articles
   rrf.py            # reciprocal_rank_fusion() for merging result sets
   context.py        # Context expansion: fetch sibling chunks, merge into richer docs
   formatting.py     # deduplicate_chunks(), format_rag_result()
@@ -41,7 +41,8 @@ rrf.py          -> models
 context.py      -> common (RAG_FL, rag_query), models
 formatting.py   -> models
 tools.py        -> server (AppContext, mcp, get_app_context), common (RAG_FL, clean_rag_query),
-                   asyncio, context, formatting, hybrid, semantic, rrf, models
+                   asyncio, context, formatting, hybrid, semantic, rrf, models,
+                   portal (portal_search, portal_highlights_to_rag_results, PORTAL_FL)
 ```
 
 No circular imports. `models.py`, `rrf.py`, and `formatting.py` have no dependencies outside the subpackage. `embeddings.py` is the only module that imports ML libraries (sentence_transformers, torch).
@@ -63,6 +64,7 @@ No circular imports. `models.py`, `rrf.py`, and `formatting.py` have no dependen
 | Add embedding model support | `embeddings.py` | `Embedder` class, `ThreadPoolExecutor` for async |
 | Add result fusion logic | `rrf.py` | Pure function, no Solr dependency |
 | Query the portal core | `portal.py` | Separate models (`PortalDocument`) and query runner (`_portal_query`) |
+| Convert portal highlights to chunks | `portal.py` | `portal_highlights_to_rag_results()` converts Solr highlight snippets to `RagDocument`s |
 | Solr schema reference | `../../docs/OKP_RAG_EXPLORATION.md` | Field names, vector dimensions, core differences |
 
 ## Two Solr Cores
@@ -70,7 +72,7 @@ No circular imports. `models.py`, `rrf.py`, and `formatting.py` have no dependen
 The RAG container hosts two cores with different schemas and different content:
 
 - **portal-rag**: Docs, CVEs, errata split into passage-sized chunks with 384-dim vector embeddings. Queried by `hybrid.py`, `lexical.py`, `semantic.py`, `context.py`.
-- **portal**: Flat whole documents for solutions and articles that are _missing_ from portal-rag (157K solutions, 7K articles). Queried by `portal.py` with its own models and query runner.
+- **portal**: Flat whole documents for solutions and articles that are _missing_ from portal-rag (157K solutions, 7K articles). Queried by `portal.py` with Solr highlighting enabled; `portal_highlights_to_rag_results()` converts highlight snippets to chunk-sized `RagDocument`s for N-way RRF fusion in `tools.py`.
 
 These are NOT interchangeable. `RagDocument`/`RagResponse` are for portal-rag, `PortalDocument`/`PortalResponse` are for portal.
 
