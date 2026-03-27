@@ -133,7 +133,10 @@ uv run okp-mcp [--transport ...] [--port ...]
        ├─ CliApp.run(ServerConfig)     # parse CLI + MCP_* env vars
        ├─ _configure_logging()
        └─ mcp.run(transport=...)       # start FastMCP server
-           → server.py: _app_lifespan()  # creates shared httpx.AsyncClient
+           → server.py: _app_lifespan()
+               ├─ Embedder(model) if MCP_RAG_SOLR_URL set
+               ├─ creates shared httpx.AsyncClient
+               └─ yields AppContext(..., embedder)
            → tools.py: @mcp.tool funcs  # registered via side-effect import
            → rag/tools.py: @mcp.tool funcs  # registered via side-effect import (disabled if MCP_RAG_SOLR_URL not set)
 ```
@@ -145,6 +148,7 @@ __init__.py → config, server, tools (side-effect import)
 tools.py    → config, server, solr, content, formatting
 formatting.py → content, solr
 solr.py     → config
+server.py   → config, rag.embeddings
 content.py  → (standalone)
 rag/*             → see rag/AGENTS.md for internal dependency graph
 ```
@@ -191,12 +195,13 @@ No circular imports. `content.py` has zero internal dependencies.
 - Use specific exception types in except clauses (`httpx.TimeoutException`, not bare `Exception`)
 - Log exceptions with `logger.exception()` for stack traces
 - Log warnings with `logger.warning()` for expected failures (timeouts)
+- **Never swallow exception details**: every `except` block that logs MUST include `exc_info=True` (for `warning`) or use `logger.exception()` (which adds it automatically). Bare `logger.warning("something failed")` without the traceback makes debugging impossible.
 - Pattern:
   ```python
   try:
       ...
   except httpx.TimeoutException:
-      logger.warning("...")
+      logger.warning("...", exc_info=True)
       return "user-friendly message"
   except (httpx.HTTPError, ValueError):
       logger.exception("...")

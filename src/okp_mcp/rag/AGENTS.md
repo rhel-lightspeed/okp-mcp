@@ -35,7 +35,7 @@ common.py       -> config (STOP_WORDS, logger), models
 lexical.py      -> common (rag_query), models
 hybrid.py       -> common (rag_query), models
 semantic.py     -> common (rag_query), models, embeddings (TYPE_CHECKING only)
-embeddings.py   -> sentence_transformers, torch (isolated, no internal deps)
+embeddings.py   -> sentence_transformers, torch (imported by server.py for AppContext init)
 portal.py       -> config (logger), models
 rrf.py          -> models
 context.py      -> common (RAG_FL, rag_query), models
@@ -133,3 +133,4 @@ When adding a new search function, add a corresponding `test_<module>.py` that c
 - **`extra="allow"` on models**: Both `RagDocument` and `PortalDocument` accept extra fields from Solr without error. This means typos in field names won't raise, they'll just be silently ignored.
 - **RAG tools disabled at startup**: If `MCP_RAG_SOLR_URL` is not set, all tools tagged `{"rag"}` are disabled automatically. Check `server.py` for the gating logic.
 - **Portal core has its own query runner**: `portal.py` uses `_portal_query()` instead of `rag_query()` from `common.py`. They look nearly identical but return different types (`PortalResponse` vs `RagResponse`). Do not unify them without also unifying the models.
+- **`AppContext.embedder` may be None**: The Embedder is initialized at server startup in `server.py` and stored in `AppContext.embedder`. It will be `None` if RAG is disabled (`MCP_RAG_SOLR_URL` not set) or if the embedding model failed to load. Always check `app.embedder is not None` before calling `encode()` or `encode_async()`.

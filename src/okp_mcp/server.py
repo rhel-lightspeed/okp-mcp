@@ -11,6 +11,7 @@ import httpx
 from fastmcp import Context, FastMCP
 
 from .config import ServerConfig
+from .rag.embeddings import Embedder
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,7 @@ class AppContext:
     solr_endpoint: str
     max_response_chars: int
     rag_solr_url: str
+    embedder: Embedder | None = None
 
 
 @asynccontextmanager
@@ -41,6 +43,16 @@ async def _app_lifespan(server: FastMCP) -> AsyncIterator[dict[str, AppContext]]
         logger.info("RAG tools disabled: MCP_RAG_SOLR_URL not set")
     logger.info("SOLR endpoint: %s", solr_endpoint)
     logger.info("RAG Solr URL: %s", rag_solr_url)
+    embedder = None
+    if cfg.rag_solr_url:
+        try:
+            embedder = Embedder(
+                model_name=cfg.embedding_model,
+                cache_dir=cfg.embedding_cache_dir or "",
+            )
+            logger.info("Embedder loaded: %s", cfg.embedding_model)
+        except Exception:
+            logger.warning("Embedding model unavailable; RAG semantic search disabled", exc_info=True)
     client = httpx.AsyncClient(timeout=30.0)
     try:
         yield {
@@ -49,10 +61,16 @@ async def _app_lifespan(server: FastMCP) -> AsyncIterator[dict[str, AppContext]]
                 solr_endpoint=solr_endpoint,
                 max_response_chars=max_response_chars,
                 rag_solr_url=rag_solr_url,
+                embedder=embedder,
             )
         }
     finally:
         await client.aclose()
+        if embedder is not None:
+            try:
+                embedder.close()
+            except Exception:
+                logger.warning("Failed to close embedder cleanly")
 
 
 def get_app_context(ctx: Context) -> AppContext:

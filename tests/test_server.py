@@ -4,7 +4,7 @@
 
 from types import SimpleNamespace
 from typing import cast
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
@@ -154,3 +154,111 @@ async def test_lifespan_uses_explicit_rag_solr_url():
                 assert app_context.rag_solr_url == "http://rag-instance:8984"
         finally:
             server_module._server_config = original
+
+
+@pytest.mark.asyncio
+async def test_lifespan_creates_embedder_when_rag_enabled():
+    """Lifespan creates an Embedder instance when MCP_RAG_SOLR_URL is set."""
+    from okp_mcp import server as server_module
+    from okp_mcp.config import ServerConfig
+
+    mock_embedder = MagicMock()
+    original = server_module._server_config
+    try:
+        server_module._server_config = ServerConfig(rag_solr_url="http://rag-test:8984")
+        with patch("okp_mcp.server.Embedder", return_value=mock_embedder):
+            async with _app_lifespan(mcp) as lifespan_context:
+                app = lifespan_context["app"]
+                assert app.embedder is mock_embedder
+    finally:
+        server_module._server_config = original
+
+
+@pytest.mark.asyncio
+async def test_lifespan_embedder_is_none_when_rag_disabled():
+    """Lifespan sets embedder to None when RAG is disabled."""
+    async with _app_lifespan(mcp) as lifespan_context:
+        app = lifespan_context["app"]
+        assert app.embedder is None
+
+
+@pytest.mark.asyncio
+async def test_lifespan_embedder_graceful_degradation_on_init_failure():
+    """Lifespan sets embedder to None if Embedder init raises."""
+    from okp_mcp import server as server_module
+    from okp_mcp.config import ServerConfig
+
+    original = server_module._server_config
+    try:
+        server_module._server_config = ServerConfig(rag_solr_url="http://rag-test:8984")
+        with patch("okp_mcp.server.Embedder", side_effect=OSError("model not found")):
+            async with _app_lifespan(mcp) as lifespan_context:
+                app = lifespan_context["app"]
+                assert app.embedder is None
+    finally:
+        server_module._server_config = original
+
+
+@pytest.mark.asyncio
+async def test_lifespan_closes_embedder_on_normal_exit():
+    """Lifespan calls embedder.close() when context exits normally."""
+    from okp_mcp import server as server_module
+    from okp_mcp.config import ServerConfig
+
+    mock_embedder = MagicMock()
+    mock_client = AsyncMock(spec=httpx.AsyncClient)
+    original = server_module._server_config
+    try:
+        server_module._server_config = ServerConfig(rag_solr_url="http://rag-test:8984")
+        with (
+            patch("okp_mcp.server.Embedder", return_value=mock_embedder),
+            patch("okp_mcp.server.httpx.AsyncClient", return_value=mock_client),
+        ):
+            async with _app_lifespan(mcp):
+                pass
+    finally:
+        server_module._server_config = original
+
+    mock_embedder.close.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_lifespan_closes_embedder_on_exception():
+    """Lifespan calls embedder.close() even if an error happens inside."""
+    from okp_mcp import server as server_module
+    from okp_mcp.config import ServerConfig
+
+    mock_embedder = MagicMock()
+    mock_client = AsyncMock(spec=httpx.AsyncClient)
+    original = server_module._server_config
+    try:
+        server_module._server_config = ServerConfig(rag_solr_url="http://rag-test:8984")
+        with (
+            patch("okp_mcp.server.Embedder", return_value=mock_embedder),
+            patch("okp_mcp.server.httpx.AsyncClient", return_value=mock_client),
+            pytest.raises(RuntimeError, match="boom"),
+        ):
+            async with _app_lifespan(mcp):
+                raise RuntimeError("boom")
+    finally:
+        server_module._server_config = original
+
+    mock_embedder.close.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_lifespan_logs_warning_on_embedder_init_failure(caplog):
+    """Lifespan logs a warning when Embedder initialization fails."""
+    from okp_mcp import server as server_module
+    from okp_mcp.config import ServerConfig
+
+    original = server_module._server_config
+    try:
+        server_module._server_config = ServerConfig(rag_solr_url="http://rag-test:8984")
+        with patch("okp_mcp.server.Embedder", side_effect=OSError("model not found")):
+            async with _app_lifespan(mcp):
+                pass
+    finally:
+        server_module._server_config = original
+
+    assert "Embedding model unavailable" in caplog.text
