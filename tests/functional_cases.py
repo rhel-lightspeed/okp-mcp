@@ -165,7 +165,7 @@ FUNCTIONAL_TEST_CASES = [
             ],
             forbidden_claims=["configures hugepages dynamically"],
         ),
-        id="RSPEED_2479",
+        id="RSPEED_2200",
     ),
     pytest.param(
         FunctionalCase(

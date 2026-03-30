@@ -185,7 +185,8 @@ def _apply_intent_boosts(params: dict, query_lower: str, cleaned_query: str) -> 
     """
     if _detect_vm_intent(query_lower):
         params["bq"] = (
-            'title:(cockpit OR virtualization OR "virt-manager")^15 main_content:(cockpit OR "cockpit-machines")^5'
+            'title:(cockpit OR virtualization OR "virt-manager")^15 '
+            'main_content:(cockpit OR "cockpit-machines" OR virsh)^5'
         )
         params["hl.q"] = f"{cleaned_query} {_VM_HIGHLIGHT_TERMS}"
 
