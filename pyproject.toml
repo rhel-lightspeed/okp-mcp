@@ -41,6 +41,11 @@ testpaths = ["tests"]
 markers = [
     "functional: end-to-end tests requiring live Solr and Vertex AI credentials",
 ]
+filterwarnings = [
+    # Upstream google-genai bug: types.py uses _UnionGenericAlias (deprecated in 3.14).
+    # https://github.com/googleapis/python-genai/issues/1233
+    "ignore:'_UnionGenericAlias' is deprecated:DeprecationWarning:google.genai.types",
+]
 
 [tool.ruff]
 target-version = "py312"

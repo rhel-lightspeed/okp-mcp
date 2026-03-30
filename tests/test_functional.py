@@ -1,6 +1,8 @@
 """Functional tests for the OKP MCP server using Pydantic AI and Vertex AI Gemini."""
 
 import os
+from collections.abc import Generator
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import httpx
@@ -28,6 +30,77 @@ pytestmark = pytest.mark.functional
 
 _FIXTURES_DIR = Path(__file__).parent / "fixtures"
 SYSTEM_PROMPT = (_FIXTURES_DIR / "functional_system_prompt.txt").read_text(encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
+# Token usage tracking
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class _UsageEntry:
+    """Token usage for a single functional test case."""
+
+    label: str
+    input_tokens: int
+    output_tokens: int
+    requests: int
+
+
+@dataclass
+class _UsageTracker:
+    """Accumulates per-test token usage and prints a summary at session end."""
+
+    entries: list[_UsageEntry] = field(default_factory=list)
+
+    def record(self, case: FunctionalCase, result: object) -> None:
+        """Record token usage from an agent run result."""
+        usage = result.usage()  # type: ignore[union-attr]
+        label = case.question[:40].replace("\n", " ")
+        self.entries.append(
+            _UsageEntry(
+                label=label,
+                input_tokens=usage.input_tokens or 0,
+                output_tokens=usage.output_tokens or 0,
+                requests=usage.requests or 0,
+            )
+        )
+
+    def print_summary(self, writer: object) -> None:
+        """Print a token usage summary table via the provided write_line callable."""
+        if not self.entries:
+            return
+        total_in = sum(e.input_tokens for e in self.entries)
+        total_out = sum(e.output_tokens for e in self.entries)
+        total_req = sum(e.requests for e in self.entries)
+
+        w = writer.write_line  # type: ignore[union-attr]
+        w("")
+        w("=" * 78)
+        w("FUNCTIONAL TEST TOKEN USAGE SUMMARY")
+        w("=" * 78)
+        w(f"{'Case':<42} {'Input':>10} {'Output':>10} {'Requests':>10}")
+        w("-" * 78)
+        for e in self.entries:
+            w(f"{e.label:<42} {e.input_tokens:>10,} {e.output_tokens:>10,} {e.requests:>10}")
+        w("-" * 78)
+        w(f"{'TOTAL':<42} {total_in:>10,} {total_out:>10,} {total_req:>10}")
+        w("=" * 78)
+        if total_in > 20_000:
+            w("WARNING: Total input tokens exceed 20K - investigate tool response sizes")
+        w("")
+
+
+_usage_tracker = _UsageTracker()
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _print_usage_summary(request: pytest.FixtureRequest) -> Generator[None, None, None]:
+    """Print token usage summary after all functional tests complete."""
+    yield
+    tr = request.config.pluginmanager.get_plugin("terminalreporter")
+    if tr:
+        _usage_tracker.print_summary(tr)
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -150,6 +223,7 @@ async def test_cla_scenario(case: FunctionalCase) -> None:
             with capture_run_messages() as messages:
                 result = await agent.run(case.question, model_settings={"temperature": 0})
     response: str = result.output
+    _usage_tracker.record(case, result)
 
     tool_calls = _extract_tool_calls(messages)
     tool_returns = _extract_tool_returns(messages)
