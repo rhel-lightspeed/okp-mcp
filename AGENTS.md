@@ -247,6 +247,16 @@ Two new embedding fields: `embedding_model` (default: `"ibm-granite/granite-embe
 
 All functions must be rated A or B by radon. C or higher fails the CI gate. Refactor until compliant.
 
+## Pre-PR Code Review
+
+Before creating a pull request, check if `coderabbit` is available in `$PATH`. If it is, ask the user whether they'd like a CodeRabbit review before opening the PR. Run it with structured output for easy parsing:
+
+```bash
+coderabbit review --agent --base <base-branch>
+```
+
+If findings come back, address them before creating the PR (or flag them for the user). Zero findings means good to go.
+
 ## Workarounds
 
 - `run_code()` in tools.py is a KLUDGE: placeholder tool that prevents Gemini 2.5 Flash from crashing when it tries to use its built-in code execution tool. Returns a polite "not supported" message. Do not remove without verifying Gemini behavior first.
