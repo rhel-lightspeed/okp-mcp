@@ -49,7 +49,7 @@ _TERM_TRIM_CHARS = "?.,!"
 
 def _normalize_query_token(token: str) -> str:
     """Strip trailing punctuation and lowercase a query token for BM25 matching."""
-    return token.lower().strip(_TERM_TRIM_CHARS)
+    return token.lower().rstrip(_TERM_TRIM_CHARS)
 
 
 def _is_numeric(token: str) -> bool:
@@ -60,17 +60,29 @@ def _is_numeric(token: str) -> bool:
 def _clean_query(query: str) -> str:
     """Strip English stopwords and quote hyphenated compounds for SOLR relevance.
 
-    Preserves quoted phrases intact, and always keeps numeric tokens (e.g. '10',
+    Strips trailing punctuation (including Solr wildcard characters like ``?``),
+    preserves quoted phrases intact, and always keeps numeric tokens (e.g. '10',
     '9') since they are critical for version-specific queries in Red Hat content.
     Hyphenated tokens like ``rpm-ostree`` are wrapped in double quotes so SOLR
     matches them as phrases instead of splitting on the hyphen. Falls back to the
     original query if stripping would remove all terms.
     """
     tokens = _split_quoted_and_plain(query)
-    parts = [t for t in tokens if t.startswith('"') or _is_numeric(t) or t.lower().strip("?.,!") not in STOP_WORDS]
-    # Solr's tokenizer splits hyphens (rpm-ostree → rpm + ostree), so quote them
-    # to force phrase matching. Without this, "rpm" alone floods results with
-    # generic RPM package docs, burying actual rpm-ostree content.
+    parts: list[str] = []
+    for t in tokens:
+        if t.startswith('"'):
+            parts.append(t)
+            continue
+        # Strip trailing punctuation that doubles as Solr syntax (? is a
+        # single-char wildcard, . triggers fuzzy proximity, etc.)
+        stripped = t.rstrip(_TERM_TRIM_CHARS)
+        if not stripped:
+            continue
+        if _is_numeric(stripped) or stripped.lower() not in STOP_WORDS:
+            parts.append(stripped)
+    # Solr's tokenizer splits hyphens (rpm-ostree -> rpm + ostree), so quote
+    # them to force phrase matching. Without this, "rpm" alone floods results
+    # with generic RPM package docs, burying actual rpm-ostree content.
     parts = _quote_hyphenated_compounds(parts)
     return " ".join(parts) if parts else query
 
