@@ -36,14 +36,18 @@ async def test_production_tools_registered():
     tools = await mcp._list_tools()
     tool_names = {tool.name for tool in tools}
     expected_tools = {
+        "search_portal",
+        "get_document",
+    }
+    assert expected_tools.issubset(tool_names)
+    removed_tools = {
         "search_documentation",
         "search_solutions",
         "search_cves",
         "search_errata",
         "search_articles",
-        "get_document",
     }
-    assert expected_tools.issubset(tool_names)
+    assert removed_tools.isdisjoint(tool_names), f"Legacy search tools still registered: {removed_tools & tool_names}"
 
 
 @pytest.mark.asyncio
