@@ -4,7 +4,7 @@ MCP server bridging LLM tool calls to a Solr-indexed Red Hat knowledge base (doc
 
 ## Maintenance Rule
 
-After any code change, verify that this file and any subpackage `AGENTS.md` files (e.g., `src/okp_mcp/rag/AGENTS.md`) are still accurate. Update them in the same PR if anything has drifted: new modules, changed function signatures, removed features, renamed files, new dependencies, etc.
+After any code change, verify that this file is still accurate. Update it in the same PR if anything has drifted: new modules, changed function signatures, removed features, renamed files, new dependencies, etc.
 
 ## Build & Run
 
@@ -82,27 +82,15 @@ src/okp_mcp/
   solr.py        # Solr query builder, BM25 paragraph extraction, RHV filtering
   content.py     # Boilerplate stripping, content truncation, text cleaning
   formatting.py  # Result annotation, deprecation/replacement detection, sort keys
-  rag/           # RAG search pipeline (see rag/AGENTS.md for module details)
 tests/
   conftest.py          # shared fixtures (solr mocks, sample responses) + functional marker deselection
   functional_cases.py  # FunctionalCase dataclass + parametrized RSPEED test data
   test_functional.py   # Vertex AI functional tests (gated behind -m functional)
   test_*.py            # unit test modules mirror src structure
-  rag/                 # tests for src/okp_mcp/rag/ subpackage
-    conftest.py        # RAG-specific fixtures (rag_chunk_response, rag_client)
-    test_common.py     # rag_query() HTTP handling, error paths, logging
-    test_embeddings.py # Embedder construction, encode, encode_async, cleanup
-    test_hybrid.py     # hybrid_search() params, endpoint, response parsing
-    test_lexical.py    # lexical_search() eDisMax params, chunk filter, defaults
-    test_models.py     # RagDocument + RagResponse construction, extras, equality
-    test_rrf.py        # reciprocal_rank_fusion() merging, scoring, edge cases
-    test_semantic.py   # semantic_search() KNN, dimension validation, text search
-    test_tools.py      # Unit tests for search_rag MCP tool
   fixtures/
     functional_system_prompt.txt  # LLM system prompt for functional tests
 docs/
-  OKP_RAG_EXPLORATION.md  # RAG container research: portal + portal-rag cores, vector embeddings, schema comparison
-  SOLR_EXPLORATION.md     # Historical: original redhat-okp container schema map (superseded by OKP_RAG_EXPLORATION.md)
+  SOLR_EXPLORATION.md     # Historical: original redhat-okp container schema map
 openshift/
   okp-mcp.yml   # OpenShift deployment template (Deployment, Service, ServiceAccount)
 INCORRECT_ANSWER_LOOP.md  # step-by-step workflow for turning RSPEED "incorrect answer" tickets into functional tests and fixes
@@ -118,11 +106,9 @@ INCORRECT_ANSWER_LOOP.md  # step-by-step workflow for turning RSPEED "incorrect 
 | Change content cleaning | `src/okp_mcp/content.py` | `strip_boilerplate()` regex, `truncate_content()` |
 | Modify config/CLI args | `src/okp_mcp/config.py` | Add field to `ServerConfig`; auto-generates CLI arg via `MCP_` prefix |
 | Add functional test case | `tests/functional_cases.py` | Add `FunctionalCase` to `FUNCTIONAL_TEST_CASES` list |
-| Mock Solr responses | `tests/conftest.py` | `solr_mock` fixture uses respx; RAG fixtures in `tests/rag/conftest.py` |
+| Mock Solr responses | `tests/conftest.py` | `solr_mock` fixture uses respx |
 | Deploy to OpenShift | `openshift/okp-mcp.yml` | Template with params: IMAGE, IMAGE_TAG, REPLICAS, etc. |
-| Solr schema reference | `docs/OKP_RAG_EXPLORATION.md` | RAG container cores, vector embeddings, schema comparison |
-| Legacy Solr reference | `docs/SOLR_EXPLORATION.md` | Historical: original redhat-okp container schema map |
-| Any RAG task | `src/okp_mcp/rag/AGENTS.md` | Has its own module layout, "Where to Look", gotchas |
+| Solr schema reference | `docs/SOLR_EXPLORATION.md` | Historical: original redhat-okp container schema map |
 
 ## Boot Sequence
 
@@ -132,13 +118,11 @@ uv run okp-mcp [--transport ...] [--port ...]
   → __init__.py: main()
        ├─ CliApp.run(ServerConfig)     # parse CLI + MCP_* env vars
        ├─ _configure_logging()
-       └─ mcp.run(transport=...)       # start FastMCP server
-           → server.py: _app_lifespan()
-               ├─ Embedder(model) if MCP_RAG_SOLR_URL set
-               ├─ creates shared httpx.AsyncClient
-               └─ yields AppContext(..., embedder)
-           → tools.py: @mcp.tool funcs  # registered via side-effect import
-           → rag/tools.py: @mcp.tool funcs  # registered via side-effect import (disabled if MCP_RAG_SOLR_URL not set)
+        └─ mcp.run(transport=...)       # start FastMCP server
+            → server.py: _app_lifespan()
+                ├─ creates shared httpx.AsyncClient
+                └─ yields AppContext(...)
+            → tools.py: @mcp.tool funcs  # registered via side-effect import
 ```
 
 ## Module Dependencies
@@ -148,9 +132,8 @@ __init__.py → config, server, tools (side-effect import)
 tools.py    → config, server, solr, content, formatting
 formatting.py → content, solr
 solr.py     → config
-server.py   → config, rag.embeddings
+server.py   → config
 content.py  → (standalone)
-rag/*             → see rag/AGENTS.md for internal dependency graph (rag/tools.py imports portal.py for portal search fusion)
 ```
 
 No circular imports. `content.py` has zero internal dependencies.
@@ -224,8 +207,6 @@ Config uses `pydantic_settings.BaseSettings` with `MCP_` env prefix. CLI via `Cl
 
 Module-level constant `STOP_WORDS` lives in `config.py` outside the class to avoid circular import issues. The Solr endpoint is no longer a module-level constant — it flows through `ServerConfig.solr_endpoint` → `AppContext.solr_endpoint` at runtime.
 
-Two new embedding fields: `embedding_model` (default: `"ibm-granite/granite-embedding-30m-english"`) and `embedding_cache_dir` (default: `None`). Available as `MCP_EMBEDDING_MODEL` and `MCP_EMBEDDING_CACHE_DIR` env vars. Read by `Embedder` callers, not wired into `AppContext` yet.
-
 ## Testing Patterns
 
 - **HTTP mocking**: `respx` library (not `responses` or `aioresponses`)
@@ -239,9 +220,7 @@ Two new embedding fields: `embedding_model` (default: `"ibm-granite/granite-embe
 
 - Use `Containerfile` (not Dockerfile), build with `podman`
 - Multi-stage build: UBI 10 builder + minimal UBI 10 Python 3.12 runtime
-- `podman-compose up -d` to run with Solr (default: `rhokp-rhel9` from `registry.redhat.io`; RAG variant on port 8984 from `images.paas.redhat.com`)
-- Embedding model (`ibm-granite/granite-embedding-30m-english`) is pre-cached in the builder stage via `huggingface_hub.snapshot_download()` to `/build/models`, then copied to `/app/models` in the runtime image
-- `HF_HUB_CACHE=/app/models` points sentence-transformers to the cached model; `HF_HUB_OFFLINE=1` prevents network calls at runtime
+- `podman-compose up -d` to run with Solr (`rhokp-rhel9` from `registry.redhat.io`)
 
 ## Complexity
 

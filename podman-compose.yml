@@ -1,6 +1,6 @@
 services:
 
-  # Red Hat OKP — Offline Knowledge Portal (Solr-based documentation index)
+  # Red Hat OKP - Offline Knowledge Portal (Solr-based documentation index)
   # Requires registry.redhat.io authentication: podman login registry.redhat.io
   redhat-okp:
     image: registry.redhat.io/offline-knowledge-portal/rhokp-rhel9:latest
@@ -14,24 +14,7 @@ services:
       - redhat-okp-data:/opt/solr/server/solr/portal/data
     restart: unless-stopped
 
-  # Red Hat OKP with RAG chunks (pre-release)
-  redhat-okp-rag:
-    image: images.paas.redhat.com/offline-kbase/rhokp-rag:mar-9-2026
-    container_name: redhat-okp-rag
-    ports:
-      - "8984:8984"
-    environment:
-      ACCESS_KEY: ${OKP_ACCESS_KEY}
-      SOLR_JETTY_HOST: "0.0.0.0"
-      # This is the SOLR recommended method for setting the port
-      SOLR_PORT_LISTEN: 8984
-      # But this is the only method that works for OKP 😆
-      SOLR_PORT: 8984
-    volumes:
-      - redhat-okp-rag-data:/opt/solr/server/solr/portal/data
-    restart: unless-stopped
-
-  # OKP MCP Server — Solr bridge for LLM tool calls
+  # OKP MCP Server - Solr bridge for LLM tool calls
   okp-mcp:
     build:
       context: .
@@ -42,11 +25,9 @@ services:
       - "8000:8000"
     environment:
       MCP_SOLR_URL: http://redhat-okp:8983
-      MCP_RAG_SOLR_URL: http://redhat-okp-rag:8984
     depends_on:
       - redhat-okp
     restart: unless-stopped
 
 volumes:
   redhat-okp-data:
-  redhat-okp-rag-data:

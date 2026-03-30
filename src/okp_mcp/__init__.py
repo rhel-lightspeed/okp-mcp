@@ -7,7 +7,6 @@ from pydantic_settings import CliApp
 from okp_mcp import server as _server
 from okp_mcp import tools as _tools  # noqa: F401 — import triggers @mcp.tool registration
 from okp_mcp.config import ServerConfig
-from okp_mcp.rag import tools as _rag_tools  # noqa: F401 — import triggers @mcp.tool registration for RAG tools
 from okp_mcp.server import mcp
 
 __all__ = ["mcp", "main"]
