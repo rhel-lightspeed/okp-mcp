@@ -105,13 +105,15 @@ def _detect_eus_intent(query_lower: str) -> bool:
 _MAIN_FL = (
     "id,allTitle,heading_h1,title,view_uri,url_slug,documentKind,"
     "product,documentation_version,lastModifiedDate,score,"
+    "main_content,"
     "cve_details,cve_threatSeverity,"
     "portal_synopsis,portal_summary,portal_severity,portal_advisory_type"
 )
 
 # Fields returned by the deprecation query (no CVE/errata-specific fields).
 _DEPRECATION_FL = (
-    "id,allTitle,heading_h1,title,view_uri,url_slug,documentKind,product,documentation_version,lastModifiedDate,score"
+    "id,allTitle,heading_h1,title,view_uri,url_slug,documentKind,"
+    "product,documentation_version,lastModifiedDate,score,main_content"
 )
 
 # Custom qf that adds errata-specific field boosts on top of the base edismax
@@ -143,10 +145,11 @@ def _build_main_query(cleaned_query: str) -> dict:
         "fl": _MAIN_FL,
         "rows": 20,
         "hl.snippets": "6",
-        # Override the base default of "true".  CVE/errata main_content starts
-        # with boilerplate; disabling defaultSummary forces the chunk layer to
-        # fall back to type-specific fields (cve_details, portal_synopsis).
-        "hl.defaultSummary": "false",
+        # Enable defaultSummary so docs/solutions/articles always get at least
+        # the first N chars of main_content when highlight query terms don't
+        # match.  CVE/errata boilerplate is handled in _docs_to_chunks() which
+        # bypasses highlights for those types and uses type-specific fields.
+        "hl.defaultSummary": "true",
         # Slight recency boost so newer RHEL content ranks higher.
         "bf": "recip(ms(NOW,lastModifiedDate),3.16e-11,1,1)^0.3",
     }
@@ -275,13 +278,8 @@ def _fallback_errata(doc: dict) -> str:
     return "\n".join(parts) if parts else ""
 
 
-def _fallback_generic(doc: dict, highlights_data: dict) -> str:
-    """Build fallback chunk text for a doc/solution/article without highlights.
-
-    Tries ``_get_highlights``-style extraction from the Solr highlighting
-    payload first, then falls back to cleaning ``main_content``.
-    """
-    # Check if there's raw main_content we can use
+def _fallback_generic(doc: dict) -> str:
+    """Build fallback chunk text for a doc/solution/article without highlights."""
     mc = doc.get("main_content", "")
     if mc:
         return strip_boilerplate(mc)[:_FALLBACK_MAX_CHARS]
@@ -294,10 +292,10 @@ def _docs_to_chunks(
 ) -> list[PortalChunk]:
     """Convert a Solr response with highlighting into a flat list of PortalChunk chunks.
 
-    Each highlight snippet becomes a separate PortalChunk. Documents without
-    highlights fall back to type-specific fields (``cve_details`` for CVEs,
-    ``portal_synopsis`` for errata, first 600 chars of ``main_content`` for
-    docs/solutions/articles).
+    CVE and Erratum documents always use type-specific fields (``cve_details``,
+    ``portal_synopsis``) instead of highlights, since their ``main_content``
+    starts with boilerplate.  All other document types use highlight snippets,
+    falling back to ``_fallback_generic()`` when no snippets are available.
 
     RHV-contaminated sentences are filtered from highlight snippets via
     ``_filter_rhv_sentences()``.
@@ -321,7 +319,24 @@ def _docs_to_chunks(
         url = _build_doc_url(doc)
         kind = doc.get("documentKind", "")
 
-        # Try highlight snippets first
+        if kind in ("Cve", "Erratum"):
+            chunk_text = _fallback_cve(doc) if kind == "Cve" else _fallback_errata(doc)
+            if chunk_text:
+                chunks.append(
+                    PortalChunk(
+                        doc_id=f"{doc_id}_fb_0",
+                        parent_id=doc_id,
+                        title=title,
+                        chunk=chunk_text,
+                        chunk_index=0,
+                        num_tokens=len(chunk_text.split()),
+                        online_source_url=url,
+                        documentKind=kind,
+                        score=doc.get("score"),
+                    )
+                )
+            continue
+
         hl_snippets = highlighting.get(doc_id, {}).get("main_content", [])
 
         if hl_snippets:
@@ -345,13 +360,7 @@ def _docs_to_chunks(
                     )
                 )
         else:
-            # Fallback: use type-specific fields
-            if kind == "Cve":
-                chunk_text = _fallback_cve(doc)
-            elif kind == "Erratum":
-                chunk_text = _fallback_errata(doc)
-            else:
-                chunk_text = _fallback_generic(doc, highlighting)
+            chunk_text = _fallback_generic(doc)
 
             if chunk_text:
                 chunks.append(
@@ -505,11 +514,10 @@ async def _run_portal_search(
     merged = _reciprocal_rank_fusion(main_chunks, dep_chunks)
     deduped = _deduplicate_by_parent(merged)
 
-    has_deprecation = any(
-        c.rrf_score and c.parent_id and c.parent_id in {d.parent_id for d in dep_chunks} for c in deduped
-    )
-
     top_n = deduped[:max_results]
+
+    dep_parent_ids = {d.parent_id for d in dep_chunks if d.parent_id is not None}
+    has_deprecation = any(c.parent_id in dep_parent_ids for c in top_n if c.parent_id is not None)
 
     logger.info(
         "Portal search: query=%r main=%d dep=%d merged=%d deduped=%d returned=%d",

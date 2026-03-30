@@ -143,7 +143,7 @@ FUNCTIONAL_TEST_CASES = [
             ],
             required_facts=[
                 "marketplace",
-                ("custom image", "custom AMI"),
+                ("custom image", "custom AMI", "custom RHEL image"),
             ],
             forbidden_claims=["do not expose"],
         ),
@@ -230,7 +230,7 @@ FUNCTIONAL_TEST_CASES = [
                 "SAP",
             ],
             required_facts=[
-                "package list",
+                ("package list", "packages"),
                 "SAP Application Server",
             ],
             forbidden_claims=["not a Red Hat product"],
@@ -246,9 +246,9 @@ FUNCTIONAL_TEST_CASES = [
                 "sap_netweaver_preconfigure",
             ],
             required_facts=[
-                "sap_general_preconfigure",
-                "sap_netweaver_preconfigure",
-                "sap_hana_preconfigure",
+                ("sap_general_preconfigure", "sap-general-preconfigure"),
+                ("sap_netweaver_preconfigure", "sap-netweaver-preconfigure"),
+                ("sap_hana_preconfigure", "sap-hana-preconfigure"),
                 "preconfigure",
             ],
             # Wrong answers often omit sap_netweaver_preconfigure or substitute sap_swpm (install role).

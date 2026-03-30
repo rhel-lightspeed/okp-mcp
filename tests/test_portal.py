@@ -210,10 +210,10 @@ class TestBuildMainQuery:
         params = _build_main_query("test")
         assert params["rows"] == 20
 
-    def test_hl_default_summary_false(self):
-        """defaultSummary is disabled so CVE/errata boilerplate triggers fallback."""
+    def test_hl_default_summary_true(self):
+        """defaultSummary is enabled; CVE/errata boilerplate is handled in _docs_to_chunks."""
         params = _build_main_query("test")
-        assert params["hl.defaultSummary"] == "false"
+        assert params["hl.defaultSummary"] == "true"
 
     def test_recency_boost(self):
         """A recency bf boost is applied to favor newer content."""
