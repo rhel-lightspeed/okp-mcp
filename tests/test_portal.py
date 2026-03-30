@@ -1,11 +1,15 @@
-"""Unit tests for the portal search query builders, intent detection, and chunk conversion."""
+"""Unit tests for the portal search module: query builders, chunk conversion, RRF, orchestrator, formatting."""
 
+import httpx
 import pytest
+import respx
 
 from okp_mcp.portal import (
+    _DEPRECATION_WARNING,
     _EOL_PRODUCTS,
     _EUS_HIGHLIGHT_TERMS,
     _FALLBACK_MAX_CHARS,
+    _KIND_LABELS,
     _MAIN_QF,
     _VM_HIGHLIGHT_TERMS,
     PortalChunk,
@@ -20,7 +24,11 @@ from okp_mcp.portal import (
     _docs_to_chunks,
     _fallback_cve,
     _fallback_errata,
+    _format_portal_chunk,
+    _format_portal_results,
+    _reciprocal_rank_fusion,
     _resolve_title,
+    _run_portal_search,
 )
 
 # ---------------------------------------------------------------------------
@@ -757,3 +765,279 @@ class TestDeduplicateByParent:
         result = _deduplicate_by_parent(chunks)
         assert len(result) == 1
         assert result[0].doc_id == "solo"
+
+
+# ---------------------------------------------------------------------------
+# Reciprocal rank fusion
+# ---------------------------------------------------------------------------
+
+
+class TestReciprocalRankFusion:
+    """Verify standalone RRF merging for PortalChunks."""
+
+    def test_overlapping_docs_boosted(self):
+        """Chunks appearing in both lists get higher RRF scores."""
+        list_a = [
+            PortalChunk(doc_id="shared", parent_id="p1", chunk="A."),
+            PortalChunk(doc_id="only_a", parent_id="p2", chunk="B."),
+        ]
+        list_b = [
+            PortalChunk(doc_id="shared", parent_id="p1", chunk="A."),
+            PortalChunk(doc_id="only_b", parent_id="p3", chunk="C."),
+        ]
+        result = _reciprocal_rank_fusion(list_a, list_b, k=60)
+        assert result[0].doc_id == "shared"
+        assert result[0].rrf_score > result[1].rrf_score
+
+    def test_disjoint_lists_all_appear(self):
+        """All chunks from disjoint lists appear in the output."""
+        list_a = [PortalChunk(doc_id="a", chunk="A.")]
+        list_b = [PortalChunk(doc_id="b", chunk="B.")]
+        result = _reciprocal_rank_fusion(list_a, list_b)
+        ids = {c.doc_id for c in result}
+        assert ids == {"a", "b"}
+
+    def test_empty_inputs(self):
+        """No inputs returns empty list."""
+        assert _reciprocal_rank_fusion() == []
+
+    def test_single_list_passthrough(self):
+        """Single list returns scored copies."""
+        chunks = [PortalChunk(doc_id="x", chunk="X.")]
+        result = _reciprocal_rank_fusion(chunks)
+        assert len(result) == 1
+        assert result[0].doc_id == "x"
+        assert result[0].rrf_score is not None
+
+    def test_preserves_chunk_data(self):
+        """RRF preserves all fields from the selected chunk."""
+        chunk = PortalChunk(
+            doc_id="d1",
+            parent_id="p1",
+            title="My Title",
+            chunk="Content.",
+            documentKind="documentation",
+            online_source_url="https://example.com",
+        )
+        result = _reciprocal_rank_fusion([chunk])
+        assert result[0].title == "My Title"
+        assert result[0].online_source_url == "https://example.com"
+
+    def test_later_list_chunk_preferred_on_collision(self):
+        """When two lists share a doc_id, the chunk from the later list wins."""
+        early = [PortalChunk(doc_id="shared", chunk="main snippet")]
+        late = [PortalChunk(doc_id="shared", chunk="deprecation snippet")]
+        result = _reciprocal_rank_fusion(early, late)
+        assert len(result) == 1
+        assert result[0].chunk == "deprecation snippet"
+
+
+# ---------------------------------------------------------------------------
+# Formatting
+# ---------------------------------------------------------------------------
+
+
+class TestFormatPortalChunk:
+    """Verify per-chunk markdown formatting."""
+
+    def test_documentation_chunk(self):
+        """Documentation chunk renders with type and URL."""
+        chunk = PortalChunk(
+            doc_id="d1",
+            title="Configuring Firewalls",
+            chunk="Use firewalld to manage zones.",
+            documentKind="documentation",
+            online_source_url="https://access.redhat.com/documentation/en-US/firewall",
+        )
+        text, _sort_key = _format_portal_chunk(chunk)
+        assert "**Configuring Firewalls**" in text
+        assert "Type: Documentation" in text
+        assert "https://access.redhat.com/documentation/en-US/firewall" in text
+        assert "Use firewalld" in text
+
+    def test_cve_chunk(self):
+        """CVE chunk renders with CVE type label."""
+        chunk = PortalChunk(
+            doc_id="cve1",
+            title="CVE-2024-12345",
+            chunk="Buffer overflow in libfoo.",
+            documentKind="Cve",
+            online_source_url="https://access.redhat.com/security/cve/CVE-2024-12345",
+        )
+        text, _ = _format_portal_chunk(chunk)
+        assert "Type: CVE" in text
+        assert "CVE-2024-12345" in text
+
+    def test_errata_chunk(self):
+        """Erratum chunk renders with Security Advisory label."""
+        chunk = PortalChunk(
+            doc_id="e1",
+            title="RHSA-2024:1234",
+            chunk="Important: kernel security update.",
+            documentKind="Erratum",
+        )
+        text, _ = _format_portal_chunk(chunk)
+        assert "Type: Security Advisory" in text
+
+    def test_deprecation_detected(self):
+        """Chunk mentioning deprecation gets annotation and sort_key <= 0."""
+        chunk = PortalChunk(
+            doc_id="d1",
+            title="virt-manager deprecated in RHEL 9",
+            chunk="virt-manager has been removed from RHEL 9.",
+            documentKind="documentation",
+        )
+        text, sort_key = _format_portal_chunk(chunk)
+        assert "Deprecation" in text
+        assert sort_key <= 0
+
+    def test_no_url_omits_line(self):
+        """Chunk without URL omits the URL line."""
+        chunk = PortalChunk(doc_id="d1", title="Test", chunk="Content.", documentKind="documentation")
+        text, _ = _format_portal_chunk(chunk)
+        assert "URL:" not in text
+
+    def test_kind_labels_complete(self):
+        """All expected document kinds have labels."""
+        assert "documentation" in _KIND_LABELS
+        assert "solution" in _KIND_LABELS
+        assert "article" in _KIND_LABELS
+        assert "Cve" in _KIND_LABELS
+        assert "Erratum" in _KIND_LABELS
+
+
+class TestFormatPortalResults:
+    """Verify full result assembly with deprecation banner and budget."""
+
+    def test_basic_formatting(self):
+        """Multiple chunks are formatted and joined."""
+        chunks = [
+            PortalChunk(doc_id="a", title="Doc A", chunk="Content A.", documentKind="documentation"),
+            PortalChunk(doc_id="b", title="Doc B", chunk="Content B.", documentKind="solution"),
+        ]
+        result = _format_portal_results(chunks, False, "test query", 10000)
+        assert "Doc A" in result
+        assert "Doc B" in result
+
+    def test_deprecation_banner_when_flagged(self):
+        """Deprecation warning banner is prepended when has_deprecation is True."""
+        chunks = [PortalChunk(doc_id="a", title="Test", chunk="Normal content.", documentKind="documentation")]
+        result = _format_portal_results(chunks, True, "test", 10000)
+        assert result.startswith(_DEPRECATION_WARNING)
+
+    def test_deprecation_banner_from_annotations(self):
+        """Banner appears when chunk content triggers deprecation annotation."""
+        chunks = [
+            PortalChunk(
+                doc_id="a",
+                title="Removed Feature",
+                chunk="This feature has been removed from RHEL 9.",
+                documentKind="documentation",
+            )
+        ]
+        result = _format_portal_results(chunks, False, "test", 10000)
+        assert _DEPRECATION_WARNING in result
+
+    def test_no_deprecation_banner_for_normal_content(self):
+        """No deprecation banner when content is normal."""
+        chunks = [PortalChunk(doc_id="a", title="Config Guide", chunk="Set up NFS.", documentKind="documentation")]
+        result = _format_portal_results(chunks, False, "nfs", 10000)
+        assert _DEPRECATION_WARNING not in result
+
+    def test_budget_enforcement(self):
+        """Results exceeding character budget are truncated."""
+        chunks = [
+            PortalChunk(doc_id=f"d{i}", title=f"Doc {i}", chunk="x" * 500, documentKind="documentation")
+            for i in range(20)
+        ]
+        result = _format_portal_results(chunks, False, "test", 2000)
+        assert len(result) <= 2500  # some overhead from truncation message
+        assert "Doc 0" in result
+
+    def test_empty_chunks_returns_no_results(self):
+        """Empty chunk list returns 'no results' message."""
+        result = _format_portal_results([], False, "missing query", 10000)
+        assert "No results found" in result
+        assert "missing query" in result
+
+
+# ---------------------------------------------------------------------------
+# Orchestrator (async, requires respx mocking)
+# ---------------------------------------------------------------------------
+
+_SOLR_ENDPOINT = "http://localhost:8983/solr/portal/select"
+
+
+def _make_solr_json(docs, highlighting=None):
+    """Build a Solr JSON response for respx mocking."""
+    return {
+        "responseHeader": {"status": 0, "QTime": 5},
+        "response": {"numFound": len(docs), "docs": docs},
+        "highlighting": highlighting or {},
+    }
+
+
+class TestRunPortalSearch:
+    """Verify the async orchestrator pipeline."""
+
+    async def test_returns_chunks_from_parallel_queries(self):
+        """Orchestrator fires two queries and returns merged chunks."""
+        doc_main = _make_doc(doc_id="main1", allTitle="Main Doc")
+        doc_dep = _make_doc(doc_id="dep1", allTitle="Dep Doc")
+        hl_main = {"main1": {"main_content": ["Main content snippet."]}}
+        hl_dep = {"dep1": {"main_content": ["Deprecated feature removed."]}}
+
+        call_count = 0
+        with respx.mock(assert_all_called=False) as router:
+
+            def side_effect(request):
+                nonlocal call_count
+                call_count += 1
+                q = str(request.url.params.get("q", ""))
+                if "deprecated" in q:
+                    return httpx.Response(200, json=_make_solr_json([doc_dep], hl_dep))
+                return httpx.Response(200, json=_make_solr_json([doc_main], hl_main))
+
+            router.get(_SOLR_ENDPOINT).mock(side_effect=side_effect)
+
+            async with httpx.AsyncClient() as client:
+                chunks, _has_dep = await _run_portal_search(
+                    "test query",
+                    client=client,
+                    solr_endpoint=_SOLR_ENDPOINT,
+                    max_results=10,
+                )
+
+        assert len(chunks) >= 1
+        assert call_count == 2  # main + deprecation queries fired
+
+    async def test_respects_max_results(self):
+        """Output is capped at max_results after deduplication."""
+        docs = [_make_doc(doc_id=f"d{i}") for i in range(10)]
+        hl = {f"d{i}": {"main_content": [f"Snippet {i}."]} for i in range(10)}
+
+        with respx.mock(assert_all_called=False) as router:
+            router.get(_SOLR_ENDPOINT).mock(return_value=httpx.Response(200, json=_make_solr_json(docs, hl)))
+            async with httpx.AsyncClient() as client:
+                chunks, _ = await _run_portal_search(
+                    "test",
+                    client=client,
+                    solr_endpoint=_SOLR_ENDPOINT,
+                    max_results=3,
+                )
+
+        assert len(chunks) <= 3
+
+    async def test_empty_results(self):
+        """Empty Solr response returns empty chunk list."""
+        with respx.mock(assert_all_called=False) as router:
+            router.get(_SOLR_ENDPOINT).mock(return_value=httpx.Response(200, json=_make_solr_json([])))
+            async with httpx.AsyncClient() as client:
+                chunks, has_dep = await _run_portal_search(
+                    "nonexistent",
+                    client=client,
+                    solr_endpoint=_SOLR_ENDPOINT,
+                )
+
+        assert chunks == []
+        assert has_dep is False

@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+import asyncio
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
-from .content import doc_uri, strip_boilerplate
-from .solr import _filter_rhv_sentences
+import httpx
+
+from .config import logger
+from .content import _select_within_budget, doc_uri, strip_boilerplate
+from .formatting import _annotate_result
+from .solr import _clean_query, _filter_rhv_sentences, _solr_query
 
 
 @dataclass
@@ -404,3 +409,190 @@ def _deduplicate_by_parent(chunks: list[PortalChunk]) -> list[PortalChunk]:
         result.append(chunk)
 
     return result
+
+
+# ---------------------------------------------------------------------------
+# Reciprocal rank fusion (standalone, no rag dependency)
+# ---------------------------------------------------------------------------
+
+
+def _reciprocal_rank_fusion(
+    *chunk_lists: list[PortalChunk],
+    k: int = 60,
+) -> list[PortalChunk]:
+    """Merge chunk lists via reciprocal rank fusion, scored by cross-list consensus.
+
+    For each unique ``doc_id``, sums ``1/(k + rank)`` across all lists where it
+    appears (rank is 0-indexed). Chunks in multiple lists get higher scores.
+
+    Args:
+        *chunk_lists: Any number of PortalChunk lists to merge.
+        k: RRF constant (default 60, per Cormack et al. 2009).
+
+    Returns:
+        Merged list sorted by descending RRF score, with ``rrf_score`` set.
+    """
+    if not chunk_lists:
+        return []
+
+    scores: dict[str, float] = {}
+    # Later lists overwrite earlier ones so callers can control priority by
+    # argument order (e.g. main first, deprecation second).
+    selected: dict[str, PortalChunk] = {}
+
+    for chunks in chunk_lists:
+        for rank, chunk in enumerate(chunks):
+            scores[chunk.doc_id] = scores.get(chunk.doc_id, 0.0) + 1.0 / (k + rank)
+            selected[chunk.doc_id] = chunk
+
+    return [
+        replace(selected[doc_id], rrf_score=score)
+        for doc_id, score in sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Orchestrator
+# ---------------------------------------------------------------------------
+
+_DEPRECATION_WARNING = (
+    "WARNING: Some results indicate a feature was deprecated or removed. If sources\n"
+    "disagree, treat the deprecation/removal notice as authoritative over workarounds\n"
+    "for other products.\n\n"
+)
+
+
+async def _run_portal_search(
+    query: str,
+    *,
+    client: httpx.AsyncClient,
+    solr_endpoint: str,
+    max_results: int = 10,
+) -> tuple[list[PortalChunk], bool]:
+    """Execute the unified portal search pipeline.
+
+    Cleans the query, fires main + deprecation queries in parallel, converts
+    results to chunks, merges via RRF, deduplicates, and returns the top-N
+    chunks plus a flag indicating whether deprecation content was found.
+
+    Args:
+        query: Raw user query string.
+        client: Shared httpx.AsyncClient (typed as object to avoid httpx import
+            at module level; the actual type is enforced by ``_solr_query``).
+        solr_endpoint: Full Solr endpoint URL for the portal core.
+        max_results: Maximum chunks to return after deduplication.
+
+    Returns:
+        Tuple of (top-N PortalChunk list, has_deprecation bool).
+    """
+    cleaned = _clean_query(query)
+    query_lower = query.lower()
+
+    main_params = _build_main_query(cleaned)
+    _apply_intent_boosts(main_params, query_lower, cleaned)
+
+    dep_params = _build_deprecation_query(cleaned)
+
+    main_data, dep_data = await asyncio.gather(
+        _solr_query(main_params, client=client, solr_endpoint=solr_endpoint),
+        _solr_query(dep_params, client=client, solr_endpoint=solr_endpoint),
+    )
+
+    main_chunks = _docs_to_chunks(main_data, query)
+    dep_chunks = _docs_to_chunks(dep_data, query)
+
+    merged = _reciprocal_rank_fusion(main_chunks, dep_chunks)
+    deduped = _deduplicate_by_parent(merged)
+
+    has_deprecation = any(
+        c.rrf_score and c.parent_id and c.parent_id in {d.parent_id for d in dep_chunks} for c in deduped
+    )
+
+    top_n = deduped[:max_results]
+
+    logger.info(
+        "Portal search: query=%r main=%d dep=%d merged=%d deduped=%d returned=%d",
+        query,
+        len(main_chunks),
+        len(dep_chunks),
+        len(merged),
+        len(deduped),
+        len(top_n),
+    )
+
+    return top_n, has_deprecation
+
+
+# ---------------------------------------------------------------------------
+# Formatting
+# ---------------------------------------------------------------------------
+
+_KIND_LABELS: dict[str, str] = {
+    "documentation": "Documentation",
+    "solution": "Solution",
+    "article": "Article",
+    "Cve": "CVE",
+    "Erratum": "Security Advisory",
+    "access-drupal10-node-type-page": "Documentation",
+}
+
+
+def _format_portal_chunk(chunk: PortalChunk) -> tuple[str, int]:
+    """Render a single PortalChunk as a markdown result block.
+
+    Uses ``_annotate_result()`` from ``formatting.py`` to detect deprecation,
+    replacement, and EOL signals. Returns ``(formatted_text, sort_key)``
+    where sort_key controls ordering (replacement first, EOL last).
+    """
+    annotations, applicability, sort_key = _annotate_result(
+        title=chunk.title,
+        highlights=chunk.chunk,
+        content=chunk.chunk,
+    )
+
+    lines: list[str] = []
+    if annotations:
+        lines.append(" | ".join(annotations))
+
+    lines.append(f"**{chunk.title}**")
+
+    kind_label = _KIND_LABELS.get(chunk.documentKind, chunk.documentKind)
+    lines.append(f"Type: {kind_label} | Applicability: {applicability}")
+
+    if chunk.online_source_url:
+        lines.append(f"URL: {chunk.online_source_url}")
+
+    if chunk.chunk:
+        lines.append(f"Content: {chunk.chunk}")
+
+    return "\n".join(lines), sort_key
+
+
+def _format_portal_results(
+    chunks: list[PortalChunk],
+    has_deprecation: bool,
+    query: str,
+    max_response_chars: int,
+) -> str:
+    """Format all chunks into a final string response with budget enforcement.
+
+    Renders each chunk via ``_format_portal_chunk()``, sorts by annotation
+    priority (replacements first, EOL last), prepends a deprecation warning
+    banner if any chunk triggered deprecation detection, and enforces the
+    character budget via ``_select_within_budget()``.
+    """
+    if not chunks:
+        return f"No results found for: {query}"
+
+    formatted_pairs = [_format_portal_chunk(c) for c in chunks]
+    formatted_pairs.sort(key=lambda x: x[1])
+    sorted_texts = [text for text, _ in formatted_pairs]
+
+    has_dep_annotation = has_deprecation or any(sk <= 0 for _, sk in formatted_pairs)
+
+    output = _select_within_budget(sorted_texts, max_response_chars, query)
+
+    if has_dep_annotation:
+        output = _DEPRECATION_WARNING + output
+
+    return output
