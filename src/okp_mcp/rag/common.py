@@ -56,7 +56,7 @@ _TERM_TRIM_CHARS = "?.,!"
 
 def _normalize_query_token(token: str) -> str:
     """Strip trailing punctuation and lowercase a query token for BM25 matching."""
-    return token.lower().strip(_TERM_TRIM_CHARS)
+    return token.lower().rstrip(_TERM_TRIM_CHARS)
 
 
 def _is_numeric(token: str) -> bool:
@@ -67,9 +67,10 @@ def _is_numeric(token: str) -> bool:
 def clean_rag_query(query: str) -> str:
     """Clean a query string for RAG Solr search.
 
-    Strips English stopwords, quotes hyphenated compounds for phrase
-    matching, and preserves numeric tokens (e.g. version numbers).
-    Falls back to the original query if all tokens are stopwords.
+    Strips English stopwords, trailing punctuation (including Solr wildcard
+    characters like ``?``), quotes hyphenated compounds for phrase matching,
+    and preserves numeric tokens (e.g. version numbers).  Falls back to the
+    original query if all tokens are stopwords.
 
     Args:
         query: Raw user query string.
@@ -78,13 +79,18 @@ def clean_rag_query(query: str) -> str:
         Cleaned query string optimized for Solr eDisMax search.
     """
     tokens = _split_quoted_and_plain(query)
-    parts = [
-        t
-        for t in tokens
-        if t.startswith('"')
-        or _is_numeric(t)
-        or (_normalize_query_token(t) and _normalize_query_token(t) not in STOP_WORDS)
-    ]
+    parts: list[str] = []
+    for t in tokens:
+        if t.startswith('"'):
+            parts.append(t)
+            continue
+        # Strip trailing punctuation that doubles as Solr syntax (? is a
+        # single-char wildcard, . triggers fuzzy proximity, etc.)
+        stripped = t.rstrip(_TERM_TRIM_CHARS)
+        if not stripped:
+            continue
+        if _is_numeric(stripped) or stripped.lower() not in STOP_WORDS:
+            parts.append(stripped)
     parts = _quote_hyphenated_compounds(parts)
     return " ".join(parts) if parts else query
 

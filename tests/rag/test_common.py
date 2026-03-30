@@ -92,8 +92,22 @@ async def test_rag_query_logs_at_info_level(rag_client, caplog):
         ("the and ?", "the and ?"),  # punctuation-only token stripped, fallback to original
         ("", ""),  # empty string
         ('"exact phrase" kernel', '"exact phrase" kernel'),  # quoted preservation
+        ("Can I run a RHEL 6 container on RHEL 9?", "RHEL 6 container RHEL 9"),  # trailing ? stripped
+        ("What version! of RHEL?", "version RHEL"),  # trailing ! and ? stripped
+        ('"RHEL 9?" support', '"RHEL 9?" support'),  # punctuation inside quotes preserved
     ],
-    ids=["stopwords", "hyphenated", "numeric", "all-stopwords", "punctuation-only", "empty", "quoted-phrase"],
+    ids=[
+        "stopwords",
+        "hyphenated",
+        "numeric",
+        "all-stopwords",
+        "punctuation-only",
+        "empty",
+        "quoted-phrase",
+        "trailing-question-mark",
+        "trailing-exclamation-and-question",
+        "quoted-punctuation",
+    ],
 )
 def test_clean_rag_query(input_query, expected):
     """clean_rag_query produces Solr-optimized tokens."""
