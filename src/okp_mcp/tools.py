@@ -10,6 +10,14 @@ from fastmcp import Context
 from .config import logger
 from .content import _select_within_budget, doc_uri, strip_boilerplate, truncate_content
 from .formatting import SORT_DEPRECATION, _format_result
+from .portal import (
+    _EOL_PRODUCTS,
+    _EUS_HIGHLIGHT_TERMS,
+    _VM_HIGHLIGHT_TERMS,
+    _detect_eus_intent,
+    _detect_release_date_intent,
+    _detect_vm_intent,
+)
 from .server import get_app_context, mcp
 from .solr import _clean_query, _extract_relevant_section, _get_highlights, _solr_query
 
@@ -17,51 +25,6 @@ _PRODUCT_ALIASES: dict[str, str] = {
     "RHEL": "Red Hat Enterprise Linux",
     "OCP": "Red Hat OpenShift Container Platform",
 }
-
-_EOL_PRODUCTS: frozenset[str] = frozenset(
-    [
-        "Red Hat Virtualization",
-        "Red Hat Hyperconverged Infrastructure for Virtualization",
-        "Red Hat JBoss Operations Network",
-        "Red Hat Fuse",
-        "Red Hat Single Sign-On",
-        "Red Hat Single Sign-On Continuous Delivery",
-        "Red Hat CodeReady Workspaces",
-        "Red Hat CodeReady Studio",
-        "Red Hat JBoss Data Virtualization",
-        "Red Hat Container Development Kit",
-        "Red Hat Gluster Storage",
-        "Red Hat JBoss Developer Studio",
-        "Red Hat JBoss Developer Studio Integration Stack",
-        "Red Hat Application Migration Toolkit",
-        "Red Hat Software Collections",
-        "JBoss Enterprise SOA Platform",
-        "JBoss Enterprise Application Platform Continuous Delivery",
-        "Red Hat Development Suite",
-        "Red Hat Developer Toolset",
-        "OpenShift Online",
-        "Red Hat JBoss Fuse Service Works",
-        "Red Hat Certificate System",
-        "Red Hat Process Automation Manager",
-        "Red Hat Decision Manager",
-        "Red Hat OpenShift Container Storage",
-    ]
-)
-
-
-def _detect_vm_intent(query_lower: str) -> bool:
-    """Return True if the lowercased query contains VM/virtualization keywords."""
-    return any(kw in query_lower for kw in ["vm", "virtual machine", "virtualization", "vms", "hypervisor"])
-
-
-def _detect_release_date_intent(query_lower: str) -> bool:
-    """Return True if the lowercased query asks about release dates or when something was released."""
-    return any(kw in query_lower for kw in ["release date", "released", "when was", "general availability"])
-
-
-def _detect_eus_intent(query_lower: str) -> bool:
-    """Return True if the lowercased query asks about EUS or Extended Update Support."""
-    return "eus" in query_lower or "extended update support" in query_lower
 
 
 def _build_sol_boosts(
@@ -88,10 +51,6 @@ def _build_sol_boosts(
     if release_date_intent:
         sol_rqq = f'allTitle:"release dates"^50 {sol_rqq}'
     return sol_bq, sol_rqq, sol_rq_weight
-
-
-_VM_HIGHLIGHT_TERMS = "virsh cockpit deprecated virt-manager"
-_EUS_HIGHLIGHT_TERMS = '"Enhanced EUS" "48 months" "Enhanced Extended Update Support"'
 
 
 def _build_search_queries(
