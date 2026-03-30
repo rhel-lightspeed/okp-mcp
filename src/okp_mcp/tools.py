@@ -302,7 +302,7 @@ def _format_errata_doc(doc: dict) -> str:
     return result
 
 
-@mcp.tool
+@mcp.tool(tags={"portal"})
 async def search_documentation(
     ctx: Context,
     query: str,
@@ -368,7 +368,7 @@ async def search_documentation(
         return "No results found. The knowledge base may be temporarily unavailable."
 
 
-@mcp.tool
+@mcp.tool(tags={"portal"})
 async def search_solutions(
     ctx: Context,
     query: str,
@@ -411,7 +411,7 @@ async def search_solutions(
         return "No results found. The knowledge base may be temporarily unavailable."
 
 
-@mcp.tool
+@mcp.tool(tags={"portal"})
 async def search_cves(
     ctx: Context,
     query: str,
@@ -468,7 +468,7 @@ async def search_cves(
         return "No results found. The knowledge base may be temporarily unavailable."
 
 
-@mcp.tool
+@mcp.tool(tags={"portal"})
 async def search_errata(
     ctx: Context,
     query: str,
@@ -519,7 +519,7 @@ async def search_errata(
         return "No results found. The knowledge base may be temporarily unavailable."
 
 
-@mcp.tool
+@mcp.tool(tags={"portal"})
 async def search_articles(
     ctx: Context,
     query: str,
