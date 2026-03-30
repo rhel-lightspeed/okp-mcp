@@ -1,4 +1,4 @@
-"""Tests for SOLR query client lifecycle behavior."""
+"""Tests for SOLR query client lifecycle and query cleaning behavior."""
 
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -7,7 +7,7 @@ import pytest
 import respx
 
 from okp_mcp.config import ServerConfig
-from okp_mcp.solr import _solr_query
+from okp_mcp.solr import _clean_query, _solr_query
 
 _SOLR_ENDPOINT = ServerConfig().solr_endpoint
 
@@ -127,3 +127,35 @@ async def test_solr_query_respx_regression_guard(solr_mock, sample_solr_response
 
     assert solr_mock.called
     assert data["response"]["numFound"] == sample_solr_response["response"]["numFound"]
+
+
+@pytest.mark.parametrize(
+    "input_query, expected",
+    [
+        ("the red hat enterprise linux", "red hat enterprise linux"),
+        ("rpm-ostree update", '"rpm-ostree" update'),
+        ("RHEL 9.4 kernel", "RHEL 9.4 kernel"),
+        ("the and or", "the and or"),
+        ("the and ?", "the and ?"),
+        ("", ""),
+        ('"exact phrase" kernel', '"exact phrase" kernel'),
+        ("Can I run a RHEL 6 container on RHEL 9?", "RHEL 6 container RHEL 9"),
+        ("What version! of RHEL?", "version RHEL"),
+        ('"RHEL 9?" support', '"RHEL 9?" support'),
+    ],
+    ids=[
+        "stopwords",
+        "hyphenated",
+        "numeric",
+        "all-stopwords",
+        "punctuation-only",
+        "empty",
+        "quoted-phrase",
+        "trailing-question-mark",
+        "trailing-exclamation-and-question",
+        "quoted-punctuation",
+    ],
+)
+def test_clean_query(input_query, expected):
+    """_clean_query strips trailing Solr wildcard chars from output tokens."""
+    assert _clean_query(input_query) == expected
