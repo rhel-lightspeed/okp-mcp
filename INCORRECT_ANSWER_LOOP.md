@@ -13,7 +13,7 @@ Repeatable process for turning RSPEED "incorrect answer" tickets into functional
 Query Jira for the most recently created RSPEED ticket with the `cla-incorrect-answer` label:
 
 ```jql
-project = RSPEED AND labels = "cla-incorrect-answer" AND status != Closed ORDER BY created DESC
+project = RSPEED AND labels = "cla-incorrect-answer" AND resolution = Unresolved ORDER BY created DESC
 ```
 
 Fields needed: `summary,labels,status,description`
