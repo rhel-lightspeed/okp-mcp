@@ -318,9 +318,9 @@ FUNCTIONAL_TEST_CASES = [
                 " provide commands with nmcli"
             ),
             expected_doc_refs=[
-                "7004674",
-                "172483",
-                "configuring_and_managing_networking",
+                "7134402",
+                "5069791",
+                "1526613",
             ],
             required_facts=[
                 ("802.3ad", "mode=4"),
