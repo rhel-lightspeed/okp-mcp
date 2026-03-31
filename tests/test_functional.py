@@ -1,6 +1,9 @@
 """Functional tests for the OKP MCP server using Pydantic AI and Vertex AI Gemini."""
 
+from __future__ import annotations
+
 import os
+from collections.abc import Callable
 from pathlib import Path
 
 import httpx
@@ -126,7 +129,7 @@ def _assert_no_forbidden_claims(case: FunctionalCase, response: str) -> None:
 
 
 @pytest.mark.parametrize("case", FUNCTIONAL_TEST_CASES)
-async def test_cla_scenario(case: FunctionalCase) -> None:
+async def test_cla_scenario(case: FunctionalCase, record_property: Callable[[str, object], None]) -> None:
     """Verify Gemini correctly answers a known CLA incorrect-answer scenario.
 
     Starts a fresh MCP server subprocess per test to avoid anyio cancel-scope
@@ -150,6 +153,12 @@ async def test_cla_scenario(case: FunctionalCase) -> None:
             with capture_run_messages() as messages:
                 result = await agent.run(case.question, model_settings={"temperature": 0})
     response: str = result.output
+
+    usage = result.usage()
+    record_property("input_tokens", usage.input_tokens or 0)
+    record_property("output_tokens", usage.output_tokens or 0)
+    record_property("requests", usage.requests)
+    record_property("tool_calls", usage.tool_calls)
 
     tool_calls = _extract_tool_calls(messages)
     tool_returns = _extract_tool_returns(messages)

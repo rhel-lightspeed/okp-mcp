@@ -68,6 +68,7 @@ Functional tests are **deselected by default** via `pytest_collection_modifyitem
 - `temperature=0` for reproducibility
 - Assertions check: tool call count, expected document references in tool returns/response, required facts (with tuple alternatives for "or" logic), and forbidden claims
 - Tests skip gracefully when `.env` is missing, credentials are invalid, or Solr is unavailable
+- Token usage is tracked via pytest's `record_property` fixture and aggregated in `pytest_terminal_summary` (xdist-safe; also embeds in JUnit XML when `--junitxml` is used)
 
 **Workflow**: See `INCORRECT_ANSWER_LOOP.md` for the full process of turning RSPEED "incorrect answer" tickets into functional test cases and fixing the MCP server until all tests pass.
 
@@ -83,7 +84,7 @@ src/okp_mcp/
   content.py     # Boilerplate stripping, content truncation, text cleaning
   formatting.py  # Result annotation, deprecation/replacement detection, sort keys
 tests/
-  conftest.py          # shared fixtures (solr mocks, sample responses) + functional marker deselection
+  conftest.py          # shared fixtures, functional marker deselection, token usage summary hook
   functional_cases.py  # FunctionalCase dataclass + parametrized RSPEED test data
   test_functional.py   # Vertex AI functional tests (gated behind -m functional)
   test_*.py            # unit test modules mirror src structure
@@ -107,6 +108,7 @@ INCORRECT_ANSWER_LOOP.md  # step-by-step workflow for turning RSPEED "incorrect 
 | Modify config/CLI args | `src/okp_mcp/config.py` | Add field to `ServerConfig`; auto-generates CLI arg via `MCP_` prefix |
 | Add functional test case | `tests/functional_cases.py` | Add `FunctionalCase` to `FUNCTIONAL_TEST_CASES` list |
 | Mock Solr responses | `tests/conftest.py` | `solr_mock` fixture uses respx |
+| Token usage reporting | `tests/conftest.py` | `pytest_terminal_summary` hook; reads `record_property` data from test reports |
 | Deploy to OpenShift | `openshift/okp-mcp.yml` | Template with params: IMAGE, IMAGE_TAG, REPLICAS, etc. |
 | Solr schema reference | `docs/SOLR_EXPLORATION.md` | Historical: original redhat-okp container schema map |
 
