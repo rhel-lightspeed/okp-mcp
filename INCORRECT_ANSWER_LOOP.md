@@ -155,7 +155,9 @@ The MCP server code that affects search results and LLM behavior:
 
 | File | What it controls |
 |------|-----------------|
-| `src/okp_mcp/tools.py` | Search queries, Solr parameters, boost queries, filters, result assembly |
+| `src/okp_mcp/tools/search.py` | `search_portal()` entrypoint, tool-level error handling |
+| `src/okp_mcp/tools/document.py` | `get_document()` entrypoint, document fetch helpers, formatting |
+| `src/okp_mcp/portal.py` | Search queries, boost queries, filters, result assembly |
 | `src/okp_mcp/solr.py` | Query cleaning, highlighting, section extraction |
 | `src/okp_mcp/content.py` | Boilerplate stripping from document content |
 | `src/okp_mcp/formatting.py` | Result formatting, sort keys, deprecation detection |
@@ -165,11 +167,11 @@ The MCP server code that affects search results and LLM behavior:
 
 | Symptom | Likely cause | Fix area |
 |---------|-------------|----------|
-| Wrong documents returned | Boost queries (`bq`) not prioritizing correct docs | `_build_search_queries()` in `tools.py` |
+| Wrong documents returned | Boost queries (`bq`) not prioritizing correct docs | `_build_search_queries()` in `portal.py` |
 | Right docs returned but LLM ignores them | System prompt doesn't instruct the model to handle this case | `functional_system_prompt.txt` |
 | Key terms getting stripped from query | Query cleaning too aggressive | `_clean_query()` in `solr.py` |
 | Relevant content truncated | Section extraction or formatting cutting off key info | `solr.py` or `formatting.py` |
-| Deprecated feature recommended as available | Deprecation boost/detection insufficient | `bq` params or `_detect_*` functions in `tools.py` |
+| Deprecated feature recommended as available | Deprecation boost/detection insufficient | `portal.py` ranking logic or `_detect_*` functions in `formatting.py` |
 
 ### Iteration loop
 
