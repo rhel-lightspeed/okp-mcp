@@ -1,9 +1,12 @@
 """Placeholder code execution MCP tool."""
 
+import logging
+
 from fastmcp import Context
 
-from ..config import logger
 from ..server import mcp
+
+logger = logging.getLogger("okp_mcp.tools.run_code")
 
 
 # KLUDGE: Gemini 2.5 Flash has a built-in code execution capability that it
