@@ -1,5 +1,7 @@
 """MCP tool definitions for RHEL OKP knowledge base search."""
 
+from urllib.parse import urlsplit
+
 import httpx
 from fastmcp import Context
 
@@ -8,6 +10,39 @@ from .content import doc_uri, strip_boilerplate, truncate_content
 from .portal import _format_portal_results, _run_portal_search
 from .server import get_app_context, mcp
 from .solr import _clean_query, _extract_relevant_section, _get_highlights, _solr_query
+
+
+def _normalize_doc_id(doc_id: str) -> str:
+    """Strip the access.redhat.com URL prefix so full URLs work as Solr lookups.
+
+    search_portal formats results with full URLs (e.g.
+    ``https://access.redhat.com/documentation/...``) but Solr stores path-based
+    IDs.  LLMs naturally pass the visible URL to get_document, so this strips
+    the prefix to recover the path.
+
+    Uses proper URL parsing to reject lookalike domains (e.g.
+    ``access.redhat.com.evil.tld``) and strip query/fragment parts.
+    """
+    parsed = urlsplit(doc_id)
+    if parsed.scheme in {"http", "https"} and parsed.netloc == "access.redhat.com":
+        return parsed.path or "/"
+    return doc_id
+
+
+def _escape_solr_phrase(value: str) -> str:
+    """Escape characters that are unsafe inside a quoted Solr/Lucene phrase."""
+    return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def _doc_id_filter(doc_id: str) -> str:
+    """Build a Solr filter that matches a document by ``id`` or ``view_uri``.
+
+    Solr ``id`` may carry an ``/index.html`` suffix that ``view_uri`` omits,
+    so checking both fields ensures a match regardless of which form the
+    caller provides.  The value is escaped to prevent Lucene query injection.
+    """
+    safe = _escape_solr_phrase(doc_id)
+    return f'id:"{safe}" OR view_uri:"{safe}"'
 
 
 @mcp.tool
@@ -73,7 +108,7 @@ async def _fetch_document_with_query(
     return await _solr_query(
         {
             "q": _clean_query(query),
-            "fq": f'id:"{doc_id}"',
+            "fq": _doc_id_filter(doc_id),
             "fl": _DOCUMENT_FL,
             "rows": 1,
             "hl.snippets": "10",
@@ -98,7 +133,7 @@ async def _fetch_document_raw(doc_id: str, client: httpx.AsyncClient | None = No
         response = await client.get(
             solr_endpoint,
             params={
-                "q": f'id:"{doc_id}"',
+                "q": _doc_id_filter(doc_id),
                 "wt": "json",
                 "fl": _DOCUMENT_FL,
                 "rows": 1,
@@ -150,9 +185,10 @@ async def _format_document(doc: dict, data: dict, doc_id: str, query: str, max_c
 async def get_document(ctx: Context, doc_id: str, query: str = "") -> str:
     """Fetch full content of a specific document by its ID.
 
-    Use view_uri values from search results as doc_id. Pass query (the original
+    Use the URL from search results as doc_id. Pass query (the original
     search question) to get BM25-scored relevant passages instead of raw truncated content.
     """
+    doc_id = _normalize_doc_id(doc_id)
     logger.info("get_document: doc_id=%r query=%r", doc_id, query)
     try:
         app = get_app_context(ctx)
