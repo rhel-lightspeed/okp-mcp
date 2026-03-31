@@ -1,325 +1,30 @@
 """MCP tool definitions for RHEL OKP knowledge base search."""
 
-import asyncio
-import os
-import re
-
 import httpx
 from fastmcp import Context
 
 from .config import logger
-from .content import _select_within_budget, doc_uri, strip_boilerplate, truncate_content
-from .formatting import SORT_DEPRECATION, _format_result
+from .content import doc_uri, strip_boilerplate, truncate_content
+from .portal import _format_portal_results, _run_portal_search
 from .server import get_app_context, mcp
 from .solr import _clean_query, _extract_relevant_section, _get_highlights, _solr_query
 
-_PRODUCT_ALIASES: dict[str, str] = {
-    "RHEL": "Red Hat Enterprise Linux",
-    "OCP": "Red Hat OpenShift Container Platform",
-}
-
-_EOL_PRODUCTS: frozenset[str] = frozenset(
-    [
-        "Red Hat Virtualization",
-        "Red Hat Hyperconverged Infrastructure for Virtualization",
-        "Red Hat JBoss Operations Network",
-        "Red Hat Fuse",
-        "Red Hat Single Sign-On",
-        "Red Hat Single Sign-On Continuous Delivery",
-        "Red Hat CodeReady Workspaces",
-        "Red Hat CodeReady Studio",
-        "Red Hat JBoss Data Virtualization",
-        "Red Hat Container Development Kit",
-        "Red Hat Gluster Storage",
-        "Red Hat JBoss Developer Studio",
-        "Red Hat JBoss Developer Studio Integration Stack",
-        "Red Hat Application Migration Toolkit",
-        "Red Hat Software Collections",
-        "JBoss Enterprise SOA Platform",
-        "JBoss Enterprise Application Platform Continuous Delivery",
-        "Red Hat Development Suite",
-        "Red Hat Developer Toolset",
-        "OpenShift Online",
-        "Red Hat JBoss Fuse Service Works",
-        "Red Hat Certificate System",
-        "Red Hat Process Automation Manager",
-        "Red Hat Decision Manager",
-        "Red Hat OpenShift Container Storage",
-    ]
-)
-
-
-def _detect_vm_intent(query_lower: str) -> bool:
-    """Return True if the lowercased query contains VM/virtualization keywords."""
-    return any(kw in query_lower for kw in ["vm", "virtual machine", "virtualization", "vms", "hypervisor"])
-
-
-def _detect_release_date_intent(query_lower: str) -> bool:
-    """Return True if the lowercased query asks about release dates or when something was released."""
-    return any(kw in query_lower for kw in ["release date", "released", "when was", "general availability"])
-
-
-def _detect_eus_intent(query_lower: str) -> bool:
-    """Return True if the lowercased query asks about EUS or Extended Update Support."""
-    return "eus" in query_lower or "extended update support" in query_lower
-
-
-def _build_sol_boosts(
-    extra_bq: str,
-    rqq_safe: str,
-    vm_intent: bool,
-    release_date_intent: bool,
-    eus_intent: bool,
-) -> tuple[str, str, int]:
-    """Build sol_bq, sol_rqq, and sol_rq_weight for the solutions/articles query."""
-    sol_bq = 'main_content:(deprecated OR removed OR unsupported OR "end of life" OR "no longer")^5'
-    if vm_intent and extra_bq:
-        sol_bq = f"{sol_bq} {extra_bq}"
-    if release_date_intent:
-        sol_bq = (
-            f'{sol_bq} title:"Enterprise Linux Release Dates"^200 allTitle:"release dates"^30 title:"release dates"^20'
-        )
-    if eus_intent:
-        sol_bq = f'{sol_bq} title:"Enhanced EUS"^100 title:"EUS FAQ"^80'
-    sol_rq_weight = 5 if release_date_intent else 2
-    sol_rqq = (
-        f'title:"{rqq_safe}"^10 main_content:(deprecated OR removed OR unsupported OR "no longer" OR "{rqq_safe}")^3'
-    )
-    if release_date_intent:
-        sol_rqq = f'allTitle:"release dates"^50 {sol_rqq}'
-    return sol_bq, sol_rqq, sol_rq_weight
-
-
-_VM_HIGHLIGHT_TERMS = "virsh cockpit deprecated virt-manager"
-_EUS_HIGHLIGHT_TERMS = '"Enhanced EUS" "48 months" "Enhanced Extended Update Support"'
-
-
-def _build_search_queries(
-    cleaned: str,
-    original_query: str,
-    product: str,
-    version: str,
-    max_results: int,
-    vm_intent: bool,
-    release_date_intent: bool,
-    eus_intent: bool,
-) -> tuple[dict, dict, dict]:
-    """Build the three Solr query parameter dicts for search_documentation.
-
-    Returns (doc_params, sol_params, dep_params) ready to be passed to _solr_query().
-    """
-    product_fq = f'(product:"{product}"* OR (*:* -product:[* TO *]))'
-    eol_fq = " AND ".join(f'-product:"{p}"' for p in _EOL_PRODUCTS)
-    doc_filters = ["documentKind:(documentation OR access-drupal10-node-type-page)", product_fq, eol_fq]
-    sol_filters = ["documentKind:(solution OR article)", product_fq, eol_fq]
-
-    version_boost = (
-        f"documentation_version:{version}^10" if version else "documentation_version:10^10 documentation_version:9^8"
-    )
-
-    extra_bq = (
-        'title:(cockpit OR virtualization OR "virt-manager")^15 main_content:(cockpit OR "cockpit-machines")^5'
-        if vm_intent
-        else ""
-    )
-    doc_bq = f'documentKind:access-drupal10-node-type-page^30 title:"{product}"^20 {version_boost} {extra_bq}'.strip()
-
-    rqq_safe = re.sub(r'["\\\[\]{}()!^~*?:/]', " ", original_query).strip()
-    doc_params = {
-        "q": cleaned,
-        "fq": doc_filters,
-        "fl": (
-            "id,allTitle,heading_h1,title,view_uri,product,documentation_version,documentKind,lastModifiedDate,score"
-        ),
-        "rows": max_results,
-        "bf": "recip(ms(NOW,lastModifiedDate),3.16e-11,1,1)^0.3",
-        "bq": doc_bq,
-        "rq": "{!rerank reRankQuery=$rqq reRankDocs=200 reRankWeight=3}",
-        "rqq": f'title:"{rqq_safe}"^10 main_content:"{rqq_safe}"^5',
-        "hl.snippets": "15",
-    }
-
-    sol_bq, sol_rqq, sol_rq_weight = _build_sol_boosts(extra_bq, rqq_safe, vm_intent, release_date_intent, eus_intent)
-    sol_params = {
-        "q": cleaned,
-        "fq": sol_filters,
-        "fl": "id,allTitle,heading_h1,title,view_uri,product,documentKind,lastModifiedDate,score",
-        "rows": max_results + 5,
-        "hl.snippets": "10",
-        "bf": "recip(ms(NOW,lastModifiedDate),3.16e-11,1,1)^0.3",
-        "bq": sol_bq,
-        "rq": "{!rerank reRankQuery=$rqq reRankDocs=200 reRankWeight=" + str(sol_rq_weight) + "}",
-        "rqq": sol_rqq,
-    }
-
-    if vm_intent:
-        doc_params["hl.q"] = f"{cleaned} {_VM_HIGHLIGHT_TERMS}"
-        sol_params["hl.q"] = f"{cleaned} {_VM_HIGHLIGHT_TERMS}"
-    if eus_intent:
-        sol_params["hl.q"] = f"{cleaned} {_EUS_HIGHLIGHT_TERMS}"
-
-    dep_bq = (
-        'allTitle:(deprecated OR removed OR "no longer" OR "end of life")^20 '
-        # Boost release notes and adoption guides — they carry authoritative deprecation notices
-        # that rank poorly due to large document size.
-        'allTitle:("release notes" OR "considerations in adopting")^15 '
-        'main_content:(deprecated OR removed OR "no longer available")^10'
-    )
-    if vm_intent and extra_bq:
-        dep_bq = f"{dep_bq} {extra_bq}"
-    dep_params = {
-        "q": f"{cleaned} deprecated removed",
-        "fq": ["documentKind:(solution OR article OR documentation)", product_fq, eol_fq],
-        "fl": "id,allTitle,heading_h1,title,view_uri,product,documentKind,lastModifiedDate,score",
-        "rows": 3,
-        "bq": dep_bq,
-    }
-    if vm_intent:
-        dep_params["hl.q"] = f"{cleaned} {_VM_HIGHLIGHT_TERMS}"
-
-    return doc_params, sol_params, dep_params
-
-
-async def _format_docs(docs: list[dict], data: dict, query: str, max_content: int = 0) -> list[tuple[str, int]]:
-    """Format a list of Solr docs into (text, sort_key) pairs."""
-    kwargs: dict = {"include_content": True, "query": query}
-    if max_content:
-        kwargs["max_content"] = max_content
-    return list(await asyncio.gather(*[_format_result(d, data, **kwargs) for d in docs]))
-
-
-async def _collect_dep_pairs(
-    dep_data: dict,
-    seen_uris: set,
-    query: str,
-    max_content: int = 0,
-) -> list[tuple[str, int]]:
-    """Format dep docs not already seen in doc/sol results."""
-    kwargs: dict = {"include_content": True, "query": query}
-    if max_content:
-        kwargs["max_content"] = max_content
-    pairs: list[tuple[str, int]] = []
-    for d in dep_data["response"]["docs"]:
-        uri = doc_uri(d)
-        if uri not in seen_uris:
-            pairs.append(await _format_result(d, dep_data, **kwargs))
-            seen_uris.add(uri)
-    return pairs
-
-
-async def _deduplicate_and_sort_results(
-    doc_data: dict,
-    sol_data: dict,
-    dep_data: dict,
-    query: str,
-) -> tuple[list[str], list[str], bool]:
-    """Deduplicate results across doc/sol/dep buckets and sort by relevance.
-
-    Returns (doc_results, sol_results, has_deprecation).
-    """
-    _SOL_CONTENT_CAP = 2_500
-    doc_pairs = await _format_docs(doc_data["response"]["docs"], doc_data, query)
-    sol_pairs = await _format_docs(sol_data["response"]["docs"], sol_data, query, max_content=_SOL_CONTENT_CAP)
-
-    seen_uris = {doc_uri(d) for d in doc_data["response"]["docs"]}
-    seen_uris |= {doc_uri(d) for d in sol_data["response"]["docs"]}
-    dep_pairs = await _collect_dep_pairs(dep_data, seen_uris, query, max_content=_SOL_CONTENT_CAP)
-
-    sol_pairs.extend(dep_pairs)
-    sol_pairs.sort(key=lambda pair: pair[1])
-
-    has_deprecation = any(sk == SORT_DEPRECATION for _, sk in doc_pairs + sol_pairs)
-    return [text for text, _ in doc_pairs], [text for text, _ in sol_pairs], has_deprecation
-
-
-def _assemble_search_output(
-    doc_results: list[str],
-    sol_results: list[str],
-    has_deprecation: bool,
-    query: str,
-    max_chars: int,
-) -> str:
-    """Assemble the final output string from categorized search results.
-
-    Applies a character budget: documentation gets 60%, solutions/articles get 40%.
-    Results are already priority-sorted, _select_within_budget drops tail entries.
-
-    Returns a formatted string with documentation and solution sections,
-    or an empty-results message when both lists are empty.
-    """
-    if not doc_results and not sol_results:
-        return f"No results found for: {query}"
-
-    doc_budget = int(max_chars * 0.6)
-    sol_budget = max_chars - doc_budget
-
-    output_parts = []
-    if has_deprecation:
-        output_parts.append(
-            "\u26a0\ufe0f WARNING: Some results indicate a feature was deprecated or removed. "
-            "If sources disagree, treat the deprecation/removal notice as authoritative "
-            "over workarounds for other products."
-        )
-    if doc_results:
-        doc_text = _select_within_budget(doc_results, doc_budget, query)
-        doc_used = len(doc_text)
-        output_parts.append(f"**Documentation** ({len(doc_results)} results):\n\n" + doc_text)
-        sol_budget += doc_budget - doc_used
-    if sol_results:
-        sol_text = _select_within_budget(sol_results, sol_budget, query)
-        output_parts.append(f"**Solutions & Articles** ({len(sol_results)} results):\n\n" + sol_text)
-
-    return "\n\n===\n\n".join(output_parts)
-
-
-def _format_solution_article_doc(doc: dict, data: dict, query: str) -> str:
-    """Format a single solution or article Solr document with title, URL, and highlights.
-
-    Used by both search_solutions and search_articles since their document
-    formatting is identical.
-    """
-    doc_id = doc.get("id", "")
-    view_uri = doc.get("view_uri", "")
-    title = doc.get("allTitle") or doc.get("heading_h1") or doc.get("title", "").split("|")[0].strip() or "Untitled"
-    highlights = _get_highlights(data, view_uri, doc_id, query=query)
-    result = f"**{title}**"
-    result += f"\nURL: https://access.redhat.com{doc_uri(doc)}"
-    if highlights:
-        result += f"\n> {highlights}"
-    return result
-
-
-def _format_errata_doc(doc: dict) -> str:
-    """Format a single errata Solr document with type, severity, and synopsis."""
-    result = f"**{doc.get('allTitle', 'Untitled')}**"
-    if doc.get("portal_advisory_type"):
-        result += f"\nType: {doc['portal_advisory_type']}"
-    if doc.get("portal_severity"):
-        result += f" | Severity: {doc['portal_severity']}"
-    if doc.get("portal_synopsis"):
-        result += f"\nSynopsis: {doc['portal_synopsis']}"
-    result += f"\nURL: https://access.redhat.com{doc_uri(doc)}"
-    return result
-
 
 @mcp.tool
-async def search_documentation(
+async def search_portal(
     ctx: Context,
     query: str,
-    product: str = "",
-    version: str = "",
-    max_results: int = 5,
+    max_results: int = 10,
 ) -> str:
-    """Search Red Hat knowledge base: documentation, solutions, articles, and support policies.
+    """Search Red Hat knowledge base: documentation, solutions, articles, CVEs, errata, and support policies.
 
-    Use this tool when you need official Red Hat documentation to answer accurately,
-    especially for version-specific details, lifecycle dates, deprecation status,
-    or changes after 2024. For well-known Linux concepts (e.g. vi commands,
-    systemd units, common CLI tools) you may answer directly without searching.
-    Covers how-to guides, troubleshooting, deprecation notices, compatibility
-    matrices, lifecycle policies, known issues, and best practices.
+    Use this tool when you need official Red Hat documentation, security advisories,
+    or errata to answer accurately, especially for version-specific details,
+    lifecycle dates, deprecation status, or changes after 2024. For well-known
+    Linux concepts (e.g. vi commands, systemd units, common CLI tools) you may
+    answer directly without searching.
 
-    IMPORTANT — interpreting results:
+    IMPORTANT - interpreting results:
     - Results marked 'Applicability: RHV only' apply to Red Hat Virtualization,
       NOT to standard RHEL KVM. Do not recommend RHV-only workarounds as the
       primary answer for RHEL questions.
@@ -332,228 +37,21 @@ async def search_documentation(
     if not query or not query.strip():
         return "Please provide a search query."
     max_results = max(1, min(max_results, 20))
-    logger.info(
-        "search_documentation: query=%r product=%r version=%r max_results=%d", query, product, version, max_results
-    )
+    logger.info("search_portal: query=%r max_results=%d", query, max_results)
     try:
         app = get_app_context(ctx)
-        product = _PRODUCT_ALIASES.get(product, product) or "Red Hat Enterprise Linux"
-        query_lower = query.lower()
-        vm_intent = _detect_vm_intent(query_lower)
-        release_date_intent = _detect_release_date_intent(query_lower)
-        eus_intent = _detect_eus_intent(query_lower)
-        cleaned = _clean_query(query)
-        doc_params, sol_params, dep_params = _build_search_queries(
-            cleaned, query, product, version, max_results, vm_intent, release_date_intent, eus_intent
-        )
-        (doc_data, sol_data, dep_data), (pinned_blocks, pinned_uris) = await asyncio.gather(
-            asyncio.gather(
-                _solr_query(doc_params, client=app.http_client, solr_endpoint=app.solr_endpoint),
-                _solr_query(sol_params, client=app.http_client, solr_endpoint=app.solr_endpoint),
-                _solr_query(dep_params, client=app.http_client, solr_endpoint=app.solr_endpoint),
-            ),
-            _pinned_search_doc_blocks(ctx, query),
-        )
-        _exclude_pinned_docs(doc_data, pinned_uris)
-        doc_results, sol_results, has_deprecation = await _deduplicate_and_sort_results(
-            doc_data, sol_data, dep_data, query
-        )
-        doc_results = pinned_blocks + doc_results
-        return _assemble_search_output(doc_results, sol_results, has_deprecation, query, app.max_response_chars)
-    except httpx.TimeoutException:
-        logger.warning("Search timed out for query: %r", query)
-        return "The search timed out. Please try again with a simpler query."
-    except (httpx.HTTPError, ValueError):
-        logger.error("Search failed for query: %r", query, exc_info=True)
-        return "No results found. The knowledge base may be temporarily unavailable."
-
-
-@mcp.tool
-async def search_solutions(
-    ctx: Context,
-    query: str,
-    product: str = "",
-    max_results: int = 5,
-) -> str:
-    """Search Red Hat knowledge base solutions. Use for troubleshooting, error messages, and known issues."""
-    if not query or not query.strip():
-        return "Please provide a search query."
-    max_results = max(1, min(max_results, 20))
-    logger.info("search_solutions: query=%r product=%r max_results=%d", query, product, max_results)
-    try:
-        app = get_app_context(ctx)
-        filters = ["documentKind:solution"]
-        if product:
-            filters.append(f"product:{product}")
-
-        data = await _solr_query(
-            {
-                "q": query,
-                "fq": filters,
-                "fl": "id,allTitle,heading_h1,title,view_uri,url_slug,score",
-                "rows": max_results,
-            },
+        chunks, has_deprecation = await _run_portal_search(
+            query,
             client=app.http_client,
             solr_endpoint=app.solr_endpoint,
+            max_results=max_results,
         )
-
-        docs = data["response"]["docs"]
-        if not docs:
-            return f"No solutions found for: {query}"
-
-        results = [_format_solution_article_doc(doc, data, query) for doc in docs]
-        return f"Found {len(docs)} solutions for '{query}':\n\n" + "\n\n---\n\n".join(results)
+        return _format_portal_results(chunks, has_deprecation, query, app.max_response_chars)
     except httpx.TimeoutException:
-        logger.warning("Search timed out for query: %r", query)
+        logger.warning("Search timed out for query: %r", query, exc_info=True)
         return "The search timed out. Please try again with a simpler query."
     except (httpx.HTTPError, ValueError):
-        logger.error("Search failed for query: %r", query, exc_info=True)
-        return "No results found. The knowledge base may be temporarily unavailable."
-
-
-@mcp.tool
-async def search_cves(
-    ctx: Context,
-    query: str,
-    severity: str = "",
-    max_results: int = 5,
-) -> str:
-    """Search CVE security advisories.
-
-    Use for vulnerability information affecting Red Hat products.
-    Severity values: Critical, Important, Moderate, Low.
-    """
-    if not query or not query.strip():
-        return "Please provide a search query."
-    max_results = max(1, min(max_results, 20))
-    logger.info("search_cves: query=%r severity=%r max_results=%d", query, severity, max_results)
-    try:
-        app = get_app_context(ctx)
-        filters = ["documentKind:Cve"]
-        if severity:
-            filters.append(f"cve_threatSeverity:{severity}")
-
-        data = await _solr_query(
-            {
-                "q": query,
-                "fq": filters,
-                "fl": "allTitle,view_uri,cve_details,cve_threatSeverity,score",
-                "rows": max_results,
-            },
-            client=app.http_client,
-            solr_endpoint=app.solr_endpoint,
-        )
-
-        docs = data["response"]["docs"]
-        if not docs:
-            return f"No CVEs found for: {query}"
-
-        results = []
-        for doc in docs:
-            result = f"**{doc.get('allTitle', 'Unknown CVE')}**"
-            if doc.get("cve_threatSeverity"):
-                result += f"\nSeverity: {doc['cve_threatSeverity']}"
-            if doc.get("cve_details"):
-                detail = doc["cve_details"][:300]
-                result += f"\nDetails: {detail}"
-            result += f"\nURL: https://access.redhat.com{doc_uri(doc)}"
-            results.append(result)
-
-        return f"Found {len(docs)} CVEs for '{query}':\n\n" + "\n\n---\n\n".join(results)
-    except httpx.TimeoutException:
-        logger.warning("Search timed out for query: %r", query)
-        return "The search timed out. Please try again with a simpler query."
-    except (httpx.HTTPError, ValueError):
-        logger.error("Search failed for query: %r", query, exc_info=True)
-        return "No results found. The knowledge base may be temporarily unavailable."
-
-
-@mcp.tool
-async def search_errata(
-    ctx: Context,
-    query: str,
-    severity: str = "",
-    advisory_type: str = "",
-    max_results: int = 5,
-) -> str:
-    """Search Red Hat errata (security advisories, bug fixes, enhancements).
-
-    Advisory types: Security Advisory, Bug Fix Advisory, Enhancement Advisory.
-    """
-    if not query or not query.strip():
-        return "Please provide a search query."
-    max_results = max(1, min(max_results, 20))
-    logger.info(
-        "search_errata: query=%r severity=%r type=%r max_results=%d", query, severity, advisory_type, max_results
-    )
-    try:
-        app = get_app_context(ctx)
-        filters = ["documentKind:Errata"]
-        if severity:
-            filters.append(f"portal_severity:{severity}")
-        if advisory_type:
-            filters.append(f"portal_advisory_type:{advisory_type}")
-
-        data = await _solr_query(
-            {
-                "q": query,
-                "fq": filters,
-                "fl": "allTitle,view_uri,portal_severity,portal_advisory_type,portal_synopsis,score",
-                "rows": max_results,
-            },
-            client=app.http_client,
-            solr_endpoint=app.solr_endpoint,
-        )
-
-        docs = data["response"]["docs"]
-        if not docs:
-            return f"No errata found for: {query}"
-
-        results = [_format_errata_doc(doc) for doc in docs]
-        return f"Found {len(docs)} errata for '{query}':\n\n" + "\n\n---\n\n".join(results)
-    except httpx.TimeoutException:
-        logger.warning("Search timed out for query: %r", query)
-        return "The search timed out. Please try again with a simpler query."
-    except (httpx.HTTPError, ValueError):
-        logger.error("Search failed for query: %r", query, exc_info=True)
-        return "No results found. The knowledge base may be temporarily unavailable."
-
-
-@mcp.tool
-async def search_articles(
-    ctx: Context,
-    query: str,
-    max_results: int = 5,
-) -> str:
-    """Search Red Hat knowledge base articles. Use for general technical information, best practices, and tips."""
-    if not query or not query.strip():
-        return "Please provide a search query."
-    max_results = max(1, min(max_results, 20))
-    logger.info("search_articles: query=%r max_results=%d", query, max_results)
-    try:
-        app = get_app_context(ctx)
-        data = await _solr_query(
-            {
-                "q": query,
-                "fq": "documentKind:article",
-                "fl": "id,allTitle,heading_h1,title,view_uri,url_slug,score",
-                "rows": max_results,
-            },
-            client=app.http_client,
-            solr_endpoint=app.solr_endpoint,
-        )
-
-        docs = data["response"]["docs"]
-        if not docs:
-            return f"No articles found for: {query}"
-
-        results = [_format_solution_article_doc(doc, data, query) for doc in docs]
-        return f"Found {len(docs)} articles for '{query}':\n\n" + "\n\n---\n\n".join(results)
-    except httpx.TimeoutException:
-        logger.warning("Search timed out for query: %r", query)
-        return "The search timed out. Please try again with a simpler query."
-    except (httpx.HTTPError, ValueError):
-        logger.error("Search failed for query: %r", query, exc_info=True)
+        logger.exception("Search failed for query: %r", query)
         return "No results found. The knowledge base may be temporarily unavailable."
 
 
@@ -611,74 +109,6 @@ async def _fetch_document_raw(doc_id: str, client: httpx.AsyncClient | None = No
     finally:
         if close_client:
             await client.aclose()
-
-
-def _exclude_pinned_docs(doc_data: dict, pinned_uris: set[str]) -> None:
-    """Remove successfully pinned documents from Solr results so they don't appear twice."""
-    if not pinned_uris:
-        return
-    doc_data["response"]["docs"] = [d for d in doc_data["response"]["docs"] if doc_uri(d) not in pinned_uris]
-
-
-async def _fetch_pinned_doc(
-    doc_id: str, query: str, *, client: httpx.AsyncClient, solr_endpoint: str
-) -> tuple[str, str] | None:
-    """Fetch a single pinned document and format it as a search result block.
-
-    Returns ``(formatted_text, doc_id)`` on success, ``None`` on failure.
-    """
-    try:
-        data = await _fetch_document_with_query(doc_id, query, client=client, solr_endpoint=solr_endpoint)
-    except (httpx.HTTPError, ValueError, KeyError):
-        logger.exception("MCP_PIN_SEARCH_DOCS: fetch failed for id %r", doc_id)
-        return None
-    docs = data.get("response", {}).get("docs", [])
-    if not docs:
-        logger.warning("MCP_PIN_SEARCH_DOCS: no Solr document for id %r", doc_id)
-        return None
-    doc = docs[0]
-    # Highlighting is keyed by Solr uniqueKey (`id`).  Older fetches omitted ``id``
-    # from ``fl``, so highlights fell back to weak matches (e.g. legal-notice boilerplate).
-    doc.setdefault("id", doc_id)
-    doc.setdefault("view_uri", doc_id)
-    text, _sk = await _format_result(doc, data, include_content=True, query=query)
-    return text, doc_id
-
-
-async def _pinned_search_doc_blocks(ctx: Context, query: str) -> tuple[list[str], set[str]]:
-    """Load Solr docs by id and format like search hits; prepend when MCP_PIN_SEARCH_DOCS is set.
-
-    Comma-separated Solr ``id`` values (same strings as ``get_document`` / ``view_uri`` paths),
-    e.g. ``/documentation/en-us/red_hat_enterprise_linux_for_sap_solutions/9/html-single/...``.
-
-    Development only: proves whether surfacing a given doc fixes LLM answers before changing
-    ranking. Unset ``MCP_PIN_SEARCH_DOCS`` in production.
-
-    Returns (formatted_blocks, resolved_uris) so callers can exclude only successfully fetched IDs.
-    """
-    raw = os.environ.get("MCP_PIN_SEARCH_DOCS", "").strip()
-    if not raw:
-        return [], set()
-    pin_suffix = os.environ.get("MCP_PIN_SEARCH_QUERY_SUFFIX", "").strip()
-    fetch_query = f"{query} {pin_suffix}".strip() if pin_suffix else query
-    app = get_app_context(ctx)
-    doc_ids = [x.strip() for x in raw.split(",") if x.strip()]
-    results = await asyncio.gather(
-        *(_fetch_pinned_doc(d, fetch_query, client=app.http_client, solr_endpoint=app.solr_endpoint) for d in doc_ids)
-    )
-    blocks = []
-    resolved_uris: set[str] = set()
-    for r in results:
-        if r is not None:
-            text, doc_id = r
-            blocks.append(text)
-            resolved_uris.add(doc_id.removesuffix("/index.html"))
-    if blocks:
-        logger.warning(
-            "MCP_PIN_SEARCH_DOCS active: prepending %d pinned document(s) to search_documentation",
-            len(blocks),
-        )
-    return blocks, resolved_uris
 
 
 async def _format_document(doc: dict, data: dict, doc_id: str, query: str, max_chars: int) -> str:
@@ -739,11 +169,11 @@ async def get_document(ctx: Context, doc_id: str, query: str = "") -> str:
 
         return await _format_document(docs[0], data, doc_id, query, app.max_response_chars)
     except httpx.TimeoutException:
-        logger.warning("Search timed out for query: %r", query)
-        return "The search timed out. Please try again with a simpler query."
+        logger.warning("get_document timed out for doc_id=%r query=%r", doc_id, query, exc_info=True)
+        return f"Unable to fetch document {doc_id} because the request timed out. Please try again."
     except (httpx.HTTPError, ValueError):
-        logger.error("Search failed for query: %r", query, exc_info=True)
-        return "No results found. The knowledge base may be temporarily unavailable."
+        logger.exception("get_document failed for doc_id=%r query=%r", doc_id, query)
+        return f"Unable to fetch document {doc_id}. The knowledge base may be temporarily unavailable."
 
 
 # KLUDGE: Gemini 2.5 Flash has a built-in code execution capability that it
@@ -763,7 +193,7 @@ async def run_code(ctx: Context, language: str, code: str) -> str:
 
     NOTE: This is a placeholder tool. Code execution is not available in this environment.
     """
-    logger.warning("⚠️  PLACEHOLDER run_code tool was invoked: language=%r code_length=%d", language, len(code))
+    logger.warning("PLACEHOLDER run_code tool was invoked: language=%r code_length=%d", language, len(code))
     return (
         "Code execution is not available in this environment. "
         "Please provide the answer or code example directly in your response as text, "

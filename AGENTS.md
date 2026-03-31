@@ -79,7 +79,8 @@ src/okp_mcp/
   __init__.py    # entry point, main(), logging config, re-exports mcp
   config.py      # ServerConfig (pydantic BaseSettings, MCP_* env vars)
   server.py      # FastMCP instance (single `mcp` object), AppContext, lifespan
-  tools.py       # @mcp.tool definitions (search_*, get_document, run_code)
+  portal.py      # Unified portal search: query builders, chunk conversion, RRF, orchestrator, formatting
+  tools.py       # @mcp.tool definitions (search_portal, get_document, run_code)
   solr.py        # Solr query builder, BM25 paragraph extraction, RHV filtering
   content.py     # Boilerplate stripping, content truncation, text cleaning
   formatting.py  # Result annotation, deprecation/replacement detection, sort keys
@@ -87,6 +88,7 @@ tests/
   conftest.py          # shared fixtures (solr mocks, sample responses) + functional marker deselection
   functional_cases.py  # FunctionalCase dataclass + parametrized RSPEED test data
   test_functional.py   # Vertex AI functional tests (gated behind -m functional)
+  test_portal.py       # portal.py unit tests: query builders, chunk conversion, RRF, formatting, orchestrator
   test_*.py            # unit test modules mirror src structure
   fixtures/
     functional_system_prompt.txt  # LLM system prompt for functional tests
@@ -102,8 +104,9 @@ INCORRECT_ANSWER_LOOP.md  # step-by-step workflow for turning RSPEED "incorrect 
 | Task | Location | Notes |
 |------|----------|-------|
 | Add a new MCP tool | `src/okp_mcp/tools.py` | Add `@mcp.tool` async function; follows error handling pattern |
+| Change portal search logic | `src/okp_mcp/portal.py` | Query builders, chunk conversion, RRF fusion, orchestrator, formatting |
 | Change Solr query logic | `src/okp_mcp/solr.py` | `_solr_query()` builds edismax params; `_clean_query()` for tokenization |
-| Modify result formatting | `src/okp_mcp/formatting.py` | `_format_result()` + `_annotate_result()` for deprecation/EOL |
+| Modify result formatting | `src/okp_mcp/formatting.py` | `_annotate_result()` for deprecation/EOL (used by portal.py) |
 | Change content cleaning | `src/okp_mcp/content.py` | `strip_boilerplate()` regex, `truncate_content()` |
 | Modify config/CLI args | `src/okp_mcp/config.py` | Add field to `ServerConfig`; auto-generates CLI arg via `MCP_` prefix |
 | Add functional test case | `tests/functional_cases.py` | Add `FunctionalCase` to `FUNCTIONAL_TEST_CASES` list |
@@ -130,7 +133,8 @@ uv run okp-mcp [--transport ...] [--port ...]
 
 ```text
 __init__.py → config, server, tools (side-effect import)
-tools.py    → config, server, solr, content, formatting
+tools.py    → config, portal, server, solr, content
+portal.py   → config, content, formatting, solr
 formatting.py → content, solr
 solr.py     → config
 server.py   → config

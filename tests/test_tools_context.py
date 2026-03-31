@@ -11,7 +11,7 @@ import okp_mcp  # noqa: F401 -- triggers @mcp.tool registration
 from okp_mcp import tools
 from okp_mcp.config import ServerConfig
 from okp_mcp.server import mcp
-from okp_mcp.tools import _assemble_search_output, _format_document
+from okp_mcp.tools import _format_document
 
 _SOLR_ENDPOINT = ServerConfig().solr_endpoint
 
@@ -19,11 +19,7 @@ _SOLR_ENDPOINT = ServerConfig().solr_endpoint
 def test_all_mcp_tools_accept_ctx_parameter():
     """All MCP tool functions expose a context parameter for lifespan access."""
     tool_names = [
-        "search_documentation",
-        "search_solutions",
-        "search_cves",
-        "search_errata",
-        "search_articles",
+        "search_portal",
         "get_document",
         "run_code",
     ]
@@ -91,11 +87,7 @@ async def test_fetch_document_with_query_passes_client_to_solr_query():
 async def test_ctx_is_hidden_from_tool_input_schema():
     """MCP input schemas do not expose internal ctx parameters to clients."""
     tool_names = {
-        "search_documentation",
-        "search_solutions",
-        "search_cves",
-        "search_errata",
-        "search_articles",
+        "search_portal",
         "get_document",
         "run_code",
     }
@@ -110,38 +102,11 @@ async def test_ctx_is_hidden_from_tool_input_schema():
         assert "ctx" not in required
 
 
-# --- _assemble_search_output budget tests ---
-
-
-def test_assemble_search_output_budget_enforcement():
-    """_assemble_search_output respects the max_chars budget by dropping tail results."""
-    large_result = "x" * 5000
-    doc_results = [large_result] * 10
-    sol_results = [large_result] * 5
-    output = _assemble_search_output(doc_results, sol_results, False, "test", max_chars=10_000)
-    # 60% doc budget (6000) + 40% sol budget (4000) = 10000 total
-    assert len(output) <= 12_000  # slack for headers, separators, budget messages
-
-
-def test_assemble_search_output_empty_results():
-    """_assemble_search_output returns no-results message when both lists are empty."""
-    output = _assemble_search_output([], [], False, "myquery", max_chars=30_000)
-    assert "No results found for: myquery" in output
-
-
-def test_assemble_search_output_deprecation_preserved():
-    """Deprecation warning is preserved in output when has_deprecation is True."""
-    output = _assemble_search_output(["some result"], [], True, "test", max_chars=30_000)
-    assert "WARNING" in output
-    assert "deprecated" in output.lower()
-
-
 # --- _format_document budget tests ---
 
 
 async def test_format_document_budget_truncates_large_content():
     """_format_document truncates output to max_chars when content exceeds budget."""
-    # Content with query terms so BM25 extracts substantial paragraphs
     paragraph = "kernel panic error trace dump occurs during boot sequence\n\n"
     huge_content = paragraph * 2000
     doc = {
