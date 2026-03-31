@@ -33,7 +33,6 @@ Settings come from CLI arguments and `MCP_*` environment variables. CLI args tak
 | `--port` | `MCP_PORT` | `8000` | Bind port for HTTP transports |
 | `--log-level` | `MCP_LOG_LEVEL` | `INFO` | Python log level |
 | `--solr-url` | `MCP_SOLR_URL` | `http://localhost:8983` | Base URL of the Solr instance |
-| `--rag-solr-url` | `MCP_RAG_SOLR_URL` | *(falls back to MCP_SOLR_URL)* | Base URL of the RAG Solr instance |
 
 Run `okp-mcp --help` for the full list.
 
@@ -46,7 +45,7 @@ podman login registry.redhat.io
 podman-compose up -d
 ```
 
-This pulls the OKP Solr image from `registry.redhat.io` (requires authentication) and builds the MCP server container locally. A pre-release RAG variant is also available on port 8984 (requires `podman login images.paas.redhat.com`).
+This pulls the OKP Solr image from `registry.redhat.io` (requires authentication) and builds the MCP server container locally.
 
 Build the MCP server image:
 

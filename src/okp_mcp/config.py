@@ -49,22 +49,10 @@ class ServerConfig(BaseSettings):
         default="http://localhost:8983",
         description="Base URL of the Solr instance",
     )
-    rag_solr_url: str | None = Field(
-        default=None,
-        description="Base URL of the RAG Solr instance (portal-rag core). Falls back to solr_url if not set.",
-    )
     max_response_chars: int = Field(
         default=30_000,
         ge=1,
         description="Maximum characters in a single tool response",
-    )
-    embedding_model: str = Field(
-        default="ibm-granite/granite-embedding-30m-english",
-        description="Embedding model name or path for text-to-vector encoding",
-    )
-    embedding_cache_dir: str | None = Field(
-        default=None,
-        description="HuggingFace cache directory for embedding model (None = use HF default)",
     )
 
     @computed_field

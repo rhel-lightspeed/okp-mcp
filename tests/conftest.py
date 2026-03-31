@@ -6,8 +6,6 @@ import respx
 
 from okp_mcp.config import ServerConfig
 
-# RAG-specific fixtures live in tests/rag/conftest.py.
-
 
 @pytest.fixture
 def sample_solr_response():
