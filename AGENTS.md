@@ -68,6 +68,7 @@ Functional tests are **deselected by default** via `pytest_collection_modifyitem
 - `temperature=0` for reproducibility
 - Assertions check: tool call count, expected document references in tool returns/response, required facts (with tuple alternatives for "or" logic), and forbidden claims
 - Tests skip gracefully when `.env` is missing, credentials are invalid, or Solr is unavailable
+- Tests are fully independent (each spawns its own MCP subprocess, HTTP client, and Gemini agent), so pass `-n 4` to run them in parallel via pytest-xdist
 
 **Workflow**: See `INCORRECT_ANSWER_LOOP.md` for the full process of turning RSPEED "incorrect answer" tickets into functional test cases and fixing the MCP server until all tests pass.
 
