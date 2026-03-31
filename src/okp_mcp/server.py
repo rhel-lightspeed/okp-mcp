@@ -11,6 +11,7 @@ import httpx
 from fastmcp import Context, FastMCP
 
 from .config import ServerConfig
+from .request_id import RequestIDContextMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -56,4 +57,5 @@ mcp = FastMCP(
     "RHEL OKP Knowledge Base",
     instructions="Search the Red Hat documentation, CVEs, errata, solutions, and articles to answer RHEL questions.",
     lifespan=_app_lifespan,
+    middleware=[RequestIDContextMiddleware()],
 )

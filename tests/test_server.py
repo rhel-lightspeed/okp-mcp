@@ -2,14 +2,29 @@
 
 # pyright: reportMissingImports=false
 
+import logging
 from types import SimpleNamespace
-from typing import cast
+from typing import Any, cast
 from unittest.mock import AsyncMock, patch
 
 import httpx
 import pytest
 from fastmcp import Context
+from fastmcp.server.middleware import MiddlewareContext
+from starlette.applications import Starlette
+from starlette.middleware import Middleware as StarletteMiddleware
+from starlette.responses import PlainTextResponse
+from starlette.routing import Route
 
+from okp_mcp.request_id import (
+    REQUEST_ID_HEADER,
+    RequestIDContextMiddleware,
+    RequestIDHeaderMiddleware,
+    RequestIDLogFilter,
+    get_request_id,
+    reset_request_id,
+    set_request_id,
+)
 from okp_mcp.server import AppContext, _app_lifespan, get_app_context, mcp
 
 
@@ -133,3 +148,70 @@ def test_server_config_assignment_propagates_to_lifespan():
         assert server_module._server_config is cfg
     finally:
         server_module._server_config = original
+
+
+def test_request_id_log_filter_uses_context_var():
+    """Log filter injects the active request ID into records."""
+    log_filter = RequestIDLogFilter()
+    record = logging.LogRecord(
+        name="okp_mcp.test",
+        level=logging.INFO,
+        pathname=__file__,
+        lineno=1,
+        msg="hello",
+        args=(),
+        exc_info=None,
+    )
+    token = set_request_id("req-123")
+
+    try:
+        assert log_filter.filter(record) is True
+    finally:
+        reset_request_id(token)
+
+    assert cast(Any, record).request_id == "req-123"
+
+
+@pytest.mark.asyncio
+async def test_request_id_context_middleware_uses_fastmcp_request_id():
+    """Middleware keeps FastMCP's request ID active while handling a message."""
+    middleware = RequestIDContextMiddleware()
+    fastmcp_context = SimpleNamespace(request_context=object(), request_id="mcp-456")
+    context = MiddlewareContext(
+        message="test",
+        fastmcp_context=cast(Any, fastmcp_context),
+    )
+
+    async def call_next(context: MiddlewareContext[Any]) -> str:
+        assert context.fastmcp_context is fastmcp_context
+        assert get_request_id() == "mcp-456"
+        return "done"
+
+    result = await middleware.on_message(context, call_next)
+
+    assert result == "done"
+    assert get_request_id() is None
+
+
+@pytest.mark.asyncio
+async def test_request_id_header_middleware_reflects_active_request_id():
+    """HTTP middleware exposes the active request ID in the response headers."""
+
+    async def homepage(request):
+        token = set_request_id("mcp-789")
+        request.scope["state"]["request_id"] = "mcp-789"
+        try:
+            return PlainTextResponse("ok")
+        finally:
+            reset_request_id(token)
+
+    app = Starlette(
+        routes=[Route("/", endpoint=homepage)],
+        middleware=[StarletteMiddleware(RequestIDHeaderMiddleware)],
+    )
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.get("/")
+
+    assert response.headers[REQUEST_ID_HEADER] == "mcp-789"
