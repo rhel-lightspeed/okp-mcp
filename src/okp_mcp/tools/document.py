@@ -1,15 +1,17 @@
 """Document retrieval MCP tool and supporting helpers."""
 
+import logging
 from urllib.parse import urlsplit
 
 import httpx
 from fastmcp import Context
 
-from ..config import logger
-from ..content import doc_uri, strip_boilerplate, truncate_content
+from ..content import _select_within_budget, doc_uri, strip_boilerplate, truncate_content
 from ..server import get_app_context, mcp
-from ..solr import _clean_query, _extract_relevant_section, _get_highlights, _solr_query
+from ..solr import _clean_query, _extract_relevant_section, _get_highlight_snippets, _solr_query
 from .shared import DOCUMENT_FL
+
+logger = logging.getLogger("okp_mcp.tools.get_document")
 
 
 def _normalize_doc_id(doc_id: str) -> str:
@@ -43,6 +45,63 @@ def _doc_id_filter(doc_id: str) -> str:
     """
     safe = _escape_solr_phrase(doc_id)
     return f'id:"{safe}" OR view_uri:"{safe}"'
+
+
+def _uses_document_passages(doc: dict) -> bool:
+    """Return whether a document should render Solr highlights as passages."""
+    if doc.get("documentKind") == "documentation":
+        return True
+    return doc_uri(doc).startswith("/documentation/")
+
+
+def _format_metadata(doc: dict) -> str:
+    """Build the metadata header for a fetched document."""
+    result = f"**{doc.get('allTitle', 'Untitled')}**"
+    result += f"\nType: {doc.get('documentKind', 'Unknown')}"
+    if doc.get("product"):
+        result += f"\nProduct: {doc['product']}"
+    if doc.get("documentation_version"):
+        result += f" {doc['documentation_version']}"
+    result += f"\nURL: https://access.redhat.com{doc_uri(doc)}"
+
+    if doc.get("portal_synopsis"):
+        result += f"\n\nSynopsis: {doc['portal_synopsis']}"
+    if doc.get("portal_summary"):
+        result += f"\n\nSummary: {doc['portal_summary']}"
+    if doc.get("cve_details"):
+        result += f"\n\nCVE Details: {doc['cve_details']}"
+    return result
+
+
+def _format_document_passages(highlight_snippets: list[str], query: str, max_chars: int, current_result: str) -> str:
+    """Format highlight snippets as numbered passages within the remaining budget."""
+    remaining_budget = max_chars - len(current_result) - len("\n\nRelevant passages:\n")
+    if remaining_budget <= 0:
+        return ""
+
+    formatted_passages = [f"Passage {index + 1}:\n{snippet}" for index, snippet in enumerate(highlight_snippets)]
+    passages = _select_within_budget(formatted_passages, remaining_budget, query)
+    return f"\n\nRelevant passages:\n{passages}"
+
+
+def _format_document_content(
+    doc: dict, data: dict, doc_id: str, query: str, max_chars: int, current_result: str
+) -> str:
+    """Build the content section for a fetched document."""
+    main_content = doc.get("main_content")
+    if not main_content:
+        return ""
+
+    content = strip_boilerplate(main_content)
+    if not query:
+        return f"\n\nContent:\n{_extract_relevant_section(content, '', max_sections=8)}"
+
+    highlight_snippets = _get_highlight_snippets(data, doc.get("view_uri", ""), doc.get("id", ""), doc_id, query=query)
+    if not highlight_snippets:
+        return f"\n\nContent:\n{_extract_relevant_section(content, query, max_sections=8)}"
+    if _uses_document_passages(doc):
+        return _format_document_passages(highlight_snippets, query, max_chars, current_result)
+    return f"\n\nContent:\n{' ... '.join(highlight_snippets)}"
 
 
 async def _fetch_document_with_query(
@@ -105,31 +164,8 @@ async def _format_document(doc: dict, data: dict, doc_id: str, query: str, max_c
     and content (highlights if available, otherwise extracted relevant section).
     Truncates final output to max_chars as a safety net.
     """
-    view_uri = doc.get("view_uri", "")
-    result = f"**{doc.get('allTitle', 'Untitled')}**"
-    result += f"\nType: {doc.get('documentKind', 'Unknown')}"
-    if doc.get("product"):
-        result += f"\nProduct: {doc['product']}"
-    if doc.get("documentation_version"):
-        result += f" {doc['documentation_version']}"
-    result += f"\nURL: https://access.redhat.com{doc_uri(doc)}"
-
-    if doc.get("portal_synopsis"):
-        result += f"\n\nSynopsis: {doc['portal_synopsis']}"
-    if doc.get("portal_summary"):
-        result += f"\n\nSummary: {doc['portal_summary']}"
-    if doc.get("cve_details"):
-        result += f"\n\nCVE Details: {doc['cve_details']}"
-    if doc.get("main_content"):
-        content = strip_boilerplate(doc["main_content"])
-        if query:
-            highlights = _get_highlights(data, view_uri, doc_id, query=query)
-            if highlights:
-                result += f"\n\nContent:\n{highlights}"
-            else:
-                result += f"\n\nContent:\n{_extract_relevant_section(content, query, max_sections=8)}"
-        else:
-            result += f"\n\nContent:\n{_extract_relevant_section(content, '', max_sections=8)}"
+    result = _format_metadata(doc)
+    result += _format_document_content(doc, data, doc_id, query, max_chars, result)
     return truncate_content(result, max_chars)
 
 
