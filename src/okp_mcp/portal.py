@@ -446,14 +446,17 @@ def _reciprocal_rank_fusion(
         return []
 
     scores: dict[str, float] = {}
-    # Later lists overwrite earlier ones so callers can control priority by
-    # argument order (e.g. main first, deprecation second).
     selected: dict[str, PortalChunk] = {}
 
     for chunks in chunk_lists:
         for rank, chunk in enumerate(chunks):
             scores[chunk.doc_id] = scores.get(chunk.doc_id, 0.0) + 1.0 / (k + rank)
-            selected[chunk.doc_id] = chunk
+            # When the same chunk appears in multiple lists (e.g. main + deprecation),
+            # keep the version with the longest text.  Different queries produce
+            # different highlight snippets for the same document; the longer snippet
+            # preserves more useful detail (commands, parameters) for the LLM.
+            if chunk.doc_id not in selected or len(chunk.chunk) > len(selected[chunk.doc_id].chunk):
+                selected[chunk.doc_id] = chunk
 
     return [
         replace(selected[doc_id], rrf_score=score)
