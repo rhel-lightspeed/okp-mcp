@@ -327,4 +327,21 @@ FUNCTIONAL_TEST_CASES = [
         ),
         id="RSPEED_2113",
     ),
+    pytest.param(
+        FunctionalCase(
+            question="how do i update the kernel arguments on a system using rpm-ostree?",
+            expected_doc_refs=[
+                "7069583",
+                "using_image_mode_for_rhel",
+                "kargs",
+            ],
+            required_facts=[
+                "rpm-ostree kargs",
+                ("--append", "append"),
+                ("--delete", "--replace"),
+            ],
+            forbidden_claims=["grubby --update-kernel"],
+        ),
+        id="RSPEED_1931",
+    ),
 ]
