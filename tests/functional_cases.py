@@ -246,7 +246,7 @@ FUNCTIONAL_TEST_CASES = [
                 "sap_netweaver_preconfigure",
             ],
             required_facts=[
-                ("sap_general_preconfigure", "sap-general-preconfigure"),
+                ("sap_general_preconfigure", "sap-general-preconfigure", "sap-preconfigure"),
                 ("sap_netweaver_preconfigure", "sap-netweaver-preconfigure"),
                 ("sap_hana_preconfigure", "sap-hana-preconfigure"),
                 "preconfigure",
@@ -257,5 +257,20 @@ FUNCTIONAL_TEST_CASES = [
             forbidden_claims=[],
         ),
         id="sap_004",
+    ),
+    pytest.param(
+        FunctionalCase(
+            question="When does the maintenance support phase end for RHEL 7?",
+            expected_doc_refs=[
+                "7005471",
+                "updates/errata",
+                "end of maintenance",
+            ],
+            required_facts=[
+                ("June 30, 2024", "June 2024"),
+            ],
+            forbidden_claims=["August 31, 2020"],
+        ),
+        id="RSPEED_2745",
     ),
 ]
