@@ -1,11 +1,14 @@
 """Portal search MCP tool."""
 
+import logging
+
 import httpx
 from fastmcp import Context
 
-from ..config import logger
 from ..portal import _format_portal_results, _run_portal_search
 from ..server import get_app_context, mcp
+
+logger = logging.getLogger("okp_mcp.tools.search_portal")
 
 
 @mcp.tool

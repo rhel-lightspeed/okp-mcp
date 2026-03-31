@@ -13,7 +13,6 @@ from okp_mcp import tools
 from okp_mcp.config import ServerConfig
 from okp_mcp.server import mcp
 from okp_mcp.tools import _doc_id_filter, _escape_solr_phrase, _format_document, _normalize_doc_id
-from okp_mcp.tools import document as document_tools
 
 _SOLR_ENDPOINT = ServerConfig().solr_endpoint
 
@@ -378,7 +377,7 @@ async def test_get_document_normalizes_full_url():
         patch("okp_mcp.tools.document._fetch_document_raw", new_callable=AsyncMock) as mock_fetch,
     ):
         mock_fetch.return_value = {"response": {"docs": [{"allTitle": "Test", "documentKind": "documentation"}]}}
-        await document_tools.get_document(mock_ctx, full_url)
+        await tools.get_document(mock_ctx, full_url)
 
         # The normalized path (not the full URL) should reach the fetch function.
         call_args = mock_fetch.call_args

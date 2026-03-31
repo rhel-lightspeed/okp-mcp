@@ -13,6 +13,8 @@ from .shared import DOCUMENT_FL
 
 logger = logging.getLogger("okp_mcp.tools.get_document")
 
+logger = logging.getLogger("okp_mcp.tools.get_document")
+
 
 def _normalize_doc_id(doc_id: str) -> str:
     """Strip the access.redhat.com URL prefix so full URLs work as Solr lookups.
