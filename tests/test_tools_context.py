@@ -6,12 +6,13 @@ import inspect
 from unittest.mock import AsyncMock, Mock, patch
 
 import httpx
+import pytest
 
 import okp_mcp  # noqa: F401 -- triggers @mcp.tool registration
 from okp_mcp import tools
 from okp_mcp.config import ServerConfig
 from okp_mcp.server import mcp
-from okp_mcp.tools import _format_document
+from okp_mcp.tools import _doc_id_filter, _escape_solr_phrase, _format_document, _normalize_doc_id
 
 _SOLR_ENDPOINT = ServerConfig().solr_endpoint
 
@@ -119,3 +120,124 @@ async def test_format_document_budget_truncates_large_content():
     result = await _format_document(doc, data, "/test-doc", "kernel panic", max_chars=200)
     assert len(result) <= 400  # slack for truncation message
     assert "Content truncated" in result
+
+
+# --- _normalize_doc_id tests ---
+
+
+@pytest.mark.parametrize(
+    ("doc_id", "expected"),
+    [
+        pytest.param(
+            "https://access.redhat.com/documentation/en-us/rhel/9/html/configuring_networking/index",
+            "/documentation/en-us/rhel/9/html/configuring_networking/index",
+            id="full_url_stripped",
+        ),
+        pytest.param(
+            "http://access.redhat.com/solutions/12345",
+            "/solutions/12345",
+            id="http_url_stripped",
+        ),
+        pytest.param(
+            "https://access.redhat.com/docs/page?foo=bar#section",
+            "/docs/page",
+            id="query_and_fragment_stripped",
+        ),
+        pytest.param(
+            "/documentation/en-us/rhel/9/html/configuring_networking/index",
+            "/documentation/en-us/rhel/9/html/configuring_networking/index",
+            id="path_unchanged",
+        ),
+        pytest.param("RHSA-2022:4915", "RHSA-2022:4915", id="errata_id_unchanged"),
+        pytest.param(
+            "https://example.com/docs/page",
+            "https://example.com/docs/page",
+            id="other_domain_unchanged",
+        ),
+        pytest.param(
+            "https://access.redhat.com.evil.tld/phish",
+            "https://access.redhat.com.evil.tld/phish",
+            id="lookalike_domain_rejected",
+        ),
+    ],
+)
+def test_normalize_doc_id(doc_id: str, expected: str):
+    """_normalize_doc_id correctly strips access.redhat.com URLs and rejects imposters."""
+    assert _normalize_doc_id(doc_id) == expected
+
+
+# --- _escape_solr_phrase tests ---
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        pytest.param("simple", "simple", id="plain_text"),
+        pytest.param('has"quote', 'has\\"quote', id="double_quote_escaped"),
+        pytest.param("has\\backslash", "has\\\\backslash", id="backslash_escaped"),
+        pytest.param('both\\"chars', 'both\\\\\\"chars', id="both_escaped"),
+    ],
+)
+def test_escape_solr_phrase(value: str, expected: str):
+    """_escape_solr_phrase escapes backslashes and double quotes for Lucene."""
+    assert _escape_solr_phrase(value) == expected
+
+
+# --- _doc_id_filter tests ---
+
+
+@pytest.mark.parametrize(
+    ("doc_id", "expected_id", "expected_view_uri"),
+    [
+        pytest.param(
+            "/documentation/en-us/rhel/9",
+            'id:"/documentation/en-us/rhel/9"',
+            'view_uri:"/documentation/en-us/rhel/9"',
+            id="path_filter",
+        ),
+        pytest.param(
+            "RHSA-2022:4915",
+            'id:"RHSA-2022:4915"',
+            'view_uri:"RHSA-2022:4915"',
+            id="errata_filter",
+        ),
+        pytest.param(
+            'inject"attempt',
+            'id:"inject\\"attempt"',
+            'view_uri:"inject\\"attempt"',
+            id="quote_escaped",
+        ),
+    ],
+)
+def test_doc_id_filter(doc_id: str, expected_id: str, expected_view_uri: str):
+    """_doc_id_filter produces an OR filter with properly escaped values."""
+    result = _doc_id_filter(doc_id)
+    assert expected_id in result
+    assert expected_view_uri in result
+    assert " OR " in result
+
+
+# --- get_document tool-level integration test ---
+
+
+async def test_get_document_normalizes_full_url():
+    """get_document accepts a full access.redhat.com URL and normalizes it before querying Solr."""
+    full_url = "https://access.redhat.com/documentation/en-us/rhel/9/html/configuring_networking/index"
+    expected_path = "/documentation/en-us/rhel/9/html/configuring_networking/index"
+
+    mock_ctx = Mock()
+    mock_app = Mock()
+    mock_app.http_client = AsyncMock(spec=httpx.AsyncClient)
+    mock_app.solr_endpoint = _SOLR_ENDPOINT
+    mock_app.max_response_chars = 5000
+
+    with (
+        patch("okp_mcp.tools.get_app_context", return_value=mock_app),
+        patch("okp_mcp.tools._fetch_document_raw", new_callable=AsyncMock) as mock_fetch,
+    ):
+        mock_fetch.return_value = {"response": {"docs": [{"allTitle": "Test", "documentKind": "documentation"}]}}
+        await tools.get_document(mock_ctx, full_url)
+
+        # The normalized path (not the full URL) should reach the fetch function.
+        call_args = mock_fetch.call_args
+        assert call_args[0][0] == expected_path
