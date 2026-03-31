@@ -219,17 +219,31 @@ def _filter_rhv_sentences(text: str, query: str) -> str:
     return " ".join(filtered)
 
 
-def _get_highlights(data: dict, *keys: str, query: str = "") -> str:
-    """Extract highlight snippets for a document, trying multiple ID keys."""
+def _get_highlight_snippets(data: dict, *keys: str, query: str = "") -> list[str]:
+    """Extract cleaned highlight snippets for a document."""
     hl = data.get("highlighting", {})
+    seen: set[str] = set()
+    cleaned_snippets: list[str] = []
+
     for key in keys:
         if key and key in hl:
             snippets = hl[key].get("main_content", [])
             if snippets:
-                clean = [re.sub(r"<[^>]+>", "", s).strip() for s in snippets]
-                joined = " ... ".join(clean)
-                return _filter_rhv_sentences(joined, query) if query else joined
-    return ""
+                for snippet in snippets:
+                    clean = re.sub(r"<[^>]+>", "", snippet)
+                    clean = re.sub(r"\s+", " ", clean).strip()
+                    clean = _filter_rhv_sentences(clean, query) if query else clean
+                    if not clean or clean in seen:
+                        continue
+                    seen.add(clean)
+                    cleaned_snippets.append(clean)
+
+    return cleaned_snippets
+
+
+def _get_highlights(data: dict, *keys: str, query: str = "") -> str:
+    """Extract highlight snippets for a document, trying multiple ID keys."""
+    return " ... ".join(_get_highlight_snippets(data, *keys, query=query))
 
 
 _EXTRACTION_BOOST_KEYWORDS = frozenset(
