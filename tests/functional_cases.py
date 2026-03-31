@@ -246,7 +246,7 @@ FUNCTIONAL_TEST_CASES = [
                 "sap_netweaver_preconfigure",
             ],
             required_facts=[
-                ("sap_general_preconfigure", "sap-general-preconfigure"),
+                ("sap_general_preconfigure", "sap-general-preconfigure", "sap-preconfigure"),
                 ("sap_netweaver_preconfigure", "sap-netweaver-preconfigure"),
                 ("sap_hana_preconfigure", "sap-hana-preconfigure"),
                 "preconfigure",
@@ -257,5 +257,91 @@ FUNCTIONAL_TEST_CASES = [
             forbidden_claims=[],
         ),
         id="sap_004",
+    ),
+    pytest.param(
+        FunctionalCase(
+            question="How to prepare a custom SELinux policy based on AVC messages?",
+            expected_doc_refs=[
+                "58792",
+                "5494701",
+                "audit2allow",
+            ],
+            required_facts=[
+                "audit2allow",
+                ("ausearch", "audit.log"),
+                "semodule",
+            ],
+            forbidden_claims=["contact your Red Hat sales representative"],
+        ),
+        id="RSPEED_2136",
+    ),
+    pytest.param(
+        FunctionalCase(
+            question="How to enable bnxt_en NIC driver debugging?",
+            expected_doc_refs=[
+                "45950",
+                "msglvl",
+                "NIC driver debugging",
+            ],
+            required_facts=[
+                "msglvl",
+                ("ethtool -s", "ethtool --change"),
+            ],
+            forbidden_claims=["ethtool -P"],
+        ),
+        id="RSPEED_2123",
+    ),
+    pytest.param(
+        FunctionalCase(
+            question="When does the maintenance support phase end for RHEL 7?",
+            expected_doc_refs=[
+                "7005471",
+                "updates/errata",
+                "end of maintenance",
+            ],
+            required_facts=[
+                ("June 30, 2024", "June 2024"),
+            ],
+            forbidden_claims=["August 31, 2020"],
+        ),
+        id="RSPEED_2745",
+    ),
+    pytest.param(
+        FunctionalCase(
+            question=(
+                "configure lacp bond with name prod and NIC of bond are ens6 and ens8,"
+                " lacp rate is slow, ip of bond is 192.9.8.3/24, gateway 192.9.8.1."
+                " provide commands with nmcli"
+            ),
+            expected_doc_refs=[
+                "7004674",
+                "172483",
+                "configuring_and_managing_networking",
+            ],
+            required_facts=[
+                ("802.3ad", "mode=4"),
+                ("bond-slave", "bond-port"),
+                "lacp_rate",
+            ],
+            forbidden_claims=["mode=active-lacp"],
+        ),
+        id="RSPEED_2113",
+    ),
+    pytest.param(
+        FunctionalCase(
+            question="how do i update the kernel arguments on a system using rpm-ostree?",
+            expected_doc_refs=[
+                "7069583",
+                "using_image_mode_for_rhel",
+                "kargs",
+            ],
+            required_facts=[
+                "rpm-ostree kargs",
+                ("--append", "append"),
+                ("--delete", "--replace"),
+            ],
+            forbidden_claims=["grubby --update-kernel"],
+        ),
+        id="RSPEED_1931",
     ),
 ]
