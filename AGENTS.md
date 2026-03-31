@@ -66,7 +66,9 @@ Functional tests are **deselected by default** via `pytest_collection_modifyitem
 - Each test spawns a fresh MCP server subprocess with `--transport stdio` (the project defaults to `streamable-http`, so this flag is critical)
 - Region is hardcoded to `us-central1`
 - `temperature=0` for reproducibility
-- Assertions check: tool call count, expected document references in tool returns/response, required facts (with tuple alternatives for "or" logic), and forbidden claims
+- Assertions check: tool call count, expected document references in tool returns/response, required facts (with tuple alternatives for "or" logic), forbidden claims, and per-test input token threshold
+- Token usage tracking uses `record_property("token_usage", ...)` so data flows through `report.user_properties` and works with pytest-xdist (each worker serializes properties to the controller). `pytest_runtest_logreport` in conftest.py aggregates entries; `pytest_terminal_summary` prints the table.
+- Per-test input token threshold is configurable via `functional_max_input_tokens` in `pyproject.toml` (default: 40000)
 - Tests skip gracefully when `.env` is missing, credentials are invalid, or Solr is unavailable
 - Tests are fully independent (each spawns its own MCP subprocess, HTTP client, and Gemini agent), so pass `-n 4` to run them in parallel via pytest-xdist
 
@@ -85,7 +87,7 @@ src/okp_mcp/
   content.py     # Boilerplate stripping, content truncation, text cleaning
   formatting.py  # Result annotation, deprecation/replacement detection, sort keys
 tests/
-  conftest.py          # shared fixtures (solr mocks, sample responses) + functional marker deselection
+  conftest.py          # shared fixtures (solr mocks, sample responses) + functional marker deselection + token usage aggregation hooks
   functional_cases.py  # FunctionalCase dataclass + parametrized RSPEED test data
   test_functional.py   # Vertex AI functional tests (gated behind -m functional)
   test_portal.py       # portal.py unit tests: query builders, chunk conversion, RRF, formatting, orchestrator

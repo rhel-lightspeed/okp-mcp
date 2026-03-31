@@ -41,6 +41,7 @@ testpaths = ["tests"]
 markers = [
     "functional: end-to-end tests requiring live Solr and Vertex AI credentials",
 ]
+functional_max_input_tokens = "40000"
 filterwarnings = [
     # Upstream google-genai bug: types.py uses _UnionGenericAlias (deprecated in 3.14).
     # https://github.com/googleapis/python-genai/issues/1233
