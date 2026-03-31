@@ -275,14 +275,18 @@ FUNCTIONAL_TEST_CASES = [
         ),
         id="RSPEED_2136",
     ),
+    # Root cause: solution 45950 contains the ethtool msglvl commands deep in
+    # the document body.  The main Solr query produces a long highlight snippet
+    # (1400+ chars) that includes the commands, but the deprecation side-query
+    # produces a shorter default-summary snippet (~535 chars) that stops before
+    # the commands.  RRF used to blindly overwrite with the later list, so the
+    # truncated deprecation snippet replaced the richer main snippet and the LLM
+    # gave a vague answer without msglvl or ethtool -s.  Fixed by keeping the
+    # longest chunk per doc_id in _reciprocal_rank_fusion().
     pytest.param(
         FunctionalCase(
             question="How to enable bnxt_en NIC driver debugging?",
-            expected_doc_refs=[
-                "45950",
-                "msglvl",
-                "NIC driver debugging",
-            ],
+            expected_doc_refs=["45950"],
             required_facts=[
                 "msglvl",
                 ("ethtool -s", "ethtool --change"),
