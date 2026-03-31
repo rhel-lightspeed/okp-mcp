@@ -277,6 +277,22 @@ FUNCTIONAL_TEST_CASES = [
     ),
     pytest.param(
         FunctionalCase(
+            question="How to enable bnxt_en NIC driver debugging?",
+            expected_doc_refs=[
+                "45950",
+                "msglvl",
+                "NIC driver debugging",
+            ],
+            required_facts=[
+                "msglvl",
+                ("ethtool -s", "ethtool --change"),
+            ],
+            forbidden_claims=["ethtool -P"],
+        ),
+        id="RSPEED_2123",
+    ),
+    pytest.param(
+        FunctionalCase(
             question="When does the maintenance support phase end for RHEL 7?",
             expected_doc_refs=[
                 "7005471",
