@@ -260,6 +260,23 @@ FUNCTIONAL_TEST_CASES = [
     ),
     pytest.param(
         FunctionalCase(
+            question="How to prepare a custom SELinux policy based on AVC messages?",
+            expected_doc_refs=[
+                "58792",
+                "5494701",
+                "audit2allow",
+            ],
+            required_facts=[
+                "audit2allow",
+                ("ausearch", "audit.log"),
+                "semodule",
+            ],
+            forbidden_claims=["contact your Red Hat sales representative"],
+        ),
+        id="RSPEED_2136",
+    ),
+    pytest.param(
+        FunctionalCase(
             question="When does the maintenance support phase end for RHEL 7?",
             expected_doc_refs=[
                 "7005471",
