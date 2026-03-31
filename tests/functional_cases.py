@@ -306,4 +306,25 @@ FUNCTIONAL_TEST_CASES = [
         ),
         id="RSPEED_2745",
     ),
+    pytest.param(
+        FunctionalCase(
+            question=(
+                "configure lacp bond with name prod and NIC of bond are ens6 and ens8,"
+                " lacp rate is slow, ip of bond is 192.9.8.3/24, gateway 192.9.8.1."
+                " provide commands with nmcli"
+            ),
+            expected_doc_refs=[
+                "7004674",
+                "172483",
+                "configuring_and_managing_networking",
+            ],
+            required_facts=[
+                ("802.3ad", "mode=4"),
+                ("bond-slave", "bond-port"),
+                "lacp_rate",
+            ],
+            forbidden_claims=["mode=active-lacp"],
+        ),
+        id="RSPEED_2113",
+    ),
 ]
