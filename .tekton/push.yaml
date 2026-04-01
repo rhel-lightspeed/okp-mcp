@@ -11,6 +11,7 @@ metadata:
       event == "push"
       && (
         target_branch == "main"
+        || target_branch.startsWith("release/")
         || target_branch.startsWith("refs/tags/")
       )
 
