@@ -1,5 +1,7 @@
 """Tests for SOLR query client lifecycle and query cleaning behavior."""
 
+# pyright: reportMissingImports=false
+
 from unittest.mock import AsyncMock, Mock, patch
 
 import httpx
@@ -7,7 +9,7 @@ import pytest
 import respx
 
 from okp_mcp.config import ServerConfig
-from okp_mcp.solr import _clean_query, _solr_query
+from okp_mcp.solr import _clean_query, _get_highlight_snippets, _solr_query
 
 _SOLR_ENDPOINT = ServerConfig().solr_endpoint
 
@@ -159,3 +161,35 @@ async def test_solr_query_respx_regression_guard(solr_mock, sample_solr_response
 def test_clean_query(input_query, expected):
     """_clean_query strips trailing Solr wildcard chars from output tokens."""
     assert _clean_query(input_query) == expected
+
+
+def test_get_highlight_snippets_preserves_individual_fragments():
+    """_get_highlight_snippets returns cleaned highlight fragments without flattening them."""
+    data = {
+        "highlighting": {
+            "doc-1": {
+                "main_content": [
+                    "First <em>kernel</em> snippet.",
+                    "Second snippet about <em>panic</em>.",
+                ]
+            }
+        }
+    }
+
+    snippets = _get_highlight_snippets(data, "doc-1", query="kernel panic")
+
+    assert snippets == ["First kernel snippet.", "Second snippet about panic."]
+
+
+def test_get_highlight_snippets_deduplicates_across_alias_keys():
+    """_get_highlight_snippets deduplicates repeated fragments returned under multiple keys."""
+    data = {
+        "highlighting": {
+            "doc-1": {"main_content": ["Repeated <em>snippet</em>."]},
+            "/docs/doc-1": {"main_content": ["Repeated <em>snippet</em>.", "Unique snippet."]},
+        }
+    }
+
+    snippets = _get_highlight_snippets(data, "doc-1", "/docs/doc-1", query="snippet")
+
+    assert snippets == ["Repeated snippet.", "Unique snippet."]
