@@ -142,7 +142,7 @@ uv run okp-mcp [--transport ...] [--port ...]
 __init__.py → config, server, tools (side-effect import)
 tools/__init__.py → tools/search.py, tools/document.py, tools/run_code.py
 tools/search.py → config, portal, server
-tools/document.py → config, content, server, solr, tools/shared.py
+tools/document.py → content, server, solr, tools/shared.py
 tools/run_code.py → config, server
 portal.py   → config, content, formatting, solr
 formatting.py → content, solr
