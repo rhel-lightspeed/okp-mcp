@@ -35,14 +35,14 @@ The repo-level ruleset "Minimum required Branch Protection" only covers `main`. 
 
 ### 3. GitLab mirror
 
-The GitLab mirror at `gitlab.cee.redhat.com/rhel-lightspeed/enhanced-shell/okp-mcp` pulls from GitHub. By default it only mirrors specific branches.
+The GitLab mirror at `gitlab.cee.redhat.com/rhel-lightspeed/enhanced-shell/okp-mcp` pulls from GitHub. It must be configured to include release branches.
 
-To add release branches to the mirror:
+To update the mirror regex:
 
 1. Go to GitLab repo **Settings > Repository > Mirroring repositories**
 2. Delete the existing mirror rule (it can't be edited in-place)
 3. Create a new Pull mirror with:
-   - **Git repository URL**: `https://github.com/rhel-lightspeed/okp-mcp.git`
+   - **Git repository URL**: `https://github.com/rhel-lightspeed/okp-mcp.git` (must end in `.git`)
    - **Mirror direction**: Pull
    - **Mirror branches**: Mirror specific branches
    - **Branch regex**: `(main|release\/.*)`
@@ -52,9 +52,11 @@ To add release branches to the mirror:
 5. Click the sync button (🔄) to trigger an immediate pull
 6. Verify the release branch appears in the GitLab branch dropdown
 
+**Note:** "Mirror only protected branches" does not reliably detect GitHub ruleset-based protection. Use "Mirror specific branches" with a regex instead.
+
 ### 4. Konflux component
 
-Konflux watches one branch per Component. The `okp-mcp` component watches `main`. A separate component is needed for the release branch.
+Konflux watches one branch per Component. The `okp-mcp` component watches `main`. A separate component is needed for the release branch to ensure Konflux triggers builds on release branch pushes.
 
 **First time setup (already done):**
 
@@ -69,6 +71,7 @@ Konflux watches one branch per Component. The `okp-mcp` component watches `main`
    - **Pipeline**: `docker-build-oci-ta`
    - **Context directory**: leave blank
 5. Click **Add component**
+6. Konflux will auto-commit Tekton pipeline files to the release branch for the new component — this is expected
 
 **For subsequent release branches:**
 
@@ -78,10 +81,12 @@ Konflux components are immutable — you cannot edit the branch. You must delete
 
 ### 5. Verify the build
 
-1. Push a commit (or empty commit) to the release branch on GitHub
-2. Wait for GitLab mirror to sync (or manually trigger sync)
+1. Push a commit to the release branch on GitHub
+2. Wait for GitLab mirror to sync (or manually trigger sync via the 🔄 button)
 3. Check Konflux Activity tab — a build should appear for the release branch
-4. Once the build succeeds, the image will be at: `quay.io/redhat-user-workloads/rhel-lightspeed-tenant/okp-mcp-rel:<commit-sha>`
+4. The image will be tagged with the commit SHA in quay.io
+
+**Note:** Both the `okp-mcp` and `okp-mcp-rel` components may build from the release branch. The `okp-mcp` component's custom pipeline (`.tekton/push.yaml`) has a CEL expression that matches `release/` branches, so it builds images to `quay.io/redhat-user-workloads/rhel-lightspeed-tenant/okp-mcp:<sha>`. This is the same quay repo as main — no `IMAGE` change is needed in app-interface.
 
 ### 6. Deploy via app-interface
 
@@ -91,11 +96,27 @@ Get the commit SHA from the release branch build:
 skopeo inspect \
   --override-os linux \
   --override-arch amd64 \
-  docker://quay.io/redhat-user-workloads/rhel-lightspeed-tenant/okp-mcp-rel:latest \
+  docker://quay.io/redhat-user-workloads/rhel-lightspeed-tenant/okp-mcp:<commit-sha> \
   | jq -r '.Labels["vcs-ref"]'
 ```
 
-Update `data/services/insights/rhel-lightspeed/cicd/saas.yml` in app-interface with the new `IMAGE_TAG` and `IMAGE` (note: the release component pushes to a different quay repo than the main component).
+Update `data/services/insights/rhel-lightspeed/cicd/saas.yml` in app-interface:
+
+1. Change `ref` from `main` to `release/YYYY-MM-DD` for all three staging targets:
+   - `lightspeed-stack-stage` (lscore-deploy templates)
+   - `redhat-okp-stage` (lscore-deploy templates)
+   - `okp-mcp-stage`
+2. Update `IMAGE_TAG` to the release branch commit SHA
+3. `IMAGE` stays the same (`quay.io/redhat-user-workloads/rhel-lightspeed-tenant/okp-mcp`)
+
+**lscore-deploy** also needs a `release/YYYY-MM-DD` branch (it's just config, no CI changes needed):
+
+```bash
+cd ~/Documents/Development/lscore-deploy
+git checkout main && git pull origin main
+git checkout -b release/YYYY-MM-DD
+git push origin release/YYYY-MM-DD
+```
 
 ## CI/CD Configuration
 
@@ -109,26 +130,34 @@ The CEL expressions in `.tekton/push.yaml` and `.tekton/pull_request.yaml` alrea
 
 ### Konflux Components
 
-| Component | Branch | Quay Image |
-|-----------|--------|------------|
-| `okp-mcp` | `main` | `quay.io/redhat-user-workloads/rhel-lightspeed-tenant/okp-mcp` |
+| Component | Watches | Quay Image |
+|-----------|---------|------------|
+| `okp-mcp` | `main` (but CEL matches `release/` too) | `quay.io/redhat-user-workloads/rhel-lightspeed-tenant/okp-mcp` |
 | `okp-mcp-rel` | release branch | `quay.io/redhat-user-workloads/rhel-lightspeed-tenant/okp-mcp-rel` |
+
+For deployment, use images from the `okp-mcp` quay repo (same as main). The `okp-mcp-rel` component is needed to ensure Konflux recognizes the release branch, but the deployable images come from the existing `okp-mcp` component's custom pipeline.
 
 ## Deployment Flow
 
 ```
 release branch commit (GitHub)
   → GitLab mirror syncs (regex: main|release\/.*)
-  → Konflux (okp-mcp-rel component) builds image
-  → image tagged with commit SHA in quay.io
-  → update app-interface saas.yml IMAGE_TAG with that SHA
+  → Konflux builds image (okp-mcp component, custom .tekton/push.yaml)
+  → image tagged with commit SHA at quay.io/.../okp-mcp:<sha>
+  → update app-interface saas.yml:
+      - ref: release/YYYY-MM-DD (for okp-mcp, lightspeed-stack, redhat-okp)
+      - IMAGE_TAG: <sha>
   → qontract-reconcile deploys to staging
 ```
 
 ## Gotchas
 
 - **Konflux components are immutable** — you can't change the branch, you have to delete and recreate
-- **GitLab mirror must include the branch** — if the mirror regex doesn't match, Konflux never sees the push
+- **GitLab mirror must include the branch** — if the mirror regex doesn't match, Konflux never sees the push. Use regex `(main|release\/.*)`, not "Mirror only protected branches"
+- **The mirror URL must end in `.git`** — GitLab treats URLs with and without `.git` as different identities
 - **The component name can't be reused immediately after deletion** — use a variation if needed
-- **Use the GitLab URL for Konflux components**, not GitHub — that's what the existing setup uses
-- **The release component pushes to a different quay repo** (`okp-mcp-rel` vs `okp-mcp`) — update the `IMAGE` field in app-interface saas.yml accordingly
+- **Use the GitLab URL for Konflux components**, not GitHub — the existing setup uses GitLab and the Tekton annotations reference GitLab URLs
+- **Images go to the same quay repo as main** — the `okp-mcp` component's custom pipeline builds release branches too, so no `IMAGE` change is needed in app-interface
+- **Konflux auto-commits `.tekton/` files** for new components — review the auto-generated commit on the release branch and ensure it doesn't conflict with existing custom pipelines
+- **The auto-generated Konflux PR build may fail** on `sast-coverity-check` (image pull flakiness) — this doesn't block the push build
+- **app-interface needs three `ref` changes** for a code freeze — okp-mcp, lightspeed-stack, and redhat-okp all need to point to the release branch
