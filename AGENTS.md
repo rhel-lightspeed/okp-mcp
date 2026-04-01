@@ -82,6 +82,7 @@ src/okp_mcp/
   config.py      # ServerConfig (pydantic BaseSettings, MCP_* env vars)
   server.py      # FastMCP instance (single `mcp` object), AppContext, lifespan
   request_id.py  # Request ID context vars, FastMCP middleware, Starlette header middleware, logging filter
+  intent.py      # Intent detection: IntentRule dataclass, INTENT_RULES registry, boost application
   portal.py      # Unified portal search: query builders, chunk conversion, RRF, orchestrator, formatting
   tools/
     __init__.py  # package export surface, triggers tool module imports for registration
@@ -113,6 +114,7 @@ INCORRECT_ANSWER_LOOP.md  # step-by-step workflow for turning RSPEED "incorrect 
 |------|----------|-------|
 | Add a new MCP tool | `src/okp_mcp/tools/` | Add `@mcp.tool` async function in the relevant module and re-export it from `tools/__init__.py` |
 | Change request ID propagation or response headers | `src/okp_mcp/request_id.py`, `src/okp_mcp/__init__.py`, `src/okp_mcp/server.py` | `RequestIDContextMiddleware` mirrors FastMCP request IDs into logs, `RequestIDHeaderMiddleware` adds `X-Request-ID` to HTTP/SSE responses |
+| Add/modify intent detection | `src/okp_mcp/intent.py` | Append `IntentRule` to `INTENT_RULES` at the correct priority position |
 | Change portal search logic | `src/okp_mcp/portal.py` | Query builders, chunk conversion, RRF fusion, orchestrator, formatting |
 | Change Solr query logic | `src/okp_mcp/solr.py` | `_solr_query()` builds edismax params; `_clean_query()` for tokenization |
 | Modify result formatting | `src/okp_mcp/formatting.py` | `_annotate_result()` for deprecation/EOL (used by portal.py) |
@@ -147,7 +149,8 @@ tools/search.py → config, portal, server
 tools/document.py → content, server, solr, tools/shared.py
 tools/run_code.py → config, server
 request_id.py → fastmcp.server.dependencies, fastmcp.server.middleware, starlette
-portal.py   → config, content, formatting, solr
+intent.py   → config
+portal.py   → config, content, formatting, intent, solr
 formatting.py → content, solr
 solr.py     → config
 server.py   → config

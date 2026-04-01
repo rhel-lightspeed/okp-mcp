@@ -4,25 +4,18 @@ import httpx
 import pytest
 import respx
 
+from okp_mcp.intent import INTENT_RULES, IntentRule, apply_main_boosts
 from okp_mcp.portal import (
     _DEPRECATION_WARNING,
     _EOL_PRODUCTS,
-    _EUS_HIGHLIGHT_TERMS,
     _FALLBACK_MAX_CHARS,
     _KIND_LABELS,
     _MAIN_QF,
-    _SPICE_HIGHLIGHT_TERMS,
-    _VM_HIGHLIGHT_TERMS,
     PortalChunk,
-    _apply_intent_boosts,
     _build_deprecation_query,
     _build_eol_filter,
     _build_main_query,
     _deduplicate_by_parent,
-    _detect_eus_intent,
-    _detect_release_date_intent,
-    _detect_spice_intent,
-    _detect_vm_intent,
     _docs_to_chunks,
     _fallback_cve,
     _fallback_errata,
@@ -74,6 +67,14 @@ class TestEolProducts:
 # ---------------------------------------------------------------------------
 
 
+def _get_rule(name: str) -> IntentRule:
+    """Look up an IntentRule by name for testing."""
+    for rule in INTENT_RULES:
+        if rule.name == name:
+            return rule
+    raise ValueError(f"No intent rule named {name!r}")
+
+
 class TestDetectVmIntent:
     """Verify VM/virtualization intent detection."""
 
@@ -90,7 +91,7 @@ class TestDetectVmIntent:
     )
     def test_positive(self, query: str):
         """Queries containing VM keywords trigger VM intent."""
-        assert _detect_vm_intent(query) is True
+        assert _get_rule("vm").matches(query) is True
 
     @pytest.mark.parametrize(
         "query",
@@ -103,7 +104,7 @@ class TestDetectVmIntent:
     )
     def test_negative(self, query: str):
         """Queries without VM keywords do not trigger VM intent."""
-        assert _detect_vm_intent(query) is False
+        assert _get_rule("vm").matches(query) is False
 
 
 class TestDetectReleaseDateIntent:
@@ -120,7 +121,7 @@ class TestDetectReleaseDateIntent:
     )
     def test_positive(self, query: str):
         """Queries about release timing trigger release-date intent."""
-        assert _detect_release_date_intent(query) is True
+        assert _get_rule("release_date").matches(query) is True
 
     @pytest.mark.parametrize(
         "query",
@@ -133,7 +134,7 @@ class TestDetectReleaseDateIntent:
     )
     def test_negative(self, query: str):
         """Queries not about release dates do not trigger the intent."""
-        assert _detect_release_date_intent(query) is False
+        assert _get_rule("release_date").matches(query) is False
 
 
 class TestDetectEusIntent:
@@ -150,7 +151,7 @@ class TestDetectEusIntent:
     )
     def test_positive(self, query: str):
         """Queries mentioning EUS or Extended Update Support trigger EUS intent."""
-        assert _detect_eus_intent(query) is True
+        assert _get_rule("eus").matches(query) is True
 
     @pytest.mark.parametrize(
         "query",
@@ -163,7 +164,7 @@ class TestDetectEusIntent:
     )
     def test_negative(self, query: str):
         """Queries without EUS keywords do not trigger EUS intent."""
-        assert _detect_eus_intent(query) is False
+        assert _get_rule("eus").matches(query) is False
 
 
 class TestDetectSpiceIntent:
@@ -186,7 +187,7 @@ class TestDetectSpiceIntent:
     )
     def test_positive(self, query: str):
         """Queries mentioning SPICE trigger SPICE intent."""
-        assert _detect_spice_intent(query) is True
+        assert _get_rule("spice").matches(query) is True
 
     @pytest.mark.parametrize(
         "query",
@@ -200,7 +201,7 @@ class TestDetectSpiceIntent:
     )
     def test_negative(self, query: str):
         """Queries without SPICE keyword do not trigger SPICE intent."""
-        assert _detect_spice_intent(query) is False
+        assert _get_rule("spice").matches(query) is False
 
 
 # ---------------------------------------------------------------------------
@@ -332,44 +333,44 @@ class TestBuildDeprecationQuery:
 # ---------------------------------------------------------------------------
 
 
-class TestApplyIntentBoosts:
-    """Verify that _apply_intent_boosts mutates params correctly for each intent."""
+class TestApplyMainBoosts:
+    """Verify that apply_main_boosts mutates params correctly for each intent."""
 
     def test_vm_intent_adds_bq_and_hlq(self):
         """VM intent injects cockpit/virt-manager bq and expands hl.q."""
         params = _build_main_query("create a vm")
-        _apply_intent_boosts(params, "create a vm", "create vm")
+        apply_main_boosts(params, "create a vm", "create vm")
         assert "cockpit" in params["bq"]
         assert "virt-manager" in params["bq"]
-        assert _VM_HIGHLIGHT_TERMS in params["hl.q"]
+        assert _get_rule("vm").highlight_terms in params["hl.q"]
         assert params["hl.q"].startswith("create vm")
 
     def test_eus_intent_adds_bq_and_hlq(self):
         """EUS intent injects Enhanced EUS bq and expands hl.q."""
         params = _build_main_query("eus support")
-        _apply_intent_boosts(params, "eus support", "eus support")
+        apply_main_boosts(params, "eus support", "eus support")
         assert "Enhanced EUS" in params["bq"]
         assert "EUS FAQ" in params["bq"]
-        assert _EUS_HIGHLIGHT_TERMS in params["hl.q"]
+        assert _get_rule("eus").highlight_terms in params["hl.q"]
 
     def test_release_date_intent_adds_bq(self):
         """Release-date intent injects release dates bq."""
         params = _build_main_query("when was rhel 9 released")
-        _apply_intent_boosts(params, "when was rhel 9 released", "rhel 9 released")
+        apply_main_boosts(params, "when was rhel 9 released", "rhel 9 released")
         assert "Enterprise Linux Release Dates" in params["bq"]
         assert 'allTitle:"release dates"' in params["bq"]
 
     def test_release_date_intent_no_hlq(self):
         """Release-date intent does not override hl.q (no special highlight terms)."""
         params = _build_main_query("when was rhel 9 released")
-        _apply_intent_boosts(params, "when was rhel 9 released", "rhel 9 released")
+        apply_main_boosts(params, "when was rhel 9 released", "rhel 9 released")
         assert "hl.q" not in params
 
     def test_no_intent_leaves_params_unchanged(self):
         """Params are not mutated when no intent is detected."""
         params = _build_main_query("configure firewall rhel 9")
         original = dict(params)
-        _apply_intent_boosts(params, "configure firewall rhel 9", "configure firewall rhel 9")
+        apply_main_boosts(params, "configure firewall rhel 9", "configure firewall rhel 9")
         assert params == original
 
     @pytest.mark.parametrize(
@@ -379,55 +380,53 @@ class TestApplyIntentBoosts:
     )
     def test_vm_intent_no_false_positive(self, query):
         """Substrings containing 'vm' (nvme, jvm, evms) must not trigger VM intent."""
-        assert not _detect_vm_intent(query)
+        assert not _get_rule("vm").matches(query)
 
     def test_eus_intent_no_false_positive(self):
         """Substrings containing 'eus' (e.g. 'zeus') must not trigger EUS intent."""
-        assert not _detect_eus_intent("zeus cluster setup")
+        assert not _get_rule("eus").matches("zeus cluster setup")
 
     def test_release_date_intent_no_false_positive(self):
         """Substrings containing 'released' fragment must not trigger release-date intent."""
-        assert not _detect_release_date_intent("unreleased feature flag")
+        assert not _get_rule("release_date").matches("unreleased feature flag")
 
     def test_spice_intent_adds_bq_and_hlq(self):
         """SPICE intent injects VNC/deprecation bq and expands hl.q with SPICE terms."""
         params = _build_main_query("spice rhel")
-        _apply_intent_boosts(params, "spice rhel", "spice rhel")
+        apply_main_boosts(params, "spice rhel", "spice rhel")
         assert "VNC" in params["bq"]
         assert "spice" in params["bq"]
-        assert _SPICE_HIGHLIGHT_TERMS in params["hl.q"]
+        assert _get_rule("spice").highlight_terms in params["hl.q"]
         assert params["hl.q"].startswith("spice rhel")
 
     def test_spice_overrides_vm_when_both_match(self):
-        """SPICE intent overrides VM intent for queries like 'SPICE for VMs'.
+        """SPICE intent wins over VM intent for queries like 'SPICE for VMs'.
 
         SPICE questions are about the display protocol, not VM management.
         Without this override, cockpit/virsh highlight terms flood results
         and the LLM omits the VNC replacement.  See RSPEED_2481.
         """
         params = _build_main_query("spice rhel vms")
-        _apply_intent_boosts(params, "is spice available for rhel vms", "spice rhel vms")
-        # SPICE runs after VM, so it wins
+        apply_main_boosts(params, "is spice available for rhel vms", "spice rhel vms")
+        # SPICE is more specific, so it matches first and wins
         assert "VNC" in params["bq"]
-        assert _SPICE_HIGHLIGHT_TERMS in params["hl.q"]
+        assert _get_rule("spice").highlight_terms in params["hl.q"]
         # VM boosts must NOT survive
         assert "cockpit" not in params["bq"]
         assert "virt-manager" not in params["bq"]
 
     def test_eus_overrides_vm_when_both_match(self):
-        """When both VM and EUS match, EUS runs second and overwrites bq/hl.q."""
-        # "eus" is a substring that doesn't match VM intent, but test the
-        # override behavior when both would match (e.g., "virtualization eus").
+        """When both VM and EUS match, EUS is more specific and wins."""
         params = _build_main_query("virtualization eus")
-        _apply_intent_boosts(params, "virtualization eus", "virtualization eus")
-        # EUS runs after VM, so it wins
+        apply_main_boosts(params, "virtualization eus", "virtualization eus")
+        # EUS is higher priority (more specific), so it wins
         assert "Enhanced EUS" in params["bq"]
-        assert _EUS_HIGHLIGHT_TERMS in params["hl.q"]
+        assert _get_rule("eus").highlight_terms in params["hl.q"]
 
     def test_mutates_in_place(self):
-        """_apply_intent_boosts modifies the dict in-place, returns None."""
+        """apply_main_boosts modifies the dict in-place, returns None."""
         params = _build_main_query("eus policy")
-        result = _apply_intent_boosts(params, "eus policy", "eus policy")
+        result = apply_main_boosts(params, "eus policy", "eus policy")
         assert result is None
         assert "bq" in params
 
