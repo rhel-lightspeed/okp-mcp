@@ -206,9 +206,9 @@ class TestBuildMainQuery:
         assert "portal_advisory_type" in fl
 
     def test_rows_overfetch(self):
-        """rows=20 over-fetches for diversity after parent deduplication."""
+        """rows=10 over-fetches for diversity after parent deduplication."""
         params = _build_main_query("test")
-        assert params["rows"] == 20
+        assert params["rows"] == 10
 
     def test_hl_default_summary_true(self):
         """defaultSummary is enabled; CVE/errata boilerplate is handled in _docs_to_chunks."""
@@ -228,9 +228,9 @@ class TestBuildMainQuery:
             assert f'-product:"{product}"' in params["fq"]
 
     def test_highlight_snippets(self):
-        """6 highlight snippets requested per document."""
+        """3 highlight snippets requested per document (enough for BM25 to pick good passages)."""
         params = _build_main_query("test")
-        assert params["hl.snippets"] == "6"
+        assert params["hl.snippets"] == "3"
 
 
 # ---------------------------------------------------------------------------
@@ -271,14 +271,14 @@ class TestBuildDeprecationQuery:
         assert "considerations in adopting" in bq
 
     def test_fewer_rows_than_main(self):
-        """Deprecation query fetches fewer rows (5) than the main query (20)."""
+        """Deprecation query fetches fewer rows (3) than the main query (10)."""
         params = _build_deprecation_query("test")
-        assert params["rows"] == 5
+        assert params["rows"] == 3
 
     def test_fewer_highlight_snippets(self):
-        """4 highlight snippets per doc (vs 6 in main query)."""
+        """2 highlight snippets per doc (only needs to detect deprecation signals)."""
         params = _build_deprecation_query("test")
-        assert params["hl.snippets"] == "4"
+        assert params["hl.snippets"] == "2"
 
     def test_fl_excludes_cve_fields(self):
         """Deprecation fl does not include CVE/errata-specific fields."""
