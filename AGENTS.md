@@ -82,7 +82,12 @@ src/okp_mcp/
   config.py      # ServerConfig (pydantic BaseSettings, MCP_* env vars)
   server.py      # FastMCP instance (single `mcp` object), AppContext, lifespan
   portal.py      # Unified portal search: query builders, chunk conversion, RRF, orchestrator, formatting
-  tools.py       # @mcp.tool definitions (search_portal, get_document, run_code)
+  tools/
+    __init__.py  # package export surface, triggers tool module imports for registration
+    search.py    # search_portal MCP tool
+    document.py  # get_document MCP tool + document helper functions
+    run_code.py  # placeholder run_code MCP tool
+    shared.py    # shared tool constants
   solr.py        # Solr query builder, BM25 paragraph extraction, RHV filtering
   content.py     # Boilerplate stripping, content truncation, text cleaning
   formatting.py  # Result annotation, deprecation/replacement detection, sort keys
@@ -105,7 +110,7 @@ INCORRECT_ANSWER_LOOP.md  # step-by-step workflow for turning RSPEED "incorrect 
 
 | Task | Location | Notes |
 |------|----------|-------|
-| Add a new MCP tool | `src/okp_mcp/tools.py` | Add `@mcp.tool` async function; follows error handling pattern |
+| Add a new MCP tool | `src/okp_mcp/tools/` | Add `@mcp.tool` async function in the relevant module and re-export it from `tools/__init__.py` |
 | Change portal search logic | `src/okp_mcp/portal.py` | Query builders, chunk conversion, RRF fusion, orchestrator, formatting |
 | Change Solr query logic | `src/okp_mcp/solr.py` | `_solr_query()` builds edismax params; `_clean_query()` for tokenization |
 | Modify result formatting | `src/okp_mcp/formatting.py` | `_annotate_result()` for deprecation/EOL (used by portal.py) |
@@ -128,14 +133,17 @@ uv run okp-mcp [--transport ...] [--port ...]
             → server.py: _app_lifespan()
                 ├─ creates shared httpx.AsyncClient
                 └─ yields AppContext(...)
-            → tools.py: @mcp.tool funcs  # registered via side-effect import
+            → tools/__init__.py: imports tool modules for @mcp.tool registration
 ```
 
 ## Module Dependencies
 
 ```text
 __init__.py → config, server, tools (side-effect import)
-tools.py    → config, portal, server, solr, content
+tools/__init__.py → tools/search.py, tools/document.py, tools/run_code.py
+tools/search.py → config, portal, server
+tools/document.py → content, server, solr, tools/shared.py
+tools/run_code.py → config, server
 portal.py   → config, content, formatting, solr
 formatting.py → content, solr
 solr.py     → config
@@ -245,4 +253,4 @@ If findings come back, address them before creating the PR (or flag them for the
 
 ## Workarounds
 
-- `run_code()` in tools.py is a KLUDGE: placeholder tool that prevents Gemini 2.5 Flash from crashing when it tries to use its built-in code execution tool. Returns a polite "not supported" message. Do not remove without verifying Gemini behavior first.
+- `run_code()` in `src/okp_mcp/tools/run_code.py` is a KLUDGE: placeholder tool that prevents Gemini 2.5 Flash from crashing when it tries to use its built-in code execution tool. Returns a polite "not supported" message. Do not remove without verifying Gemini behavior first.

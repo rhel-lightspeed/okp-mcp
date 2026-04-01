@@ -13,6 +13,7 @@ from okp_mcp import tools
 from okp_mcp.config import ServerConfig
 from okp_mcp.server import mcp
 from okp_mcp.tools import _doc_id_filter, _escape_solr_phrase, _format_document, _normalize_doc_id
+from okp_mcp.tools import document as document_tools
 
 _SOLR_ENDPOINT = ServerConfig().solr_endpoint
 
@@ -40,7 +41,9 @@ async def test_fetch_document_raw_uses_provided_client_without_constructing_or_c
     mock_client.get = AsyncMock(return_value=response)
     mock_client.aclose = AsyncMock()
 
-    with patch("okp_mcp.tools.httpx.AsyncClient", side_effect=AssertionError("constructor should not be called")):
+    with patch(
+        "okp_mcp.tools.document.httpx.AsyncClient", side_effect=AssertionError("constructor should not be called")
+    ):
         data = await tools._fetch_document_raw("/solutions/123", client=mock_client, solr_endpoint=_SOLR_ENDPOINT)
 
     mock_client.get.assert_awaited_once()
@@ -58,7 +61,7 @@ async def test_fetch_document_raw_creates_and_closes_client_when_not_provided():
     created_client.get = AsyncMock(return_value=response)
     created_client.aclose = AsyncMock()
 
-    with patch("okp_mcp.tools.httpx.AsyncClient", return_value=created_client) as client_ctor:
+    with patch("okp_mcp.tools.document.httpx.AsyncClient", return_value=created_client) as client_ctor:
         data = await tools._fetch_document_raw("/solutions/123", solr_endpoint=_SOLR_ENDPOINT)
 
     client_ctor.assert_called_once_with(timeout=30.0)
@@ -72,7 +75,7 @@ async def test_fetch_document_with_query_passes_client_to_solr_query():
     mock_client = AsyncMock(spec=httpx.AsyncClient)
     expected = {"response": {"numFound": 1, "docs": [{"id": "123"}]}}
 
-    with patch("okp_mcp.tools._solr_query", AsyncMock(return_value=expected)) as solr_query_mock:
+    with patch("okp_mcp.tools.document._solr_query", AsyncMock(return_value=expected)) as solr_query_mock:
         data = await tools._fetch_document_with_query(
             "/solutions/123", "kernel panic", client=mock_client, solr_endpoint=_SOLR_ENDPOINT
         )
@@ -232,11 +235,11 @@ async def test_get_document_normalizes_full_url():
     mock_app.max_response_chars = 5000
 
     with (
-        patch("okp_mcp.tools.get_app_context", return_value=mock_app),
-        patch("okp_mcp.tools._fetch_document_raw", new_callable=AsyncMock) as mock_fetch,
+        patch("okp_mcp.tools.document.get_app_context", return_value=mock_app),
+        patch("okp_mcp.tools.document._fetch_document_raw", new_callable=AsyncMock) as mock_fetch,
     ):
         mock_fetch.return_value = {"response": {"docs": [{"allTitle": "Test", "documentKind": "documentation"}]}}
-        await tools.get_document(mock_ctx, full_url)
+        await document_tools.get_document(mock_ctx, full_url)
 
         # The normalized path (not the full URL) should reach the fetch function.
         call_args = mock_fetch.call_args
