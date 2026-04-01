@@ -2,8 +2,12 @@
 
 import re
 
+# Solr content uses a Unicode right single quotation mark (U+2019, a.k.a.
+# "smart apostrophe") in "Red Hat\u2019s", not the ASCII apostrophe (U+0027).
+# The character class ['\u2019] matches either variant so the pattern works
+# regardless of which encoding the Solr index or content pipeline produces.
 _FAST_TRACK_PATTERN = re.compile(
-    r"This solution is part of Red Hat's fast-track publication program.*",
+    r"This solution is part of Red Hat['\u2019]s fast-track publication program.*",
     re.DOTALL,
 )
 _NOT_INCLUDED_PATTERN = re.compile(r"This content is not included\.")
