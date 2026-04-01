@@ -249,8 +249,10 @@ All functions must be rated A or B by radon. C or higher fails the CI gate. Refa
 Before creating a pull request, check if `coderabbit` is available in `$PATH`. If it is, ask the user whether they'd like a CodeRabbit review before opening the PR. Run it with structured output for easy parsing:
 
 ```bash
-coderabbit review --agent --base <base-branch>
+coderabbit review --agent --base <base-branch> -c .coderabbit.yaml
 ```
+
+The CLI does not auto-read `.coderabbit.yaml` from the repo root. Always pass `-c .coderabbit.yaml` so local reviews match the GitHub PR review behavior (tone, path instructions, review profile).
 
 If findings come back, address them before creating the PR (or flag them for the user). Zero findings means good to go.
 
