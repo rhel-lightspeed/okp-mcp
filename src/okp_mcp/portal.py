@@ -69,6 +69,13 @@ _EOL_PRODUCTS: frozenset[str] = frozenset(
 # Highlight term expansions injected into hl.q for intent-specific queries.
 _VM_HIGHLIGHT_TERMS = "virsh cockpit deprecated virt-manager"
 _EUS_HIGHLIGHT_TERMS = '"Enhanced EUS" "48 months" "Enhanced Extended Update Support"'
+# SPICE highlight terms: VNC is the supported replacement for the deprecated
+# SPICE display protocol.  Including "VNC" in hl.q causes Solr to select
+# highlight snippets that mention VNC, which is critical for the LLM to
+# recommend the correct replacement.  Without this, the VM intent's
+# cockpit/virsh terms dominate snippets and the LLM omits VNC entirely.
+# See functional test RSPEED_2481.
+_SPICE_HIGHLIGHT_TERMS = "VNC deprecated removed replacement"
 
 
 # ---------------------------------------------------------------------------
@@ -79,6 +86,11 @@ _EUS_HIGHLIGHT_TERMS = '"Enhanced EUS" "48 months" "Enhanced Extended Update Sup
 _VM_INTENT_RE = re.compile(r"\b(?:vm|vms|virtual machine|virtualization|hypervisor)\b")
 _RELEASE_DATE_INTENT_RE = re.compile(r"\b(?:release dates?|released|when was|general availability)\b")
 _EUS_INTENT_RE = re.compile(r"\b(?:eus|extended update support)\b")
+# SPICE is a display/graphics protocol for VMs, NOT a VM management tool.
+# Queries mentioning SPICE need display-protocol-specific boosts (VNC),
+# not VM management boosts (cockpit/virsh).  This regex detects SPICE
+# intent so _apply_intent_boosts can override the generic VM intent.
+_SPICE_INTENT_RE = re.compile(r"\bspice\b")
 
 
 def _detect_vm_intent(query_lower: str) -> bool:
@@ -94,6 +106,17 @@ def _detect_release_date_intent(query_lower: str) -> bool:
 def _detect_eus_intent(query_lower: str) -> bool:
     """Return True if the lowercased query asks about EUS or Extended Update Support."""
     return bool(_EUS_INTENT_RE.search(query_lower))
+
+
+def _detect_spice_intent(query_lower: str) -> bool:
+    """Return True if the lowercased query mentions the SPICE display protocol.
+
+    SPICE questions are about display protocol availability and replacements
+    (VNC), not about VM management tools (cockpit/virsh).  Detecting SPICE
+    intent separately from VM intent prevents the generic VM boosts from
+    flooding results with irrelevant cockpit/virsh content.
+    """
+    return bool(_SPICE_INTENT_RE.search(query_lower))
 
 
 # ---------------------------------------------------------------------------
@@ -213,8 +236,12 @@ def _build_deprecation_query(cleaned_query: str) -> dict:
 def _apply_intent_boosts(params: dict, query_lower: str, cleaned_query: str) -> None:
     """Mutate *params* in-place to add intent-specific bq/hl.q boosts.
 
-    Called after ``_build_main_query`` to layer on VM, EUS, or release-date
-    boosts without complicating the base query builder.
+    Called after ``_build_main_query`` to layer on VM, EUS, release-date,
+    or SPICE boosts without complicating the base query builder.
+
+    Order matters: later intents overwrite earlier ones.  SPICE runs after
+    VM so that "SPICE for VMs" gets display-protocol boosts (VNC), not
+    VM-management boosts (cockpit/virsh).
     """
     if _detect_vm_intent(query_lower):
         params["bq"] = (
@@ -222,6 +249,21 @@ def _apply_intent_boosts(params: dict, query_lower: str, cleaned_query: str) -> 
             'main_content:(cockpit OR "cockpit-machines" OR virsh)^5'
         )
         params["hl.q"] = f"{cleaned_query} {_VM_HIGHLIGHT_TERMS}"
+
+    # SPICE intent MUST run after VM intent so it overwrites the VM boosts.
+    # SPICE questions are about the display protocol (SPICE vs VNC), not
+    # about VM management tools (cockpit/virsh).  Without this override,
+    # queries like "Is SPICE available for VMs?" trigger VM intent, which
+    # injects cockpit/virsh highlight terms that flood results with
+    # irrelevant VM management content and push out the critical VNC
+    # replacement information the LLM needs to answer correctly.
+    # See functional test RSPEED_2481.
+    if _detect_spice_intent(query_lower):
+        params["bq"] = (
+            'allTitle:(spice OR deprecated OR "no longer")^15 '
+            'main_content:(VNC OR deprecated OR removed OR replacement OR "no longer")^10'
+        )
+        params["hl.q"] = f"{cleaned_query} {_SPICE_HIGHLIGHT_TERMS}"
 
     if _detect_eus_intent(query_lower):
         params["bq"] = 'title:"Enhanced EUS"^100 title:"EUS FAQ"^80'

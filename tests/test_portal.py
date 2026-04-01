@@ -11,6 +11,7 @@ from okp_mcp.portal import (
     _FALLBACK_MAX_CHARS,
     _KIND_LABELS,
     _MAIN_QF,
+    _SPICE_HIGHLIGHT_TERMS,
     _VM_HIGHLIGHT_TERMS,
     PortalChunk,
     _apply_intent_boosts,
@@ -20,6 +21,7 @@ from okp_mcp.portal import (
     _deduplicate_by_parent,
     _detect_eus_intent,
     _detect_release_date_intent,
+    _detect_spice_intent,
     _detect_vm_intent,
     _docs_to_chunks,
     _fallback_cve,
@@ -162,6 +164,43 @@ class TestDetectEusIntent:
     def test_negative(self, query: str):
         """Queries without EUS keywords do not trigger EUS intent."""
         assert _detect_eus_intent(query) is False
+
+
+class TestDetectSpiceIntent:
+    """Verify SPICE display protocol intent detection.
+
+    SPICE queries are about the display protocol, not VM management.
+    Detecting SPICE separately prevents the generic VM intent from injecting
+    cockpit/virsh boosts that drown out VNC replacement information.
+    """
+
+    @pytest.mark.parametrize(
+        "query",
+        [
+            "is spice available for rhel vms",
+            "spice protocol deprecated",
+            "how to use spice with virtualization",
+            "spice remote display",
+        ],
+        ids=["spice-vms", "spice-deprecated", "spice-virtualization", "spice-display"],
+    )
+    def test_positive(self, query: str):
+        """Queries mentioning SPICE trigger SPICE intent."""
+        assert _detect_spice_intent(query) is True
+
+    @pytest.mark.parametrize(
+        "query",
+        [
+            "configure firewall",
+            "create a vm on rhel 9",
+            "vnc remote display",
+            "",
+        ],
+        ids=["firewall", "vm-no-spice", "vnc-only", "empty"],
+    )
+    def test_negative(self, query: str):
+        """Queries without SPICE keyword do not trigger SPICE intent."""
+        assert _detect_spice_intent(query) is False
 
 
 # ---------------------------------------------------------------------------
@@ -349,6 +388,31 @@ class TestApplyIntentBoosts:
     def test_release_date_intent_no_false_positive(self):
         """Substrings containing 'released' fragment must not trigger release-date intent."""
         assert not _detect_release_date_intent("unreleased feature flag")
+
+    def test_spice_intent_adds_bq_and_hlq(self):
+        """SPICE intent injects VNC/deprecation bq and expands hl.q with SPICE terms."""
+        params = _build_main_query("spice rhel")
+        _apply_intent_boosts(params, "spice rhel", "spice rhel")
+        assert "VNC" in params["bq"]
+        assert "spice" in params["bq"]
+        assert _SPICE_HIGHLIGHT_TERMS in params["hl.q"]
+        assert params["hl.q"].startswith("spice rhel")
+
+    def test_spice_overrides_vm_when_both_match(self):
+        """SPICE intent overrides VM intent for queries like 'SPICE for VMs'.
+
+        SPICE questions are about the display protocol, not VM management.
+        Without this override, cockpit/virsh highlight terms flood results
+        and the LLM omits the VNC replacement.  See RSPEED_2481.
+        """
+        params = _build_main_query("spice rhel vms")
+        _apply_intent_boosts(params, "is spice available for rhel vms", "spice rhel vms")
+        # SPICE runs after VM, so it wins
+        assert "VNC" in params["bq"]
+        assert _SPICE_HIGHLIGHT_TERMS in params["hl.q"]
+        # VM boosts must NOT survive
+        assert "cockpit" not in params["bq"]
+        assert "virt-manager" not in params["bq"]
 
     def test_eus_overrides_vm_when_both_match(self):
         """When both VM and EUS match, EUS runs second and overwrites bq/hl.q."""
