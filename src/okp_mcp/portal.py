@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import html as html_mod
 import re
 from dataclasses import dataclass, field, replace
 
@@ -143,8 +144,24 @@ def _build_main_query(cleaned_query: str) -> dict:
         "fq": _build_eol_filter(),
         "qf": _MAIN_QF,
         "fl": _MAIN_FL,
-        "rows": 20,
-        "hl.snippets": "6",
+        # Token budget control: _deduplicate_by_parent keeps only the best
+        # chunk per parent doc, and max_results (default 10) caps the final
+        # output.  Fetching 10 rows x 3 snippets = 30 intermediate chunks is
+        # plenty of headroom.  Raising rows past ~15 pulls in marginally
+        # relevant docs that bloat the tool response without improving answer
+        # quality (measured via functional tests).
+        "rows": 10,
+        # 3 snippets per doc gives BM25 scoring enough candidates to pick a
+        # good passage while keeping intermediate chunk count manageable.
+        # Higher values (e.g. 6) create chunks that _deduplicate_by_parent
+        # immediately discards, wasting Solr highlighting work.
+        "hl.snippets": "3",
+        # NOTE: Do NOT add hl.fragsize here.  The base default (600) with
+        # hl.fragsizeIsMinimum=true is critical for structured content like
+        # compatibility matrix tables.  Reducing it causes Solr to truncate
+        # table data before the key rows (e.g. the RHEL container compat
+        # matrix loses its "Unsupported" entries with fragsize < 600).
+        #
         # Enable defaultSummary so docs/solutions/articles always get at least
         # the first N chars of main_content when highlight query terms don't
         # match.  CVE/errata boilerplate is handled in _docs_to_chunks() which
@@ -170,8 +187,21 @@ def _build_deprecation_query(cleaned_query: str) -> dict:
             eol_fq,
         ],
         "fl": _DEPRECATION_FL,
-        "rows": 5,
-        "hl.snippets": "4",
+        # The deprecation query is a secondary signal, not the primary search.
+        # 3 rows is enough to surface deprecation/removal notices for the
+        # topic without flooding the final results with tangentially related
+        # deprecation content (e.g. JBoss EAP deprecation appearing in
+        # container compatibility results).
+        "rows": 3,
+        # 2 snippets per doc suffices because we only need to detect
+        # deprecation signals, not extract comprehensive content.
+        "hl.snippets": "2",
+        # Shorter fragments are fine here: the deprecation query only needs
+        # enough text to identify deprecation/removal notices, not full
+        # tables or detailed procedures.  Unlike the main query (which needs
+        # fragsize >= 600 for structured content like compat matrix tables),
+        # deprecation signals are typically in short sentences.
+        "hl.fragsize": "400",
         "bq": (
             'allTitle:(deprecated OR removed OR "no longer" OR "end of life")^20 '
             'allTitle:("release notes" OR "considerations in adopting")^15 '
@@ -206,7 +236,11 @@ def _apply_intent_boosts(params: dict, query_lower: str, cleaned_query: str) -> 
 # ---------------------------------------------------------------------------
 
 # Maximum characters of fallback content when highlighting returns no snippets.
-_FALLBACK_MAX_CHARS = 600
+# 400 chars captures the lead paragraph of most solutions/articles without
+# pulling in boilerplate footers (e.g. fast-track publication notices).
+# Increase cautiously: every extra char here multiplies across all results
+# that lack highlight matches, inflating the tool response token count.
+_FALLBACK_MAX_CHARS = 400
 
 _ACCESS_BASE_URL = "https://access.redhat.com"
 
@@ -342,6 +376,19 @@ def _docs_to_chunks(
         if hl_snippets:
             for i, snippet in enumerate(hl_snippets):
                 chunk_text = re.sub(r"<[^>]+>", "", snippet).strip()
+                # Decode HTML entities (&#x27; -> ', &#x2F; -> /, etc.)
+                # before any further processing.  Solr highlights preserve
+                # raw HTML entities from the indexed content, and leaving
+                # them encoded wastes tokens and breaks regex patterns
+                # (e.g. strip_boilerplate matching the apostrophe in
+                # "Red Hat's fast-track publication program").
+                chunk_text = html_mod.unescape(chunk_text)
+                # Strip boilerplate from highlight snippets: Solr highlights
+                # can include "This content is not included." markers and
+                # fast-track publication footers that waste tokens without
+                # adding useful info.  The fallback path (_fallback_generic)
+                # already calls strip_boilerplate on main_content.
+                chunk_text = strip_boilerplate(chunk_text)
                 if query:
                     chunk_text = _filter_rhv_sentences(chunk_text, query)
                 if not chunk_text:
@@ -465,6 +512,56 @@ def _reciprocal_rank_fusion(
 
 
 # ---------------------------------------------------------------------------
+# Score-based quality gate
+# ---------------------------------------------------------------------------
+
+# Minimum Solr score as a fraction of the top-scoring chunk.  Chunks below
+# this threshold are dropped before the final top-N slice.  This eliminates
+# tail results that matched only tangentially (e.g. "NIC compatibility" or
+# "SSSD compatibility" appearing in a search for "container compatibility").
+#
+# Set conservatively at 0.45 (45% of top score).  In practice, genuinely
+# relevant results cluster at 60-100% of top, while noise drops to 30-40%.
+# The 45% threshold sits in the natural gap between those clusters.
+#
+# IMPORTANT: Solr scores from the main and deprecation queries use different
+# query terms and boosts, so they are not perfectly comparable after RRF
+# fusion.  A generous threshold avoids false-positive filtering caused by
+# cross-query score differences.  Do not tighten below ~0.40 without
+# testing across all functional cases.
+_MIN_SCORE_RATIO = 0.45
+
+
+def _filter_by_score(chunks: list[PortalChunk]) -> list[PortalChunk]:
+    """Drop chunks whose Solr score falls below a fraction of the top score.
+
+    This is a quality gate, not a ranking mechanism: it removes obvious noise
+    without altering the relative order of surviving chunks.  Chunks without
+    a score (None) are always kept.
+    """
+    if not chunks:
+        return chunks
+
+    top_score = max((c.score for c in chunks if c.score is not None), default=0.0)
+    if top_score <= 0:
+        return chunks
+
+    threshold = top_score * _MIN_SCORE_RATIO
+    kept = [c for c in chunks if c.score is None or c.score >= threshold]
+
+    if len(kept) < len(chunks):
+        logger.info(
+            "Score filter: dropped %d/%d chunks below %.1f%% of top score (%.1f)",
+            len(chunks) - len(kept),
+            len(chunks),
+            _MIN_SCORE_RATIO * 100,
+            top_score,
+        )
+
+    return kept
+
+
+# ---------------------------------------------------------------------------
 # Orchestrator
 # ---------------------------------------------------------------------------
 
@@ -516,8 +613,9 @@ async def _run_portal_search(
 
     merged = _reciprocal_rank_fusion(main_chunks, dep_chunks)
     deduped = _deduplicate_by_parent(merged)
+    quality_filtered = _filter_by_score(deduped)
 
-    top_n = deduped[:max_results]
+    top_n = quality_filtered[:max_results]
 
     dep_parent_ids = {d.parent_id for d in dep_chunks if d.parent_id is not None}
     has_deprecation = any(c.parent_id in dep_parent_ids for c in top_n if c.parent_id is not None)
@@ -538,6 +636,19 @@ async def _run_portal_search(
 # ---------------------------------------------------------------------------
 # Formatting
 # ---------------------------------------------------------------------------
+
+# Cap content per search result to prevent a single large document from
+# consuming the entire tool response.  Solr highlights with
+# hl.fragsizeIsMinimum=true extend to sentence boundaries and can produce
+# fragments of 2000+ characters.  Without this cap, a single large highlight
+# can push other results out of the token budget entirely.
+#
+# 1500 chars is enough to include structured data like the RHEL container
+# compatibility matrix table (~800 chars for the key rows) while still
+# leaving room for ~8 other results in a typical 30K char budget.
+# See also: formatting.py _MAX_RESULT_CONTENT (used by the legacy
+# _format_result path, not this portal chunk path).
+_MAX_CHUNK_CONTENT = 1500
 
 _KIND_LABELS: dict[str, str] = {
     "documentation": "Documentation",
@@ -575,7 +686,12 @@ def _format_portal_chunk(chunk: PortalChunk) -> tuple[str, int]:
         lines.append(f"URL: {chunk.online_source_url}")
 
     if chunk.chunk:
-        lines.append(f"Content: {chunk.chunk}")
+        # Hard-truncate oversized chunks.  The LLM can always call
+        # get_document for the full content if the snippet isn't enough.
+        content = chunk.chunk
+        if len(content) > _MAX_CHUNK_CONTENT:
+            content = content[:_MAX_CHUNK_CONTENT] + " [...]"
+        lines.append(f"Content: {content}")
 
     return "\n".join(lines), sort_key
 
