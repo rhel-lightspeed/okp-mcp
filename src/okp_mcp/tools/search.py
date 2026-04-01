@@ -15,7 +15,13 @@ logger = logging.getLogger("okp_mcp.tools.search_portal")
 async def search_portal(
     ctx: Context,
     query: str,
-    max_results: int = 10,
+    # Reduced from 10 to 7 to lower token overhead per search call.
+    # 7 results consistently provide enough coverage for the LLM to
+    # answer correctly across all functional test scenarios (RSPEED_2480,
+    # 2481, 2482).  The LLM can still request up to 20 via the parameter.
+    # DO NOT reduce below 5 without testing - some queries need multiple
+    # results to cross-reference deprecation vs current status.
+    max_results: int = 7,
 ) -> str:
     """Search Red Hat knowledge base: documentation, solutions, articles, CVEs, errata, and support policies.
 
