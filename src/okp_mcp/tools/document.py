@@ -13,6 +13,13 @@ from .shared import DOCUMENT_FL
 
 logger = logging.getLogger("okp_mcp.tools.get_document")
 
+# Documentation pages (RHEL guides, etc.) can exceed 500KB of raw content.
+# Tighter budgets here prevent token-heavy responses while still surfacing
+# the most relevant passages via Solr highlights or local BM25 extraction.
+_DOCUMENTATION_MAX_CHARS = 10_000
+_DOCUMENTATION_MAX_SECTIONS = 3
+_DOCUMENTATION_PER_SECTION = 1000
+
 
 def _normalize_doc_id(doc_id: str) -> str:
     """Strip the access.redhat.com URL prefix so full URLs work as Solr lookups.
@@ -87,7 +94,38 @@ def _format_document_passages(highlight_snippets: list[str], query: str, max_cha
 def _format_document_content(
     doc: dict, data: dict, doc_id: str, query: str, max_chars: int, current_result: str
 ) -> str:
-    """Build the content section for a fetched document."""
+    """Build the content section for a fetched document.
+
+    Documentation pages (RHEL guides, etc.) can exceed 500KB and eat tokens
+    fast, so they get tighter budgets. Non-documentation types pass through
+    with the full budget.
+
+    Decision tree for documentation pages::
+
+        is documentation?
+         +--NO--> [unchanged: full content, 30K budget]
+         |
+        YES
+         |
+        query provided?
+         +--NO--> metadata + "pass a query" nudge (~500 chars)
+         |
+        YES
+         |
+        Solr highlights exist?
+         +--YES--> highlight passages (capped at 10K)
+         +--NO---> BM25 fallback (3 sections, 1K each, ~3-5K typical)
+    """
+    is_documentation = _uses_document_passages(doc)
+
+    # Documentation without a query is almost always useless (first 1500 chars
+    # is typically a table of contents). Nudge the caller to be specific.
+    if is_documentation and not query:
+        return (
+            "\n\nThis is a large documentation page. "
+            "Pass a query to get_document to extract the most relevant passages."
+        )
+
     main_content = doc.get("main_content")
     if not main_content:
         return ""
@@ -97,10 +135,18 @@ def _format_document_content(
         return f"\n\nContent:\n{_extract_relevant_section(content, '', max_sections=8)}"
 
     highlight_snippets = _get_highlight_snippets(data, doc.get("view_uri", ""), doc.get("id", ""), doc_id, query=query)
+
+    if is_documentation:
+        if highlight_snippets:
+            doc_budget = min(max_chars, _DOCUMENTATION_MAX_CHARS)
+            return _format_document_passages(highlight_snippets, query, doc_budget, current_result)
+        extracted = _extract_relevant_section(
+            content, query, per_section=_DOCUMENTATION_PER_SECTION, max_sections=_DOCUMENTATION_MAX_SECTIONS
+        )
+        return f"\n\nContent:\n{extracted}"
+
     if not highlight_snippets:
         return f"\n\nContent:\n{_extract_relevant_section(content, query, max_sections=8)}"
-    if _uses_document_passages(doc):
-        return _format_document_passages(highlight_snippets, query, max_chars, current_result)
     return f"\n\nContent:\n{' ... '.join(highlight_snippets)}"
 
 
