@@ -324,7 +324,7 @@ FUNCTIONAL_TEST_CASES = [
             ],
             required_facts=[
                 ("802.3ad", "mode=4"),
-                ("bond-slave", "bond-port"),
+                ("bond-slave", "bond-port", "master prod"),
                 "lacp_rate",
             ],
             forbidden_claims=["mode=active-lacp"],
