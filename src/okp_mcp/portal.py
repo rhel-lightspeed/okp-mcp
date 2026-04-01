@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 
 import httpx
@@ -68,6 +69,13 @@ _EOL_PRODUCTS: frozenset[str] = frozenset(
 # Highlight term expansions injected into hl.q for intent-specific queries.
 _VM_HIGHLIGHT_TERMS = "virsh cockpit deprecated virt-manager"
 _EUS_HIGHLIGHT_TERMS = '"Enhanced EUS" "48 months" "Enhanced Extended Update Support"'
+# SPICE highlight terms: VNC is the supported replacement for the deprecated
+# SPICE display protocol.  Including "VNC" in hl.q causes Solr to select
+# highlight snippets that mention VNC, which is critical for the LLM to
+# recommend the correct replacement.  Without this, the VM intent's
+# cockpit/virsh terms dominate snippets and the LLM omits VNC entirely.
+# See functional test RSPEED_2481.
+_SPICE_HIGHLIGHT_TERMS = "VNC deprecated removed replacement"
 
 
 # ---------------------------------------------------------------------------
@@ -78,6 +86,11 @@ _EUS_HIGHLIGHT_TERMS = '"Enhanced EUS" "48 months" "Enhanced Extended Update Sup
 _VM_INTENT_RE = re.compile(r"\b(?:vm|vms|virtual machine|virtualization|hypervisor)\b")
 _RELEASE_DATE_INTENT_RE = re.compile(r"\b(?:release dates?|released|when was|general availability)\b")
 _EUS_INTENT_RE = re.compile(r"\b(?:eus|extended update support)\b")
+# SPICE is a display/graphics protocol for VMs, NOT a VM management tool.
+# Queries mentioning SPICE need display-protocol-specific boosts (VNC),
+# not VM management boosts (cockpit/virsh).  This regex detects SPICE
+# intent so _apply_intent_boosts can override the generic VM intent.
+_SPICE_INTENT_RE = re.compile(r"\bspice\b")
 
 
 def _detect_vm_intent(query_lower: str) -> bool:
@@ -93,6 +106,17 @@ def _detect_release_date_intent(query_lower: str) -> bool:
 def _detect_eus_intent(query_lower: str) -> bool:
     """Return True if the lowercased query asks about EUS or Extended Update Support."""
     return bool(_EUS_INTENT_RE.search(query_lower))
+
+
+def _detect_spice_intent(query_lower: str) -> bool:
+    """Return True if the lowercased query mentions the SPICE display protocol.
+
+    SPICE questions are about display protocol availability and replacements
+    (VNC), not about VM management tools (cockpit/virsh).  Detecting SPICE
+    intent separately from VM intent prevents the generic VM boosts from
+    flooding results with irrelevant cockpit/virsh content.
+    """
+    return bool(_SPICE_INTENT_RE.search(query_lower))
 
 
 # ---------------------------------------------------------------------------
@@ -183,8 +207,12 @@ def _build_deprecation_query(cleaned_query: str) -> dict:
 def _apply_intent_boosts(params: dict, query_lower: str, cleaned_query: str) -> None:
     """Mutate *params* in-place to add intent-specific bq/hl.q boosts.
 
-    Called after ``_build_main_query`` to layer on VM, EUS, or release-date
-    boosts without complicating the base query builder.
+    Called after ``_build_main_query`` to layer on VM, EUS, release-date,
+    or SPICE boosts without complicating the base query builder.
+
+    Order matters: later intents overwrite earlier ones.  SPICE runs after
+    VM so that "SPICE for VMs" gets display-protocol boosts (VNC), not
+    VM-management boosts (cockpit/virsh).
     """
     if _detect_vm_intent(query_lower):
         params["bq"] = (
@@ -193,12 +221,122 @@ def _apply_intent_boosts(params: dict, query_lower: str, cleaned_query: str) -> 
         )
         params["hl.q"] = f"{cleaned_query} {_VM_HIGHLIGHT_TERMS}"
 
+    # SPICE intent MUST run after VM intent so it overwrites the VM boosts.
+    # SPICE questions are about the display protocol (SPICE vs VNC), not
+    # about VM management tools (cockpit/virsh).  Without this override,
+    # queries like "Is SPICE available for VMs?" trigger VM intent, which
+    # injects cockpit/virsh highlight terms that flood results with
+    # irrelevant VM management content and push out the critical VNC
+    # replacement information the LLM needs to answer correctly.
+    # See functional test RSPEED_2481.
+    if _detect_spice_intent(query_lower):
+        params["bq"] = (
+            'allTitle:(spice OR deprecated OR "no longer")^15 '
+            'main_content:(VNC OR deprecated OR removed OR replacement OR "no longer")^10'
+        )
+        params["hl.q"] = f"{cleaned_query} {_SPICE_HIGHLIGHT_TERMS}"
+
     if _detect_eus_intent(query_lower):
         params["bq"] = 'title:"Enhanced EUS"^100 title:"EUS FAQ"^80'
         params["hl.q"] = f"{cleaned_query} {_EUS_HIGHLIGHT_TERMS}"
 
     if _detect_release_date_intent(query_lower):
         params["bq"] = 'title:"Enterprise Linux Release Dates"^200 allTitle:"release dates"^30'
+
+
+@dataclass(frozen=True, slots=True)
+class _DeprecationIntentBoost:
+    """Maps an intent detector to Solr boost terms for the deprecation query.
+
+    Each entry pairs a detection function with the allTitle and main_content
+    terms that should be boosted when that intent is active.  This ensures
+    the deprecation query finds deprecation notices about the user's actual
+    topic rather than unrelated deprecation content.
+
+    Attributes:
+        detect: Function that takes a lowercased query and returns True if
+            this intent is active.
+        title_terms: Solr OR-joined terms for the allTitle boost.
+        content_terms: Solr OR-joined terms for the main_content boost.
+    """
+
+    detect: Callable[[str], bool]
+    title_terms: str
+    content_terms: str
+
+
+# Registry of intent-specific boosts for the deprecation query.
+#
+# ORDER MATTERS: entries are evaluated first-match-wins.  SPICE must come
+# before VM because SPICE queries contain VM terms ("VMs") but need
+# display-protocol boosts (VNC), not VM management boosts (cockpit/virsh).
+#
+# To add a new intent: append a _DeprecationIntentBoost entry at the
+# correct priority position and add a functional test to verify.
+_DEPRECATION_INTENT_BOOSTS: list[_DeprecationIntentBoost] = [
+    # SPICE is a display protocol; deprecation results should mention
+    # SPICE, VNC (its replacement), or display protocols.
+    _DeprecationIntentBoost(
+        detect=_detect_spice_intent,
+        title_terms='SPICE OR VNC OR "display protocol"',
+        content_terms='SPICE OR VNC OR "display protocol"',
+    ),
+    # VM queries need deprecation results about virt-manager, cockpit,
+    # and virtualization tools, not Eclipse Vert.x or network teaming.
+    _DeprecationIntentBoost(
+        detect=_detect_vm_intent,
+        title_terms='"virt-manager" OR virtualization OR cockpit OR "virtual machine"',
+        content_terms='"virt-manager" OR cockpit OR virsh OR "virtual machine"',
+    ),
+]
+
+# Boost weights for deprecation intent terms.
+#
+# IMPORTANT: Keep these at ^5/^3 or lower.  Higher values (e.g. ^30/^15)
+# inflate deprecation query scores well above main query scores (~120),
+# causing _filter_by_score to drop ALL main results because they fall
+# below 45% of the inflated top score.  The score filter uses raw Solr
+# scores which are NOT comparable across queries with different bq boosts.
+#
+# At ^5/^3, the intent boosts are strong enough to re-rank within the
+# deprecation results (e.g. VM deprecation > Vert.x deprecation) without
+# overwhelming the cross-query score comparison.
+_DEP_TITLE_BOOST = 5
+_DEP_CONTENT_BOOST = 3
+
+
+def _apply_deprecation_intent_boosts(params: dict, query_lower: str) -> None:
+    """Add topic-specific boosts to the deprecation query based on detected intent.
+
+    Without intent-aware boosts, the deprecation query matches ANY content
+    containing "deprecated" and "removed", pulling in noise results like
+    Eclipse Vert.x release notes or network teaming deprecation notices for
+    a VM management question.  Adding intent-specific bq ensures the
+    deprecation query surfaces deprecation notices about the user's actual
+    topic, not unrelated deprecation content.
+
+    This function APPENDS to the existing bq (the base deprecation term
+    boosts defined in _build_deprecation_query) rather than replacing it,
+    so the original deprecation/removal title boosts remain active.
+
+    First matching intent wins (evaluated in _DEPRECATION_INTENT_BOOSTS
+    order).  Queries that match no intent are left unchanged.
+
+    Token budget impact: without these boosts, the deprecation query
+    contributes 2-3 completely off-topic results (e.g., Eclipse Vert.x
+    migration guides) that waste ~2,000 chars of response budget.
+
+    See functional tests RSPEED_2480 (VM management) and RSPEED_2481 (SPICE).
+    """
+    for boost in _DEPRECATION_INTENT_BOOSTS:
+        if boost.detect(query_lower):
+            existing_bq = params.get("bq", "")
+            params["bq"] = (
+                f"{existing_bq} "
+                f"allTitle:({boost.title_terms})^{_DEP_TITLE_BOOST} "
+                f"main_content:({boost.content_terms})^{_DEP_CONTENT_BOOST}"
+            )
+            return
 
 
 # ---------------------------------------------------------------------------
@@ -480,7 +618,11 @@ async def _run_portal_search(
     *,
     client: httpx.AsyncClient,
     solr_endpoint: str,
-    max_results: int = 10,
+    # Reduced from 10 to 7 to match search_portal default.  7 is the
+    # sweet spot: enough coverage for cross-referencing deprecation vs
+    # current status, but avoids returning low-relevance tail results
+    # that inflate the tool response without improving answer quality.
+    max_results: int = 7,
 ) -> tuple[list[PortalChunk], bool]:
     """Execute the unified portal search pipeline.
 
@@ -505,6 +647,12 @@ async def _run_portal_search(
     _apply_intent_boosts(main_params, query_lower, cleaned)
 
     dep_params = _build_deprecation_query(cleaned)
+    # Apply intent-aware boosts to the deprecation query so it finds
+    # deprecation notices about the user's ACTUAL topic, not random
+    # deprecation content.  Without this, a VM management query gets
+    # Eclipse Vert.x and network teaming deprecation results that waste
+    # ~2,000 chars of response budget (see RSPEED_2480).
+    _apply_deprecation_intent_boosts(dep_params, query_lower)
 
     main_data, dep_data = await asyncio.gather(
         _solr_query(main_params, client=client, solr_endpoint=solr_endpoint),
