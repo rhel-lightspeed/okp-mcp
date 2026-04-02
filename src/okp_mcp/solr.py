@@ -97,9 +97,39 @@ async def _solr_query(params: dict, client: httpx.AsyncClient | None = None, *, 
         "wt": "json",
         # Use Extended DisMax, which supports field boosting, phrase boosting, and minimum-match.
         "defType": "edismax",
-        # Query fields with boosts: title matches matter most (^5), headings and synopses help,
-        # and body content contributes at lower weight.
-        "qf": "title^5 main_content heading_h1^3 heading_h2 portal_synopsis allTitle^3 content^2 all_content^1",
+        # Query fields with boosts.  edismax scores each field independently and
+        # combines them, so a term matching in a high-boost field contributes more
+        # to the final score than the same term in a low-boost field.
+        #
+        #   syn_product ^6  Product-name synonym field (copy of `product` through
+        #                   the `text_product_synonym` analyzer, which expands
+        #                   abbreviations like RHEL -> Red Hat Enterprise Linux via
+        #                   SynonymGraphFilterFactory).  Highest boost because a
+        #                   product-name match is a very strong relevance signal.
+        #                   Only populated on documentation pages (~2.8% of corpus);
+        #                   solutions, CVEs, errata, and articles have no `product`
+        #                   field and therefore no `syn_product` index entries.
+        #   title       ^5  Document title (exact tokenization, no stemming).
+        #   heading_h1  ^3  Top-level headings within the document.
+        #   allTitle    ^3  Alternate/combined title field (covers CVE IDs, errata
+        #                   advisory names, and other title variants).
+        #   content     ^2  Secondary content field.
+        #   main_content    Primary body text (no explicit boost = ^1).
+        #   heading_h2      Second-level headings (no explicit boost = ^1).
+        #   portal_synopsis Synopsis/abstract (no explicit boost = ^1).
+        #   all_content ^1  Copy-field that aggregates all text fields.  Uses the
+        #                   `text_en_splitting_tight` type (EnglishMinimalStemmer),
+        #                   so "configuring" matches "configuration".  Low weight
+        #                   keeps it as a recall safety net without distorting
+        #                   precision from the unstemmed primary fields.
+        #
+        # NOTE: portal.py defines _MAIN_QF which overrides this qf for the main
+        # search path (adds portal_synopsis^3).  Changes here only affect callers
+        # that use _solr_query() directly without a qf override.
+        "qf": (
+            "title^5 main_content heading_h1^3 heading_h2 portal_synopsis"
+            " allTitle^3 content^2 all_content^1 syn_product^6"
+        ),
         # Phrase boost: reward documents where all query terms appear as an exact phrase.
         "pf": "main_content^5 title^8",
         # Phrase slop for pf: terms may be up to 3 positions apart and still earn the phrase boost.
