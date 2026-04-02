@@ -66,9 +66,20 @@ class IntentRule:
 # Priority rationale:
 #   - release_date: very specific query type, no overlap with other intents.
 #   - eus: specific product lifecycle concept, rarely co-occurs with VM/SPICE.
+#   - lifecycle: broader than EUS but still specific to support duration/phase
+#     queries.  Must come after EUS so "EUS lifecycle" matches EUS first.
+#     See functional test RSPEED_2698.
 #   - spice: SPICE queries contain VM terms ("VMs") but need display-protocol
 #     boosts (VNC), not VM management boosts (cockpit/virsh).  Must match
 #     before the generic VM intent.  See functional test RSPEED_2481.
+#   - cloud_deploy: AWS/EC2 queries need deployment guide boosts.  Must come
+#     before VM so "RHEL VM on AWS" gets cloud boosts, not cockpit/virsh.
+#     See functional test RSPEED_2201.
+#   - sap: SAP queries need system-roles/preconfigure boosts.  Must come
+#     before VM so "SAP HANA VM" gets SAP boosts.  See functional test
+#     sap_004.
+#   - ethtool: NIC driver debugging queries need msglvl highlight terms.
+#     See functional test RSPEED_2123.
 #   - vm: broadest intent, catches all VM/virtualization queries that didn't
 #     match a more specific intent above.
 INTENT_RULES: list[IntentRule] = [
@@ -82,6 +93,21 @@ INTENT_RULES: list[IntentRule] = [
         pattern=r"\b(?:eus|extended update support)\b",
         bq='title:"Enhanced EUS"^100 title:"EUS FAQ"^80',
         highlight_terms='"Enhanced EUS" "48 months" "Enhanced Extended Update Support"',
+    ),
+    # Lifecycle queries ask about support duration, phases, or EOL dates for
+    # a RHEL major release.  Without this, "RHEL 10 support lifecycle" pulls
+    # in random RHEL 10 solutions and the deprecation side-query surfaces
+    # unrelated deprecation notices (e.g. BIND on RHEL 10), causing the LLM
+    # to answer from training data instead of official lifecycle docs.
+    # Must come after EUS (EUS is a specific lifecycle sub-topic).
+    IntentRule(
+        name="lifecycle",
+        pattern=r"\blife[\s-]?cycles?\b",
+        bq=(
+            'allTitle:("Life Cycle" OR "life-cycle" OR "lifecycle")^100 '
+            'allTitle:("updates" OR "errata" OR "support policy")^30'
+        ),
+        highlight_terms='"Life Cycle" "full support" "maintenance support" "extended life"',
     ),
     # SPICE is a display/graphics protocol for VMs, NOT a VM management tool.
     # Queries mentioning SPICE need display-protocol-specific boosts (VNC),
@@ -100,6 +126,53 @@ INTENT_RULES: list[IntentRule] = [
         highlight_terms="VNC deprecated removed replacement",
         dep_title_terms='SPICE OR VNC OR "display protocol"',
         dep_content_terms='SPICE OR VNC OR "display protocol"',
+    ),
+    # Cloud deployment queries (AWS, EC2) need deployment guide boosts, not
+    # generic solution articles.  Without this, "RHEL AWS Secure Boot" pulls
+    # in kernel module signing solutions instead of the deploying_rhel_on_aws
+    # documentation that covers marketplace images and custom AMIs.
+    # Must come before VM so "RHEL VM on AWS" gets cloud boosts, not
+    # cockpit/virsh boosts.
+    IntentRule(
+        name="cloud_deploy",
+        pattern=r"\b(?:aws|amazon\s+web\s+services|ec2)\b",
+        bq=(
+            'allTitle:(deploying OR "amazon web services" OR AWS)^30 '
+            'main_content:(marketplace OR AMI OR "custom image")^10'
+        ),
+        highlight_terms='deploying marketplace "custom image" AMI AWS',
+    ),
+    # SAP queries need boosts for SAP system roles and preconfigure
+    # documentation.  Without this, "RHEL System Roles for SAP" (cleaned
+    # to "RHEL Roles SAP" after stopword removal of "System") returns
+    # generic SAP docs without the three preconfigure role names in
+    # snippets, causing the LLM to make 12+ search calls.  The
+    # highlight_terms inject preconfigure role names into hl.q so Solr
+    # selects passages containing them.  Must come before VM so "SAP
+    # HANA VM" gets SAP boosts.
+    IntentRule(
+        name="sap",
+        pattern=r"\bsap\b",
+        bq=(
+            'allTitle:("system roles" OR "SAP solutions" OR SAP OR preconfigure)^30 '
+            "main_content:(sap_general_preconfigure OR sap_netweaver_preconfigure OR sap_hana_preconfigure)^15"
+        ),
+        highlight_terms=(
+            "sap_general_preconfigure sap_netweaver_preconfigure sap_hana_preconfigure "
+            '"system roles" preconfigure "SAP Application Server"'
+        ),
+    ),
+    # ethtool / NIC driver queries need msglvl and message-level terms
+    # injected into hl.q so Solr picks passages containing the actual
+    # debugging commands.  Without this, solution 45950 (bnxt_en debugging)
+    # returns a short default-summary snippet that stops before the msglvl
+    # commands, and get_document fails due to Solr ID mismatch, so the LLM
+    # never sees the answer.  See functional test RSPEED_2123.
+    IntentRule(
+        name="ethtool",
+        pattern=r"\b(?:ethtool|bnxt[\w-]*|nic\s+driver|network\s+driver)\b",
+        bq='main_content:(msglvl OR ethtool OR "message level")^10',
+        highlight_terms='msglvl ethtool "message level" "ethtool -s"',
     ),
     IntentRule(
         name="vm",
