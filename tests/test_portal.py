@@ -9,6 +9,7 @@ from okp_mcp.portal import (
     _DEPRECATION_WARNING,
     _EOL_PRODUCTS,
     _FALLBACK_MAX_CHARS,
+    _KIND_FACET_LABELS,
     _KIND_LABELS,
     _MAIN_QF,
     PortalChunk,
@@ -17,8 +18,10 @@ from okp_mcp.portal import (
     _build_main_query,
     _deduplicate_by_parent,
     _docs_to_chunks,
+    _extract_facet_counts,
     _fallback_cve,
     _fallback_errata,
+    _format_facet_summary,
     _format_portal_chunk,
     _format_portal_results,
     _reciprocal_rank_fusion,
@@ -1115,7 +1118,7 @@ class TestRunPortalSearch:
             router.get(_SOLR_ENDPOINT).mock(side_effect=side_effect)
 
             async with httpx.AsyncClient() as client:
-                chunks, _has_dep = await _run_portal_search(
+                chunks, _has_dep, _facets = await _run_portal_search(
                     "test query",
                     client=client,
                     solr_endpoint=_SOLR_ENDPOINT,
@@ -1133,7 +1136,7 @@ class TestRunPortalSearch:
         with respx.mock(assert_all_called=False) as router:
             router.get(_SOLR_ENDPOINT).mock(return_value=httpx.Response(200, json=_make_solr_json(docs, hl)))
             async with httpx.AsyncClient() as client:
-                chunks, _ = await _run_portal_search(
+                chunks, _, _facets = await _run_portal_search(
                     "test",
                     client=client,
                     solr_endpoint=_SOLR_ENDPOINT,
@@ -1147,7 +1150,7 @@ class TestRunPortalSearch:
         with respx.mock(assert_all_called=False) as router:
             router.get(_SOLR_ENDPOINT).mock(return_value=httpx.Response(200, json=_make_solr_json([])))
             async with httpx.AsyncClient() as client:
-                chunks, has_dep = await _run_portal_search(
+                chunks, has_dep, _facets = await _run_portal_search(
                     "nonexistent",
                     client=client,
                     solr_endpoint=_SOLR_ENDPOINT,
@@ -1155,3 +1158,222 @@ class TestRunPortalSearch:
 
         assert chunks == []
         assert has_dep is False
+
+    async def test_returns_facet_counts_from_main_query(self):
+        """Orchestrator extracts facet counts from the main query response."""
+        doc = _make_doc(doc_id="d1", kind="solution")
+        hl = {"d1": {"main_content": ["Solution snippet."]}}
+        solr_json = _make_solr_json([doc], hl)
+        solr_json["facet_counts"] = {
+            "facet_fields": {
+                "documentKind": ["solution", 3, "Cve", 487, "documentation", 1],
+            }
+        }
+
+        with respx.mock(assert_all_called=False) as router:
+
+            def side_effect(request):
+                """Return faceted response for main query, empty for deprecation."""
+                q = str(request.url.params.get("q", ""))
+                if "deprecated" in q:
+                    return httpx.Response(200, json=_make_solr_json([]))
+                return httpx.Response(200, json=solr_json)
+
+            router.get(_SOLR_ENDPOINT).mock(side_effect=side_effect)
+
+            async with httpx.AsyncClient() as client:
+                _chunks, _has_dep, facets = await _run_portal_search(
+                    "test query",
+                    client=client,
+                    solr_endpoint=_SOLR_ENDPOINT,
+                )
+
+        assert facets == {"documentKind": {"solution": 3, "Cve": 487, "documentation": 1}}
+
+    async def test_empty_facets_when_solr_omits_facet_counts(self):
+        """Facets are empty when Solr response has no facet_counts key."""
+        with respx.mock(assert_all_called=False) as router:
+            router.get(_SOLR_ENDPOINT).mock(return_value=httpx.Response(200, json=_make_solr_json([])))
+            async with httpx.AsyncClient() as client:
+                _chunks, _has_dep, facets = await _run_portal_search(
+                    "test",
+                    client=client,
+                    solr_endpoint=_SOLR_ENDPOINT,
+                )
+
+        assert facets == {}
+
+
+# ---------------------------------------------------------------------------
+# Facet extraction
+# ---------------------------------------------------------------------------
+
+
+class TestExtractFacetCounts:
+    """Verify Solr facet field extraction from response JSON."""
+
+    def test_parses_alternating_list_format(self):
+        """Converts Solr's [value, count, value, count, ...] into a dict."""
+        response = {
+            "facet_counts": {
+                "facet_fields": {
+                    "documentKind": ["Cve", 487, "solution", 3, "documentation", 1],
+                }
+            }
+        }
+        result = _extract_facet_counts(response)
+        assert result == {"documentKind": {"Cve": 487, "solution": 3, "documentation": 1}}
+
+    def test_drops_zero_count_entries(self):
+        """Facet values with zero count are excluded."""
+        response = {
+            "facet_counts": {
+                "facet_fields": {
+                    "documentKind": ["Cve", 10, "article", 0, "solution", 5],
+                }
+            }
+        }
+        result = _extract_facet_counts(response)
+        assert "article" not in result["documentKind"]
+        assert result["documentKind"] == {"Cve": 10, "solution": 5}
+
+    def test_multiple_facet_fields(self):
+        """Multiple facet fields are extracted independently."""
+        response = {
+            "facet_counts": {
+                "facet_fields": {
+                    "documentKind": ["Cve", 10],
+                    "product": ["Red Hat Enterprise Linux", 42],
+                }
+            }
+        }
+        result = _extract_facet_counts(response)
+        assert "documentKind" in result
+        assert "product" in result
+        assert result["product"] == {"Red Hat Enterprise Linux": 42}
+
+    def test_empty_facet_fields(self):
+        """All-zero facet values produce an empty dict for that field."""
+        response = {
+            "facet_counts": {
+                "facet_fields": {
+                    "documentKind": ["Cve", 0, "solution", 0],
+                }
+            }
+        }
+        result = _extract_facet_counts(response)
+        assert result == {}
+
+    def test_missing_facet_counts_key(self):
+        """Response without facet_counts returns empty dict."""
+        result = _extract_facet_counts({"response": {"docs": []}})
+        assert result == {}
+
+    def test_missing_facet_fields_key(self):
+        """facet_counts without facet_fields returns empty dict."""
+        result = _extract_facet_counts({"facet_counts": {}})
+        assert result == {}
+
+    def test_odd_length_list_does_not_crash(self):
+        """Malformed odd-length facet list is handled without IndexError."""
+        response = {
+            "facet_counts": {
+                "facet_fields": {
+                    "documentKind": ["Cve", 10, "solution"],  # trailing orphan
+                }
+            }
+        }
+        result = _extract_facet_counts(response)
+        # The trailing "solution" without a count is safely skipped
+        assert result == {"documentKind": {"Cve": 10}}
+
+
+# ---------------------------------------------------------------------------
+# Facet summary formatting
+# ---------------------------------------------------------------------------
+
+
+class TestFormatFacetSummary:
+    """Verify compact facet summary rendering for LLM output."""
+
+    def test_basic_formatting(self):
+        """Facet counts are rendered as 'count Label' sorted by descending count."""
+        facets = {"documentKind": {"Cve": 487, "solution": 3, "documentation": 1}}
+        result = _format_facet_summary(facets)
+        assert result == "Result distribution: 487 CVE, 3 Solution, 1 Documentation"
+
+    def test_single_facet(self):
+        """Single document kind renders correctly."""
+        facets = {"documentKind": {"solution": 42}}
+        result = _format_facet_summary(facets)
+        assert result == "Result distribution: 42 Solution"
+
+    def test_uses_kind_facet_labels(self):
+        """Facet labels are mapped through _KIND_FACET_LABELS."""
+        facets = {"documentKind": {"Erratum": 15}}
+        result = _format_facet_summary(facets)
+        assert "15 Advisory" in result
+
+    def test_unknown_kind_uses_raw_value(self):
+        """Unknown document kinds fall through as-is."""
+        facets = {"documentKind": {"mystery_type": 7}}
+        result = _format_facet_summary(facets)
+        assert "7 mystery_type" in result
+
+    def test_empty_document_kind(self):
+        """Empty documentKind facet returns empty string."""
+        result = _format_facet_summary({"documentKind": {}})
+        assert result == ""
+
+    def test_no_document_kind_key(self):
+        """Missing documentKind key returns empty string."""
+        result = _format_facet_summary({"product": {"RHEL": 10}})
+        assert result == ""
+
+    def test_empty_facets(self):
+        """Empty facets dict returns empty string."""
+        result = _format_facet_summary({})
+        assert result == ""
+
+    def test_kind_facet_labels_cover_kind_labels(self):
+        """_KIND_FACET_LABELS covers all keys in _KIND_LABELS for consistency."""
+        for kind in _KIND_LABELS:
+            assert kind in _KIND_FACET_LABELS, f"{kind!r} missing from _KIND_FACET_LABELS"
+
+
+# ---------------------------------------------------------------------------
+# Facet summary in formatted results
+# ---------------------------------------------------------------------------
+
+
+class TestFormatPortalResultsWithFacets:
+    """Verify facet summary integration in _format_portal_results."""
+
+    def test_facet_summary_prepended(self):
+        """Facet summary appears before result content."""
+        chunks = [PortalChunk(doc_id="a", title="Doc A", chunk="Content A.", documentKind="documentation")]
+        facets = {"documentKind": {"documentation": 5, "Cve": 100}}
+        result = _format_portal_results(chunks, False, "test", 10000, facets=facets)
+        assert result.startswith("Result distribution:")
+        assert "Doc A" in result
+
+    def test_facet_before_deprecation_banner(self):
+        """Facet summary appears before the deprecation warning banner."""
+        chunks = [PortalChunk(doc_id="a", title="Test", chunk="Normal.", documentKind="documentation")]
+        facets = {"documentKind": {"documentation": 1}}
+        result = _format_portal_results(chunks, True, "test", 10000, facets=facets)
+        facet_pos = result.index("Result distribution:")
+        dep_pos = result.index("WARNING:")
+        assert facet_pos < dep_pos
+
+    def test_no_facets_no_summary(self):
+        """No facet line when facets is None."""
+        chunks = [PortalChunk(doc_id="a", title="Test", chunk="Content.", documentKind="documentation")]
+        result = _format_portal_results(chunks, False, "test", 10000)
+        assert "Result distribution:" not in result
+
+    def test_empty_facets_no_summary(self):
+        """No facet line when facets dict is empty."""
+        chunks = [PortalChunk(doc_id="a", title="Test", chunk="Content.", documentKind="documentation")]
+        result = _format_portal_results(chunks, False, "test", 10000, facets={})
+        assert "Result distribution:" not in result

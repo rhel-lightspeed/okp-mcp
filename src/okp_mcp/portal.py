@@ -37,6 +37,37 @@ class PortalChunk:
     rrf_score: float | None = field(default=None, repr=False)
 
 
+# ---------------------------------------------------------------------------
+# Facet extraction
+# ---------------------------------------------------------------------------
+
+
+def _extract_facet_counts(solr_response: dict) -> dict[str, dict[str, int]]:
+    """Extract facet field counts from a Solr response.
+
+    Solr returns ``facet.field`` data as alternating ``[value, count, value,
+    count, ...]`` lists.  This converts them to ``{field: {value: count}}``
+    dicts, dropping zero-count entries so downstream code only sees facets
+    with actual results.
+
+    Returns an empty dict when the response has no ``facet_counts`` key
+    (e.g. in unit tests with minimal mock responses).
+    """
+    facet_fields = solr_response.get("facet_counts", {}).get("facet_fields", {})
+    result: dict[str, dict[str, int]] = {}
+    for field_name, pairs in facet_fields.items():
+        counts: dict[str, int] = {}
+        # Solr facet lists are always even-length ([value, count, ...]),
+        # but guard against a malformed trailing element to avoid IndexError.
+        for i in range(0, len(pairs) - 1, 2):
+            value, count = pairs[i], pairs[i + 1]
+            if count > 0:
+                counts[value] = count
+        if counts:
+            result[field_name] = counts
+    return result
+
+
 _EOL_PRODUCTS: frozenset[str] = frozenset(
     [
         "Red Hat Virtualization",
@@ -534,12 +565,13 @@ async def _run_portal_search(
     # current status, but avoids returning low-relevance tail results
     # that inflate the tool response without improving answer quality.
     max_results: int = 7,
-) -> tuple[list[PortalChunk], bool]:
+) -> tuple[list[PortalChunk], bool, dict[str, dict[str, int]]]:
     """Execute the unified portal search pipeline.
 
     Cleans the query, fires main + deprecation queries in parallel, converts
     results to chunks, merges via RRF, deduplicates, and returns the top-N
-    chunks plus a flag indicating whether deprecation content was found.
+    chunks plus a flag indicating whether deprecation content was found and
+    facet counts from the main query.
 
     Args:
         query: Raw user query string.
@@ -549,7 +581,10 @@ async def _run_portal_search(
         max_results: Maximum chunks to return after deduplication.
 
     Returns:
-        Tuple of (top-N PortalChunk list, has_deprecation bool).
+        Tuple of (top-N PortalChunk list, has_deprecation bool, facet counts dict).
+        Facet counts come from the main query only (the deprecation query is
+        filtered to docs/solutions/articles, so its facets are not representative
+        of the full corpus distribution).
     """
     cleaned = _clean_query(query)
     query_lower = query.lower()
@@ -582,6 +617,11 @@ async def _run_portal_search(
     dep_parent_ids = {d.parent_id for d in dep_chunks if d.parent_id is not None}
     has_deprecation = any(c.parent_id in dep_parent_ids for c in top_n if c.parent_id is not None)
 
+    # Extract facet counts from the main query only.  The deprecation query
+    # is filtered to docs/solutions/articles, so its facets would
+    # misrepresent the full corpus distribution.
+    facets = _extract_facet_counts(main_data)
+
     logger.info(
         "Portal search: query=%r main=%d dep=%d merged=%d deduped=%d returned=%d",
         query,
@@ -592,7 +632,7 @@ async def _run_portal_search(
         len(top_n),
     )
 
-    return top_n, has_deprecation
+    return top_n, has_deprecation, facets
 
 
 # ---------------------------------------------------------------------------
@@ -620,6 +660,34 @@ _KIND_LABELS: dict[str, str] = {
     "Erratum": "Security Advisory",
     "access-drupal10-node-type-page": "Documentation",
 }
+
+# Labels for facet summary output.  Mirrors _KIND_LABELS but uses shorter
+# forms suitable for the compact "Result distribution:" line.
+_KIND_FACET_LABELS: dict[str, str] = {
+    "Cve": "CVE",
+    "Erratum": "Advisory",
+    "solution": "Solution",
+    "documentation": "Documentation",
+    "article": "Article",
+    "access-drupal10-node-type-page": "Documentation",
+}
+
+
+def _format_facet_summary(facets: dict[str, dict[str, int]]) -> str:
+    """Render ``documentKind`` facet counts as a compact one-liner for LLM context.
+
+    Produces a string like ``"Result distribution: 487 CVE, 3 Solution, 1 Documentation"``
+    sorted by descending count.  Returns an empty string when no ``documentKind``
+    facet data is available.
+    """
+    kind_counts = facets.get("documentKind", {})
+    if not kind_counts:
+        return ""
+    parts: list[str] = []
+    for kind, count in sorted(kind_counts.items(), key=lambda x: x[1], reverse=True):
+        label = _KIND_FACET_LABELS.get(kind, kind)
+        parts.append(f"{count} {label}")
+    return "Result distribution: " + ", ".join(parts)
 
 
 def _format_portal_chunk(chunk: PortalChunk) -> tuple[str, int]:
@@ -663,13 +731,15 @@ def _format_portal_results(
     has_deprecation: bool,
     query: str,
     max_response_chars: int,
+    facets: dict[str, dict[str, int]] | None = None,
 ) -> str:
     """Format all chunks into a final string response with budget enforcement.
 
     Renders each chunk via ``_format_portal_chunk()``, sorts by annotation
     priority (replacements first, EOL last), prepends a deprecation warning
-    banner if any chunk triggered deprecation detection, and enforces the
-    character budget via ``_select_within_budget()``.
+    banner if any chunk triggered deprecation detection, adds a facet
+    distribution summary when available, and enforces the character budget
+    via ``_select_within_budget()``.
     """
     if not chunks:
         return f"No results found for: {query}"
@@ -684,5 +754,11 @@ def _format_portal_results(
 
     if has_dep_annotation:
         output = _DEPRECATION_WARNING + output
+
+    # Prepend facet distribution summary so the LLM can see the overall
+    # result landscape (e.g. "mostly CVEs, few solutions").
+    facet_line = _format_facet_summary(facets) if facets else ""
+    if facet_line:
+        output = facet_line + "\n\n" + output
 
     return output
