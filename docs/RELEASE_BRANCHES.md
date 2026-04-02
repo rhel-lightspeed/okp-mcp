@@ -31,22 +31,7 @@ A GitHub ruleset already protects all branches matching `release/**` with the sa
 
 ### 3. GitLab mirror
 
-The GitLab mirror at `gitlab.cee.redhat.com/rhel-lightspeed/enhanced-shell/okp-mcp` pulls from GitHub. It must be configured to include release branches.
-
-To update the mirror regex:
-
-1. Go to GitLab repo **Settings > Repository > Mirroring repositories**
-2. Delete the existing mirror rule (it can't be edited in-place)
-3. Create a new Pull mirror with:
-   - **Git repository URL**: `https://github.com/rhel-lightspeed/okp-mcp.git` (must end in `.git`)
-   - **Mirror direction**: Pull
-   - **Mirror branches**: Mirror specific branches
-   - **Branch regex**: `(main|release\/.*)`
-   - **Overwrite diverged branches**: checked
-   - **Trigger pipelines for mirror updates**: checked
-4. Click **Mirror repository**
-5. Click the sync button (🔄) to trigger an immediate pull
-6. Verify the release branch appears in the GitLab branch dropdown
+The GitLab mirror at `gitlab.cee.redhat.com/rhel-lightspeed/enhanced-shell/okp-mcp` automatically pulls `main` and any branch matching `release/*` from GitHub. New release branches will appear on GitLab after the next mirror sync (typically within minutes).
 
 **Note:** "Mirror only protected branches" does not reliably detect GitHub ruleset-based protection. Use "Mirror specific branches" with a regex instead.
 
