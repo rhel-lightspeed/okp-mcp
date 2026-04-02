@@ -148,7 +148,8 @@ def apply_main_boosts(params: dict, query_lower: str, cleaned_query: str) -> Non
             params["bq"] = rule.bq
             if rule.highlight_terms:
                 params["hl.q"] = f"{cleaned_query} {rule.highlight_terms}"
-            logger.debug("Intent boost applied: %s", rule.name)
+            boosted = "bq + hl.q" if rule.highlight_terms else "bq"
+            logger.info("Intent boost: applied '%s' to main query (%s)", rule.name, boosted)
             return
 
 
@@ -187,5 +188,7 @@ def apply_deprecation_boosts(params: dict, query_lower: str) -> None:
             f"allTitle:({rule.dep_title_terms})^{_DEP_TITLE_BOOST} "
             f"main_content:({rule.dep_content_terms})^{_DEP_CONTENT_BOOST}"
         )
-        logger.debug("Deprecation intent boost applied: %s", rule.name)
+        logger.info(
+            "Intent boost: applied '%s' to deprecation query (^%d/^%d)", rule.name, _DEP_TITLE_BOOST, _DEP_CONTENT_BOOST
+        )
         return

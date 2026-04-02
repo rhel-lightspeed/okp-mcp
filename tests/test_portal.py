@@ -4,7 +4,7 @@ import httpx
 import pytest
 import respx
 
-from okp_mcp.intent import INTENT_RULES, IntentRule, apply_main_boosts
+from okp_mcp.intent import INTENT_RULES, IntentRule, apply_deprecation_boosts, apply_main_boosts
 from okp_mcp.portal import (
     _DEPRECATION_WARNING,
     _EOL_PRODUCTS,
@@ -429,6 +429,57 @@ class TestApplyMainBoosts:
         result = apply_main_boosts(params, "eus policy", "eus policy")
         assert result is None
         assert "bq" in params
+
+
+# ---------------------------------------------------------------------------
+# Intent boost logging
+# ---------------------------------------------------------------------------
+
+
+class TestIntentBoostLogging:
+    """Verify that intent boost functions emit info-level log lines."""
+
+    @pytest.mark.parametrize(
+        ("query", "expected_fragment"),
+        [
+            ("create a vm", "applied 'vm' to main query (bq + hl.q)"),
+            ("when was rhel 9 released", "applied 'release_date' to main query (bq)"),
+            ("spice rhel", "applied 'spice' to main query (bq + hl.q)"),
+        ],
+        ids=["vm-bq-hlq", "release-date-bq-only", "spice-bq-hlq"],
+    )
+    def test_main_boost_logs(self, caplog, query, expected_fragment):
+        """Main query boost logs intent name and which params were set."""
+        params = _build_main_query(query)
+        with caplog.at_level("INFO", logger="okp_mcp"):
+            apply_main_boosts(params, query, query)
+        assert any(expected_fragment in m for m in caplog.messages)
+
+    def test_main_boost_no_match_no_log(self, caplog):
+        """No log line emitted when no intent matches."""
+        params = _build_main_query("configure firewall rhel 9")
+        with caplog.at_level("INFO", logger="okp_mcp"):
+            apply_main_boosts(params, "configure firewall rhel 9", "configure firewall rhel 9")
+        assert not any("Intent boost" in m for m in caplog.messages)
+
+    def test_deprecation_boost_logs_with_weights(self, caplog):
+        """Deprecation query boost logs intent name and boost weights."""
+        params = _build_deprecation_query("spice rhel")
+        with caplog.at_level("INFO", logger="okp_mcp"):
+            apply_deprecation_boosts(params, "spice rhel")
+        assert any("applied 'spice' to deprecation query (^5/^3)" in m for m in caplog.messages)
+
+    @pytest.mark.parametrize(
+        "query",
+        ["configure firewall rhel 9", "when was rhel 9 released"],
+        ids=["no-match", "intent-without-dep-terms"],
+    )
+    def test_deprecation_boost_no_log(self, caplog, query):
+        """No log line when no deprecation intent matches or matched intent has no dep terms."""
+        params = _build_deprecation_query(query)
+        with caplog.at_level("INFO", logger="okp_mcp"):
+            apply_deprecation_boosts(params, query)
+        assert not any("Intent boost" in m for m in caplog.messages)
 
 
 # ---------------------------------------------------------------------------
