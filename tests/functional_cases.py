@@ -21,6 +21,7 @@ class FunctionalCase:
 
 
 FUNCTIONAL_TEST_CASES = [
+    # Optimized/verified on 2026-03-31
     pytest.param(
         FunctionalCase(
             question="Can I run a RHEL 6 container on RHEL 9?",
@@ -34,6 +35,7 @@ FUNCTIONAL_TEST_CASES = [
         ),
         id="RSPEED_2482",
     ),
+    # Optimized/verified on 2026-03-31
     pytest.param(
         FunctionalCase(
             question="Is SPICE available to help with RHEL VMs?",
@@ -43,6 +45,7 @@ FUNCTIONAL_TEST_CASES = [
         ),
         id="RSPEED_2481",
     ),
+    # Optimized/verified on 2026-03-31
     pytest.param(
         FunctionalCase(
             question="What is the recommended tool for managing VMs in RHEL?",
@@ -56,6 +59,7 @@ FUNCTIONAL_TEST_CASES = [
         ),
         id="RSPEED_2480",
     ),
+    # Optimized/verified on 2026-03-31
     pytest.param(
         FunctionalCase(
             question="How long is an EUS release supported for?",
@@ -69,6 +73,7 @@ FUNCTIONAL_TEST_CASES = [
         ),
         id="RSPEED_2479",
     ),
+    # Optimized/verified on 2026-03-31
     pytest.param(
         FunctionalCase(
             question="Which RHEL 9 releases have EUS available?",
@@ -83,6 +88,12 @@ FUNCTIONAL_TEST_CASES = [
         ),
         id="RSPEED_2478",
     ),
+    # Optimized/verified on 2026-04-02
+    # NOTE: This test passes but uses ~20k input tokens (6 requests) because
+    # the RHEL Life Cycle page's JS-rendered dates table is not captured in
+    # the Solr index, forcing the LLM to search repeatedly for lifecycle
+    # details that aren't there.  Token usage should drop to ~5k once the
+    # Solr data gap is fixed.  Tracked by RSPEED-2701 / RHOKP-1208.
     pytest.param(
         FunctionalCase(
             question="How long is RHEL 10 supported?",
@@ -103,6 +114,7 @@ FUNCTIONAL_TEST_CASES = [
         ),
         id="RSPEED_2698",
     ),
+    # Optimized/verified on 2026-04-02
     pytest.param(
         FunctionalCase(
             question="When was RHEL 10 released?",
@@ -118,6 +130,7 @@ FUNCTIONAL_TEST_CASES = [
         ),
         id="RSPEED_2697",
     ),
+    # Optimized/verified on 2026-04-02
     pytest.param(
         FunctionalCase(
             question="What is most current version of Python for RHEL 10?",
@@ -133,6 +146,7 @@ FUNCTIONAL_TEST_CASES = [
         ),
         id="RSPEED_2294",
     ),
+    # Optimized/verified on 2026-04-02
     pytest.param(
         FunctionalCase(
             question="How to configure RHEL on AWS with Secure Boot?",
@@ -143,12 +157,13 @@ FUNCTIONAL_TEST_CASES = [
             ],
             required_facts=[
                 "marketplace",
-                ("custom image", "custom AMI", "custom RHEL image"),
+                ("custom image", "custom AMI", "custom RHEL image", "custom RHEL AMI"),
             ],
             forbidden_claims=["do not expose"],
         ),
         id="RSPEED_2201",
     ),
+    # Optimized/verified on 2026-04-02
     pytest.param(
         FunctionalCase(
             question="How to configure 64 hugepages of size 1G at boot time in RHEL 10?",
@@ -167,6 +182,7 @@ FUNCTIONAL_TEST_CASES = [
         ),
         id="RSPEED_2200",
     ),
+    # Optimized/verified on 2026-04-02
     pytest.param(
         FunctionalCase(
             question="What are the migration options from Red Hat Fuse to Red Hat build of Apache Camel?",
@@ -185,6 +201,7 @@ FUNCTIONAL_TEST_CASES = [
         ),
         id="fuse_regression_eol",
     ),
+    # Optimized/verified on 2026-04-02
     pytest.param(
         FunctionalCase(
             question="What are the migration options from Red Hat Gluster Storage to Red Hat Ceph Storage?",
@@ -203,6 +220,7 @@ FUNCTIONAL_TEST_CASES = [
         ),
         id="gluster_regression_eol",
     ),
+    # Optimized/verified on 2026-04-02
     pytest.param(
         FunctionalCase(
             question="What are the migration options for Red Hat Virtualization to OpenShift Virtualization?",
@@ -221,6 +239,7 @@ FUNCTIONAL_TEST_CASES = [
         ),
         id="rhv_regression_eol",
     ),
+    # Optimized/verified on 2026-04-02
     pytest.param(
         FunctionalCase(
             question="What is the list of Red Hat Enterprise Linux for SAP Application Server packages?",
@@ -237,6 +256,7 @@ FUNCTIONAL_TEST_CASES = [
         ),
         id="RSPEED_1998",
     ),
+    # Optimized/verified on 2026-04-02
     pytest.param(
         FunctionalCase(
             question="What are the names of the three RHEL System Roles for SAP used to preconfigure systems?",
@@ -258,6 +278,7 @@ FUNCTIONAL_TEST_CASES = [
         ),
         id="sap_004",
     ),
+    # Optimized/verified on 2026-04-02
     pytest.param(
         FunctionalCase(
             question="How to prepare a custom SELinux policy based on AVC messages?",
@@ -275,6 +296,7 @@ FUNCTIONAL_TEST_CASES = [
         ),
         id="RSPEED_2136",
     ),
+    # Optimized/verified on 2026-04-02
     # Root cause: solution 45950 contains the ethtool msglvl commands deep in
     # the document body.  The main Solr query produces a long highlight snippet
     # (1400+ chars) that includes the commands, but the deprecation side-query
@@ -295,6 +317,7 @@ FUNCTIONAL_TEST_CASES = [
         ),
         id="RSPEED_2123",
     ),
+    # Optimized/verified on 2026-04-02
     pytest.param(
         FunctionalCase(
             question="When does the maintenance support phase end for RHEL 7?",
@@ -310,6 +333,7 @@ FUNCTIONAL_TEST_CASES = [
         ),
         id="RSPEED_2745",
     ),
+    # Optimized/verified on 2026-04-02
     pytest.param(
         FunctionalCase(
             question=(
@@ -331,6 +355,7 @@ FUNCTIONAL_TEST_CASES = [
         ),
         id="RSPEED_2113",
     ),
+    # Optimized/verified on 2026-04-02
     pytest.param(
         FunctionalCase(
             question="how do i update the kernel arguments on a system using rpm-ostree?",

@@ -108,8 +108,9 @@ def _build_main_query(cleaned_query: str) -> dict:
     base edismax params.  Keys here override the base defaults (e.g. ``qf``,
     ``hl.defaultSummary``).
 
-    Intent-specific boosts (VM, EUS, SPICE, release-date) are applied by
-    ``apply_main_boosts`` (from ``intent.py``) after construction.
+    Intent-specific boosts are applied by ``apply_main_boosts`` (from
+    ``intent.py``) after construction.  See ``INTENT_RULES`` for the full
+    list of detected intents and their boost parameters.
     """
     return {
         "q": cleaned_query,
