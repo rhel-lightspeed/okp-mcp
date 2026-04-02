@@ -174,7 +174,7 @@ def test_request_id_log_filter_uses_context_var():
 
 @pytest.mark.asyncio
 async def test_request_id_context_middleware_uses_fastmcp_request_id():
-    """Middleware keeps FastMCP's request ID active while handling a message."""
+    """Middleware uses FastMCP's request ID when no HTTP-level ID exists (e.g. stdio)."""
     middleware = RequestIDContextMiddleware()
     fastmcp_context = SimpleNamespace(request_context=object(), request_id="mcp-456")
     context = MiddlewareContext(
@@ -191,6 +191,33 @@ async def test_request_id_context_middleware_uses_fastmcp_request_id():
 
     assert result == "done"
     assert get_request_id() is None
+
+
+@pytest.mark.asyncio
+async def test_request_id_context_middleware_preserves_http_uuid():
+    """HTTP-level UUID is kept instead of being overwritten by the JSON-RPC message counter."""
+    http_uuid = "721b3d6f55374e52abc57651ef2510af"
+    token = set_request_id(http_uuid)
+
+    try:
+        middleware = RequestIDContextMiddleware()
+        fastmcp_context = SimpleNamespace(request_context=object(), request_id="2")
+        context = MiddlewareContext(
+            message="test",
+            fastmcp_context=cast(Any, fastmcp_context),
+        )
+
+        async def call_next(context: MiddlewareContext[Any]) -> str:
+            """Verify the UUID survives through the middleware chain."""
+            assert get_request_id() == http_uuid
+            return "done"
+
+        result = await middleware.on_message(context, call_next)
+
+        assert result == "done"
+        assert get_request_id() == http_uuid
+    finally:
+        reset_request_id(token)
 
 
 @pytest.mark.asyncio

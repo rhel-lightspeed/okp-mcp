@@ -23,6 +23,10 @@ def _configure_logging(log_level: str) -> None:
         force=True,
     )
 
+    # httpx logs every HTTP request at INFO with the full URL-encoded query string.
+    # Our solr.py already logs query params in readable form, so this is redundant noise.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+
     request_id_filter = RequestIDLogFilter()
     root_logger = logging.getLogger()
     for handler in root_logger.handlers:
