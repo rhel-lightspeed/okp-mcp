@@ -2,7 +2,9 @@
 
 ## Overview
 
-During code freezes, we use release branches to stabilize staging while development continues on `main`. Bugfixes go to the release branch and are cherry-picked to `main`. New features go to `main` only.
+There is always an active release branch. This is what runs in staging (and eventually production). Development continues on `main`. Bugfixes and approved changes go to the release branch first, then get cherry-picked to `main`. New features go to `main` only.
+
+To cut a new release, either update the existing release branch or create a new one.
 
 ## Branch Naming
 
