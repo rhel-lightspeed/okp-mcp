@@ -25,13 +25,7 @@ git push origin release/YYYY-MM-DD
 
 ### 2. GitHub branch protection
 
-The repo-level ruleset "Minimum required Branch Protection" only covers `main`. For release branches, add a classic branch protection rule:
-
-1. Go to GitHub repo **Settings > Branches > Add classic branch protection rule**
-2. Branch name pattern: the specific branch name (e.g., `release/2026-04-01`)
-   - Wildcard patterns like `release/**` may trigger a "merge queue" warning that blocks creation; use the specific branch name instead
-3. Enable: Require pull request before merging
-4. Click **Create**
+A GitHub ruleset already protects all branches matching `release/**` with the same rules as `main` (require PR approval before merging, restrict deletions, block force pushes). No additional setup needed.
 
 ### 3. GitLab mirror
 
