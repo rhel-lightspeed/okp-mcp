@@ -61,14 +61,25 @@ class RequestIDContextMiddleware(Middleware):
                 reset_request_id(token)
 
     def _resolve_request_id(self, context: MiddlewareContext[Any]) -> str | None:
-        """Prefer FastMCP's request ID, then fall back to the HTTP layer."""
+        """Prefer HTTP-level correlation ID, then fall back to FastMCP's JSON-RPC id.
+
+        RequestIDHeaderMiddleware sets a UUID in the contextvar for each HTTP
+        request.  FastMCP's ``context.fastmcp_context.request_id`` is the
+        JSON-RPC message ``id`` (typically a sequential integer like 1, 2, 3)
+        which is useless for log correlation.  Keep the UUID when it exists;
+        fall back to the JSON-RPC id only for non-HTTP transports (e.g. stdio).
+        """
+        existing = get_request_id()
+        if existing is not None:
+            return existing
+
         if context.fastmcp_context is not None and context.fastmcp_context.request_context is not None:
             return context.fastmcp_context.request_id
 
         try:
             http_request = get_http_request()
         except RuntimeError:
-            return get_request_id()
+            return None
 
         return getattr(http_request.state, "request_id", None) or http_request.headers.get(REQUEST_ID_HEADER)
 
