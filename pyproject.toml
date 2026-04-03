@@ -22,7 +22,6 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
-    "pydantic-ai-slim[google,mcp]>=1.74.0,<2.0",
     "pytest>=9.0.2",
     "pytest-asyncio>=1.3.0",
     "pytest-cov>=7.1.0",
@@ -39,14 +38,9 @@ dev = [
 asyncio_mode = "auto"
 testpaths = ["tests"]
 markers = [
-    "functional: end-to-end tests requiring live Solr and Vertex AI credentials",
+    "functional: document retrieval tests requiring live Solr (podman-compose up -d)",
 ]
-functional_max_input_tokens = "40000"
-filterwarnings = [
-    # Upstream google-genai bug: types.py uses _UnionGenericAlias (deprecated in 3.14).
-    # https://github.com/googleapis/python-genai/issues/1233
-    "ignore:'_UnionGenericAlias' is deprecated:DeprecationWarning:google.genai.types",
-]
+
 
 [tool.ruff]
 target-version = "py312"

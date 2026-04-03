@@ -204,6 +204,78 @@ class TestDetectSpiceIntent:
         assert _get_rule("spice").matches(query) is False
 
 
+class TestDetectContainerCompatIntent:
+    """Verify container compatibility intent detection.
+
+    Container + RHEL queries need container support policy boosts, not
+    generic container docs.  See functional test RSPEED_2482.
+    """
+
+    @pytest.mark.parametrize(
+        "query",
+        [
+            "can I run a RHEL 6 container on RHEL 9",
+            "RHEL container compatibility matrix",
+            "which containers are supported on RHEL 8",
+        ],
+        ids=["container-rhel-version", "container-compat", "containers-supported"],
+    )
+    def test_positive(self, query: str):
+        """Queries about containers on RHEL trigger container_compat intent."""
+        assert _get_rule("container_compat").matches(query) is True
+
+    @pytest.mark.parametrize(
+        "query",
+        [
+            "how to build a container image",
+            "podman container runtime",
+            "deploy RHEL virtual machine",
+            "",
+        ],
+        ids=["build-no-rhel", "podman-no-rhel", "vm-no-container", "empty"],
+    )
+    def test_negative(self, query: str):
+        """Queries without both container and RHEL do not trigger."""
+        assert _get_rule("container_compat").matches(query) is False
+
+
+class TestDetectProgrammingLanguageIntent:
+    """Verify programming language intent detection.
+
+    Python/Ruby/etc. queries need Application Streams boosts so the
+    dynamic programming languages doc surfaces over unrelated deprecation
+    content.  See functional test RSPEED_2294.
+    """
+
+    @pytest.mark.parametrize(
+        "query",
+        [
+            "what is the current version of python for RHEL 10",
+            "install ruby on RHEL 9",
+            "php version available in RHEL",
+            "perl modules for enterprise linux",
+        ],
+        ids=["python-rhel10", "ruby-rhel9", "php-rhel", "perl-el"],
+    )
+    def test_positive(self, query: str):
+        """Queries mentioning a programming language trigger the intent."""
+        assert _get_rule("programming_language").matches(query) is True
+
+    @pytest.mark.parametrize(
+        "query",
+        [
+            "install nodejs on RHEL",
+            "java application server",
+            "configure firewall rhel 9",
+            "",
+        ],
+        ids=["nodejs-excluded", "java-excluded", "no-language", "empty"],
+    )
+    def test_negative(self, query: str):
+        """Queries without a matched language keyword do not trigger."""
+        assert _get_rule("programming_language").matches(query) is False
+
+
 # ---------------------------------------------------------------------------
 # Main query builder
 # ---------------------------------------------------------------------------

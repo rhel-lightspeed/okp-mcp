@@ -1,179 +1,114 @@
-"""Functional tests for the OKP MCP server using Pydantic AI and Vertex AI Gemini."""
+"""Functional tests for document retrieval quality against live Solr.
 
-import os
-from pathlib import Path
+Tests call ``_run_portal_search()`` directly against a running Solr instance
+(default: localhost:8983) and assert on document identity, position, and chunk
+content.  No LLM is involved; assertions are fully deterministic.
+
+Run with::
+
+    uv run pytest -m functional -v
+
+Requires: OKP Solr container running (``podman-compose up -d``)
+"""
 
 import httpx
 import pytest
-from dotenv import dotenv_values, load_dotenv
 from functional_cases import FUNCTIONAL_TEST_CASES, FunctionalCase
-from pydantic_ai import Agent, capture_run_messages
-from pydantic_ai.mcp import MCPServerStdio
-from pydantic_ai.messages import ModelRequest, ModelResponse, ToolCallPart, ToolReturnPart
-from pydantic_ai.models.google import GoogleModel
-from pydantic_ai.providers.google import GoogleProvider
 
-_VERTEX_REGION = "us-central1"
+from okp_mcp.config import ServerConfig
+from okp_mcp.portal import PortalChunk, _run_portal_search
 
-_ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
-_DOTENV = dotenv_values(_ENV_PATH)
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 
-def _model_name() -> str:
-    """Return the Gemini model name from .env, defaulting to gemini-2.5-flash."""
-    return _DOTENV.get("OKP_FUNCTIONAL_MODEL") or "gemini-2.5-flash"
+def _chunk_identifiers(chunk: PortalChunk) -> str:
+    """Concatenate identifying fields of a single chunk for substring matching."""
+    return " ".join(filter(None, [chunk.doc_id, chunk.parent_id, chunk.title, chunk.online_source_url])).lower()
 
 
-pytestmark = pytest.mark.functional
-
-_FIXTURES_DIR = Path(__file__).parent / "fixtures"
-SYSTEM_PROMPT = (_FIXTURES_DIR / "functional_system_prompt.txt").read_text(encoding="utf-8")
-
-
-@pytest.fixture(scope="module", autouse=True)
-def _require_functional_stack() -> None:
-    """Skip all tests in this module if .env credentials or Solr are unavailable."""
-    if not _DOTENV:
-        pytest.skip(".env file not found or empty — cp .env.example .env and fill in values")
-    creds_path = _DOTENV.get("GOOGLE_APPLICATION_CREDENTIALS")
-    if not creds_path:
-        pytest.skip("GOOGLE_APPLICATION_CREDENTIALS not set in .env — see .env.example")
-    creds = Path(creds_path).expanduser()
-    if not creds.is_absolute():
-        creds = (_ENV_PATH.parent / creds).resolve()
-    if not creds.exists():
-        pytest.skip(f"Credentials file not found: {creds} — check GOOGLE_APPLICATION_CREDENTIALS in .env")
-    if not _DOTENV.get("GOOGLE_CLOUD_PROJECT"):
-        pytest.skip("GOOGLE_CLOUD_PROJECT not set in .env — see .env.example")
-    load_dotenv(_ENV_PATH, override=True)
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(creds)
-    try:
-        with httpx.Client(timeout=5) as client:
-            resp = client.get("http://localhost:8983/solr/portal/admin/ping")
-            if resp.status_code != 200:
-                pytest.skip("SOLR not responding at http://localhost:8983 - run: podman-compose up -d")
-    except httpx.RequestError:
-        pytest.skip("SOLR not reachable at http://localhost:8983 - run: podman-compose up -d")
+def _all_identifiers(chunks: list[PortalChunk]) -> str:
+    """Concatenate all identifying fields across all chunks."""
+    return " ".join(_chunk_identifiers(c) for c in chunks)
 
 
-def _extract_tool_calls(messages: list) -> list[tuple[str, object]]:
-    """Return (tool_name, args) pairs for every MCP tool call found in captured messages.
-
-    Tool calls appear as ToolCallPart objects inside ModelResponse.parts.
-    """
-    calls = []
-    for msg in messages:
-        if isinstance(msg, ModelResponse):
-            for part in msg.parts:
-                if isinstance(part, ToolCallPart):
-                    calls.append((part.tool_name, part.args))
-    return calls
+def _all_chunk_text(chunks: list[PortalChunk]) -> str:
+    """Concatenate all chunk text (lowercased) for content assertions."""
+    return " ".join(c.chunk for c in chunks).lower()
 
 
-def _extract_tool_returns(messages: list) -> list[str]:
-    """Return text content for every MCP tool return found in captured messages.
-
-    Tool returns appear as ToolReturnPart objects inside ModelRequest.parts.
-    Uses model_response_str() to safely convert multimodal content to plain text.
-    """
-    returns = []
-    for msg in messages:
-        if isinstance(msg, ModelRequest):
-            for part in msg.parts:
-                if isinstance(part, ToolReturnPart):
-                    returns.append(part.model_response_str())
-    return returns
+def _find_doc_position(chunks: list[PortalChunk], ref: str) -> int | None:
+    """Find 0-indexed position of first chunk matching a doc ref substring."""
+    ref_lower = ref.lower()
+    for i, chunk in enumerate(chunks):
+        if ref_lower in _chunk_identifiers(chunk):
+            return i
+    return None
 
 
-def _assert_doc_refs(case: FunctionalCase, tool_calls: list, tool_returns: list[str], response: str) -> None:
-    """Assert MCP tools were called and expected document references appear in results."""
-    if not case.expected_doc_refs:
-        return
-
-    assert len(tool_calls) >= 1, (
-        f"Expected at least one MCP tool call, got none.\nQuestion: {case.question}\nResponse: {response[:500]}"
-    )
-
-    all_content = " ".join(tool_returns) + " " + response
-    found_refs = [ref for ref in case.expected_doc_refs if ref.lower() in all_content.lower()]
-    assert len(found_refs) >= 1, (
-        f"None of {case.expected_doc_refs!r} found in tool returns or response.\n"
-        f"Question: {case.question}\nTool content (first 500): {all_content[:500]}"
-    )
+def _parent_ids(chunks: list[PortalChunk]) -> list[str]:
+    """Extract parent_id list for error messages."""
+    return [c.parent_id or "?" for c in chunks]
 
 
-def _assert_required_facts(case: FunctionalCase, response: str) -> None:
-    """Assert all required factual phrases appear in the response (case-insensitive)."""
-    for fact in case.required_facts:
-        if isinstance(fact, tuple):
-            assert any(alt.lower() in response.lower() for alt in fact), (
-                f"None of required alternatives {fact!r} found in response.\n"
-                f"Question: {case.question}\nResponse: {response[:1000]}"
+async def _portal_search(question: str, max_results: int = 7) -> tuple[list[PortalChunk], bool]:
+    """Run a portal search against the live Solr instance, skipping if unreachable."""
+    config = ServerConfig()
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        try:
+            return await _run_portal_search(
+                question, client=client, solr_endpoint=config.solr_endpoint, max_results=max_results
             )
-        else:
-            assert fact.lower() in response.lower(), (
-                f"Required fact {fact!r} missing from response.\nQuestion: {case.question}\nResponse: {response[:1000]}"
-            )
+        except (httpx.ConnectError, httpx.TimeoutException):
+            pytest.skip(f"Solr not reachable at {config.solr_url}")
+            raise  # unreachable, satisfies type checker
 
 
-def _assert_no_forbidden_claims(case: FunctionalCase, response: str) -> None:
-    """Assert no known-incorrect claims appear in the response (case-insensitive)."""
-    for claim in case.forbidden_claims:
-        assert claim.lower() not in response.lower(), (
-            f"Forbidden claim {claim!r} found in response (known-incorrect answer).\n"
-            f"Question: {case.question}\nResponse: {response[:1000]}"
+# ---------------------------------------------------------------------------
+# Tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.functional
+@pytest.mark.parametrize("case", FUNCTIONAL_TEST_CASES)
+async def test_search_retrieval(case: FunctionalCase) -> None:
+    """Verify a single portal search returns the right documents with key content.
+
+    Asserts on four dimensions of retrieval quality:
+
+    1. Document presence: at least one expected doc appears in results
+    2. Position: expected doc appears within top N (if specified)
+    3. Content: chunk text contains required facts
+    4. Result count: not more than max_result_count (if specified)
+    """
+    chunks, _ = await _portal_search(case.question)
+
+    assert chunks, f"No results for: {case.question}"
+
+    # 1. At least one expected doc must match
+    all_ids = _all_identifiers(chunks)
+    matched = [ref for ref in case.expected_docs if ref.lower() in all_ids]
+    assert matched, f"No expected docs found.\n  Expected (any of): {case.expected_docs}\n  Got: {_parent_ids(chunks)}"
+
+    # 2. Position check
+    if case.max_position is not None:
+        positions = [_find_doc_position(chunks, ref) for ref in case.expected_docs]
+        best = min((p for p in positions if p is not None), default=None)
+        assert best is not None and best < case.max_position, (
+            f"Expected doc not in top {case.max_position}.\n"
+            f"  Best position: {best}\n"
+            f"  Top results: {_parent_ids(chunks[: case.max_position])}"
         )
 
+    # 3. Content assertions
+    content = _all_chunk_text(chunks)
+    for fact in case.expected_content:
+        if isinstance(fact, tuple):
+            assert any(f.lower() in content for f in fact), f"None of alternatives found in chunk text: {fact}"
+        else:
+            assert fact.lower() in content, f"Expected content not found: '{fact}'"
 
-@pytest.mark.parametrize("case", FUNCTIONAL_TEST_CASES)
-async def test_cla_scenario(case: FunctionalCase, request: pytest.FixtureRequest, record_property) -> None:
-    """Verify Gemini correctly answers a known CLA incorrect-answer scenario.
-
-    Starts a fresh MCP server subprocess per test to avoid anyio cancel-scope
-    conflicts with pytest-asyncio fixture teardown. Each test:
-    1. Spawns the OKP MCP server via MCPServerStdio.
-    2. Sends the question to Vertex Gemini (model from OKP_FUNCTIONAL_MODEL
-       or gemini-2.5-flash) with temperature=0.
-    3. Asserts at least one MCP tool was called.
-    4. Asserts at least one expected document reference appears in tool results or response.
-    5. Asserts all required factual phrases appear in the response (case-insensitive).
-    6. Asserts no known-incorrect claims appear in the response (case-insensitive).
-    7. Asserts input tokens stay within the configured threshold.
-    """
-    server = MCPServerStdio("uv", args=["run", "okp-mcp", "--transport", "stdio"])
-
-    async with httpx.AsyncClient(timeout=httpx.Timeout(60.0)) as http_client:
-        provider = GoogleProvider(location=_VERTEX_REGION, http_client=http_client)
-        model = GoogleModel(_model_name(), provider=provider)
-        agent = Agent(model, toolsets=[server], instructions=SYSTEM_PROMPT)
-
-        async with server:
-            with capture_run_messages() as messages:
-                result = await agent.run(case.question, model_settings={"temperature": 0})
-    response: str = result.output
-
-    # Record token usage for the summary table (xdist-safe via report serialization).
-    usage = result.usage()  # type: ignore[union-attr]
-    input_tokens = usage.input_tokens or 0
-    record_property(
-        "token_usage",
-        {
-            "label": case.question[:40].replace("\n", " "),
-            "input_tokens": input_tokens,
-            "output_tokens": usage.output_tokens or 0,
-            "requests": usage.requests or 0,
-        },
-    )
-
-    tool_calls = _extract_tool_calls(messages)
-    tool_returns = _extract_tool_returns(messages)
-
-    _assert_doc_refs(case, tool_calls, tool_returns, response)
-    _assert_required_facts(case, response)
-    _assert_no_forbidden_claims(case, response)
-
-    # Fail if input tokens exceed the configured threshold.
-    max_tokens = int(request.config.getini("functional_max_input_tokens"))
-    assert input_tokens <= max_tokens, (
-        f"Input tokens ({input_tokens:,}) exceed threshold ({max_tokens:,}).\nQuestion: {case.question[:80]}"
-    )
+    # 4. Result count
+    if case.max_result_count is not None:
+        assert len(chunks) <= case.max_result_count, f"Too many results: {len(chunks)} > {case.max_result_count}"

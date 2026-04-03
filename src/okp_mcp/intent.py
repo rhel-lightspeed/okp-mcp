@@ -78,6 +78,10 @@ class IntentRule:
 #   - sap: SAP queries need system-roles/preconfigure boosts.  Must come
 #     before VM so "SAP HANA VM" gets SAP boosts.  See functional test
 #     sap_004.
+#   - container_compat: container + RHEL queries need container support policy
+#     and compatibility matrix boosts.  See functional test RSPEED_2482.
+#   - programming_language: Python/Ruby/etc. queries need Application Streams
+#     boosts.  See functional test RSPEED_2294.
 #   - ethtool: NIC driver debugging queries need msglvl highlight terms.
 #     See functional test RSPEED_2123.
 #   - vm: broadest intent, catches all VM/virtualization queries that didn't
@@ -161,6 +165,36 @@ INTENT_RULES: list[IntentRule] = [
             "sap_general_preconfigure sap_netweaver_preconfigure sap_hana_preconfigure "
             '"system roles" preconfigure "SAP Application Server"'
         ),
+    ),
+    # Container compatibility/support queries need boosts for the container
+    # support policy (article 2726611) and the RHEL container compatibility
+    # matrix.  Without this, "Can I run a RHEL 6 container on RHEL 9?"
+    # returns unrelated deprecation docs because the cleaned query "RHEL 6
+    # container RHEL 9" is too generic.  See functional test RSPEED_2482.
+    IntentRule(
+        name="container_compat",
+        pattern=r"\bcontainers?\b.*\brhel\b|\brhel\b.*\bcontainers?\b",
+        bq=(
+            'allTitle:("container support" OR "container compatibility" OR "compatibility matrix")^100 '
+            'title:("support policy" OR compatibility)^50 '
+            "main_content:(container AND host AND supported)^20"
+        ),
+        highlight_terms='"container support" "compatibility matrix" supported unsupported',
+    ),
+    # Programming language queries (Python, Ruby, etc.) need boosts for the
+    # Application Streams / dynamic programming languages documentation.
+    # Without this, "What is most current version of Python for RHEL 10?"
+    # gets drowned by JBoss EAP deprecation docs from the side query because
+    # "10" matches Java/JakartaEE content.  See functional test RSPEED_2294.
+    IntentRule(
+        name="programming_language",
+        pattern=r"\b(?:python|perl|ruby|php)\b",
+        bq=(
+            'allTitle:("dynamic programming languages" OR "Application Stream" OR "Application Streams")^50 '
+            'title:("installing and using" OR "programming languages")^30 '
+            'main_content:("Application Stream" OR "programming languages")^10'
+        ),
+        highlight_terms='"Application Stream" "programming languages" version',
     ),
     # ethtool / NIC driver queries need msglvl and message-level terms
     # injected into hl.q so Solr picks passages containing the actual

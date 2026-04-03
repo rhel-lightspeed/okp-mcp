@@ -41,38 +41,15 @@ pytest is configured with `asyncio_mode = "auto"` so async tests run without exp
 
 ### Functional Tests
 
-Functional tests use Pydantic AI + Vertex AI Gemini to verify MCP tools return correct answers for known-incorrect CLA scenarios (RSPEED Jira tickets). They spawn a real MCP server subprocess via `MCPServerStdio`, send questions through Gemini, and assert response quality.
+Functional tests verify document retrieval quality by calling `_run_portal_search()` directly against a live Solr instance. No LLM is involved; assertions target the structured `PortalChunk` objects (document identity, rank position, chunk text content). This makes tests fully deterministic: same Solr index produces identical results every run.
 
-```bash
-uv run pytest -m functional -v           # run functional tests (requires live Solr + Vertex AI)
-uv run pytest -m functional -k "2482"    # run a single case
-```
+Test scenarios live in `tests/functional_cases.py` as `FunctionalCase` dataclasses parametrized with `pytest.param`. Each case captures a known-incorrect CLA answer from a RSPEED Jira ticket: the question, expected documents, and expected chunk content.
 
-Functional tests are **deselected by default** via `pytest_collection_modifyitems` in `tests/conftest.py`. They only run when explicitly requested with `-m functional`. Credentials are loaded exclusively from `.env` via `python-dotenv` — bare environment variables are not sufficient.
-
-**Required** (in `.env`):
-- `GOOGLE_APPLICATION_CREDENTIALS`: path to service account JSON (e.g., `./secrets/your-sa.json`)
-- `GOOGLE_CLOUD_PROJECT`: GCP project ID
-
-**Optional** (in `.env`):
-- `OKP_FUNCTIONAL_MODEL`: Gemini model override (default: `gemini-2.5-flash`). Read exclusively from `.env`, not from environment variables.
+Functional tests are **deselected by default** via `pytest_collection_modifyitems` in `tests/conftest.py`. They only run when explicitly requested with `-m functional`. They require a running OKP Solr container (`podman-compose up -d`); tests skip automatically if Solr is unreachable.
 
 **Key files**:
-- `tests/test_functional.py`: test runner with MCPServerStdio + GoogleProvider
-- `tests/functional_cases.py`: `FunctionalCase` dataclass + parametrized test data
-- `tests/fixtures/functional_system_prompt.txt`: LLM system prompt adapted for this project's tools
-
-**Architecture notes**:
-- Each test spawns a fresh MCP server subprocess with `--transport stdio` (the project defaults to `streamable-http`, so this flag is critical)
-- Region is hardcoded to `us-central1`
-- `temperature=0` for reproducibility
-- Assertions check: tool call count, expected document references in tool returns/response, required facts (with tuple alternatives for "or" logic), forbidden claims, and per-test input token threshold
-- Token usage tracking uses `record_property("token_usage", ...)` so data flows through `report.user_properties` and works with pytest-xdist (each worker serializes properties to the controller). `pytest_runtest_logreport` in conftest.py aggregates entries; `pytest_terminal_summary` prints the table.
-- Per-test input token threshold is configurable via `functional_max_input_tokens` in `pyproject.toml` (default: 40000)
-- Tests skip gracefully when `.env` is missing, credentials are invalid, or Solr is unavailable
-- Tests are fully independent (each spawns its own MCP subprocess, HTTP client, and Gemini agent), so pass `-n 4` to run them in parallel via pytest-xdist
-
-**Workflow**: See `INCORRECT_ANSWER_LOOP.md` for the full process of turning RSPEED "incorrect answer" tickets into functional test cases and fixing the MCP server until all tests pass.
+- `tests/functional_cases.py`: `FunctionalCase` dataclass + parametrized RSPEED test data
+- `tests/test_functional.py`: test runner calling `_run_portal_search()` with structured assertions
 
 ## Project Layout
 
@@ -94,18 +71,15 @@ src/okp_mcp/
   content.py     # Boilerplate stripping, content truncation, text cleaning
   formatting.py  # Result annotation, deprecation/replacement detection, sort keys
 tests/
-  conftest.py          # shared fixtures (solr mocks, sample responses) + functional marker deselection + token usage aggregation hooks
+  conftest.py          # shared fixtures (solr mocks, sample responses) + functional marker deselection
   functional_cases.py  # FunctionalCase dataclass + parametrized RSPEED test data
-  test_functional.py   # Vertex AI functional tests (gated behind -m functional)
+  test_functional.py   # functional test runner: calls _run_portal_search() against live Solr, asserts on PortalChunk results
   test_portal.py       # portal.py unit tests: query builders, chunk conversion, RRF, formatting, orchestrator
   test_*.py            # unit test modules mirror src structure
-  fixtures/
-    functional_system_prompt.txt  # LLM system prompt for functional tests
 docs/
   SOLR_EXPLORATION.md     # Historical: original redhat-okp container schema map
 openshift/
   okp-mcp.yml   # OpenShift deployment template (Deployment, Service, ServiceAccount)
-INCORRECT_ANSWER_LOOP.md  # step-by-step workflow for turning RSPEED "incorrect answer" tickets into functional tests and fixes
 ```
 
 ## Where to Look

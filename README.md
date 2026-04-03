@@ -79,35 +79,7 @@ make test        # pytest with coverage
 
 ## Functional Tests
 
-Functional tests run real queries against a live Solr instance and Vertex AI Gemini to verify the MCP server returns accurate RHEL knowledge. They are gated behind the `functional` pytest marker and skipped by default. Scenarios are defined in `tests/functional_cases.py`.
-
-Prerequisites:
-
-- OKP Solr container running on `localhost:8983`
-- Google Cloud service account JSON with Vertex AI access
-- GCP project ID
-- (Optional) `OKP_FUNCTIONAL_MODEL` in `.env` to override the Gemini model (default: `gemini-2.5-flash`)
-
-Set up credentials:
-
-```bash
-cp .env.example .env
-# Edit .env with your real values
-```
-
-Run them:
-
-```bash
-uv run pytest -m functional -v
-```
-
-Add `-rs` to print why a test was skipped (missing creds, Solr not on `localhost:8983`):
-
-```bash
-uv run pytest -m functional -k sap_004 -v -rs
-```
-
-Credentials are loaded exclusively from `.env` — bare environment variables are not sufficient. The tests skip gracefully if `.env` is missing, credentials are invalid, or Solr is unavailable.
+Functional test scenarios are defined in `tests/functional_cases.py`. They are gated behind the `functional` pytest marker and deselected by default. Run them with `uv run pytest -m functional -v` (requires a running Solr instance).
 
 ## License
 
