@@ -60,7 +60,7 @@ src/okp_mcp/
   server.py      # FastMCP instance (single `mcp` object), AppContext, lifespan
   request_id.py  # Request ID context vars, FastMCP middleware, Starlette header middleware, logging filter
   intent.py      # Intent detection: IntentRule dataclass, INTENT_RULES registry, boost application
-  portal.py      # Unified portal search: query builders, chunk conversion, RRF, orchestrator, formatting
+  portal.py      # Unified portal search: query builders, chunk conversion, RRF, single/multi-query orchestrators, formatting
   tools/
     __init__.py  # package export surface, triggers tool module imports for registration
     search.py    # search_portal MCP tool
@@ -74,7 +74,7 @@ tests/
   conftest.py          # shared fixtures (solr mocks, sample responses) + functional marker deselection
   functional_cases.py  # FunctionalCase dataclass + parametrized RSPEED test data
   test_functional.py   # functional test runner: calls _run_portal_search() against live Solr, asserts on PortalChunk results
-  test_portal.py       # portal.py unit tests: query builders, chunk conversion, RRF, formatting, orchestrator
+  test_portal.py       # portal.py unit tests: query builders, chunk conversion, RRF, formatting, single/multi-query orchestrators
   test_*.py            # unit test modules mirror src structure
 docs/
   SOLR_EXPLORATION.md     # Historical: original redhat-okp container schema map
@@ -89,7 +89,7 @@ openshift/
 | Add a new MCP tool | `src/okp_mcp/tools/` | Add `@mcp.tool` async function in the relevant module and re-export it from `tools/__init__.py` |
 | Change request ID propagation or response headers | `src/okp_mcp/request_id.py`, `src/okp_mcp/__init__.py`, `src/okp_mcp/server.py` | `RequestIDContextMiddleware` mirrors FastMCP request IDs into logs, `RequestIDHeaderMiddleware` adds `X-Request-ID` to HTTP/SSE responses |
 | Add/modify intent detection | `src/okp_mcp/intent.py` | Append `IntentRule` to `INTENT_RULES` at the correct priority position |
-| Change portal search logic | `src/okp_mcp/portal.py` | Query builders, chunk conversion, RRF fusion, orchestrator, formatting |
+| Change portal search logic | `src/okp_mcp/portal.py` | Query builders, chunk conversion, RRF fusion, single/multi-query orchestrators, formatting |
 | Change Solr query logic | `src/okp_mcp/solr.py` | `_solr_query()` builds edismax params; `_clean_query()` for tokenization |
 | Modify result formatting | `src/okp_mcp/formatting.py` | `_annotate_result()` for deprecation/EOL (used by portal.py) |
 | Change content cleaning | `src/okp_mcp/content.py` | `strip_boilerplate()` regex, `truncate_content()` |

@@ -5,16 +5,48 @@ import logging
 import httpx
 from fastmcp import Context
 
-from ..portal import _format_portal_results, _run_portal_search
+from ..portal import _MAX_QUERIES, _format_portal_results, _run_multi_query_search, _run_portal_search
 from ..server import get_app_context, mcp
 
 logger = logging.getLogger("okp_mcp.tools.search_portal")
 
 
+def _normalize_queries(query: str | list[str]) -> list[str] | str:
+    """Validate and normalize the query parameter into a clean list of unique strings.
+
+    Returns a list of stripped, deduplicated query strings on success, or a
+    user-facing error string on validation failure.  The caller can
+    ``isinstance``-check the return to distinguish the two cases.
+    """
+    # Validate types.
+    if isinstance(query, str):
+        raw = [query]
+    elif isinstance(query, list):
+        bad = [repr(q) for q in query if not isinstance(q, str)]
+        if bad:
+            return f"All query entries must be strings, got non-string items: {', '.join(bad)}"
+        raw = query
+    else:
+        return f"query must be a string or list of strings, got {type(query).__name__}"
+
+    # Strip whitespace, drop empty entries, and dedupe (preserving order)
+    # so identical normalized queries don't inflate RRF votes or waste
+    # Solr round-trips.
+    seen: set[str] = set()
+    cleaned: list[str] = []
+    for q in raw:
+        stripped = q.strip()
+        if stripped and stripped not in seen:
+            seen.add(stripped)
+            cleaned.append(stripped)
+
+    return cleaned if cleaned else "Please provide a search query."
+
+
 @mcp.tool
 async def search_portal(
     ctx: Context,
-    query: str,
+    query: str | list[str],
     # Reduced from 10 to 7 to lower token overhead per search call.
     # 7 results consistently provide enough coverage for the LLM to
     # answer correctly across all functional test scenarios (RSPEED_2480,
@@ -31,6 +63,22 @@ async def search_portal(
     Linux concepts (e.g. vi commands, systemd units, common CLI tools) you may
     answer directly without searching.
 
+    Query format: pass a single search string, or a list of up to 3 query
+    reformulations for better coverage.  When multiple queries are provided,
+    results are merged via reciprocal rank fusion so documents matching
+    across multiple phrasings rank higher.
+
+    Multi-query tips:
+    - Keep product names and version numbers in every query; never strip
+      context to make a query "broader" (e.g. do not reduce "RHEL 8
+      container on RHEL 9" to just "container deprecation").
+    - Vary the search angle, not the specificity: rephrase using
+      RHEL-specific terminology, try official document titles, or use
+      different keywords for the same concept.
+    - Include the user's original phrasing as one of the queries.
+    - For exact lookups (CVE IDs, KB numbers, erratum names), a single
+      query is sufficient.
+
     IMPORTANT - interpreting results:
     - Results marked 'Applicability: RHV only' apply to Red Hat Virtualization,
       NOT to standard RHEL KVM. Do not recommend RHV-only workarounds as the
@@ -41,25 +89,43 @@ async def search_portal(
     - When results list specific releases or dates (e.g. EUS availability per
       minor release), enumerate every release explicitly in your answer.
     """
-    if not query or not query.strip():
-        return "Please provide a search query."
+    normalized = _normalize_queries(query)
+    if isinstance(normalized, str):
+        return normalized  # validation error message
+    # Cap at _MAX_QUERIES to bound Solr load (research shows diminishing
+    # returns past 3 queries).
+    queries = normalized[:_MAX_QUERIES]
+
     max_results = max(1, min(max_results, 20))
-    logger.info("search_portal: query=%r max_results=%d", query, max_results)
+    logger.info("search_portal: queries=%r max_results=%d", queries, max_results)
+
     try:
         app = get_app_context(ctx)
-        chunks, has_deprecation = await _run_portal_search(
-            query,
-            client=app.http_client,
-            solr_endpoint=app.solr_endpoint,
-            max_results=max_results,
-        )
-        return _format_portal_results(chunks, has_deprecation, query, app.max_response_chars)
+
+        if len(queries) == 1:
+            # Single-query fast path: no behavioral change from before.
+            chunks, has_deprecation = await _run_portal_search(
+                queries[0],
+                client=app.http_client,
+                solr_endpoint=app.solr_endpoint,
+                max_results=max_results,
+            )
+        else:
+            chunks, has_deprecation = await _run_multi_query_search(
+                queries,
+                client=app.http_client,
+                solr_endpoint=app.solr_endpoint,
+                max_results=max_results,
+            )
+
+        # Use the first query for the "No results" message and budget selection.
+        return _format_portal_results(chunks, has_deprecation, queries[0], app.max_response_chars)
     except httpx.TimeoutException:
-        logger.warning("Search timed out for query: %r", query, exc_info=True)
+        logger.warning("Search timed out for queries: %r", queries, exc_info=True)
         return "The search timed out. Please try again with a simpler query."
     except httpx.HTTPError:
-        logger.exception("Search failed for query: %r", query)
+        logger.exception("Search failed for queries: %r", queries)
         return "The knowledge base search is temporarily unavailable. Please try again shortly."
     except ValueError:
-        logger.exception("Search failed for query: %r", query)
+        logger.exception("Search failed for queries: %r", queries)
         return "The knowledge base search returned an unexpected response. Please try again."
