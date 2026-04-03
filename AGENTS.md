@@ -41,14 +41,15 @@ pytest is configured with `asyncio_mode = "auto"` so async tests run without exp
 
 ### Functional Tests
 
-Functional test scenarios live in `tests/functional_cases.py` as `FunctionalCase` dataclasses parametrized with `pytest.param`. Each case captures a known-incorrect CLA answer from a RSPEED Jira ticket: the question, expected Solr document references, required facts, and forbidden claims.
+Functional tests verify document retrieval quality by calling `_run_portal_search()` directly against a live Solr instance. No LLM is involved; assertions target the structured `PortalChunk` objects (document identity, rank position, chunk text content). This makes tests fully deterministic: same Solr index produces identical results every run.
 
-The test runner is being replaced. The cases file and `functional` pytest marker are stable; only the runner and its dependencies are changing.
+Test scenarios live in `tests/functional_cases.py` as `FunctionalCase` dataclasses parametrized with `pytest.param`. Each case captures a known-incorrect CLA answer from a RSPEED Jira ticket: the question, expected documents, and expected chunk content.
 
-Functional tests are **deselected by default** via `pytest_collection_modifyitems` in `tests/conftest.py`. They only run when explicitly requested with `-m functional`.
+Functional tests are **deselected by default** via `pytest_collection_modifyitems` in `tests/conftest.py`. They only run when explicitly requested with `-m functional`. They require a running OKP Solr container (`podman-compose up -d`); tests skip automatically if Solr is unreachable.
 
 **Key files**:
 - `tests/functional_cases.py`: `FunctionalCase` dataclass + parametrized RSPEED test data
+- `tests/test_functional.py`: test runner calling `_run_portal_search()` with structured assertions
 
 ## Project Layout
 
@@ -72,6 +73,7 @@ src/okp_mcp/
 tests/
   conftest.py          # shared fixtures (solr mocks, sample responses) + functional marker deselection
   functional_cases.py  # FunctionalCase dataclass + parametrized RSPEED test data
+  test_functional.py   # functional test runner: calls _run_portal_search() against live Solr, asserts on PortalChunk results
   test_portal.py       # portal.py unit tests: query builders, chunk conversion, RRF, formatting, orchestrator
   test_*.py            # unit test modules mirror src structure
 docs/

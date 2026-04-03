@@ -38,7 +38,7 @@ dev = [
 asyncio_mode = "auto"
 testpaths = ["tests"]
 markers = [
-    "functional: end-to-end tests requiring live Solr and Vertex AI credentials",
+    "functional: document retrieval tests requiring live Solr (podman-compose up -d)",
 ]
 
 
