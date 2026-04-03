@@ -5,7 +5,6 @@ from typing import Literal
 
 from pydantic import Field, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from stop_words import get_stop_words
 
 # Configure logging
 logging.basicConfig(
@@ -14,7 +13,75 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-STOP_WORDS: frozenset[str] = frozenset(get_stop_words("en"))
+# English stopwords stripped client-side before sending queries to Solr.
+# The core set is Lucene's StopAnalyzer list, shipped with Solr as
+# lang/stopwords_en.txt (Apache License 2.0).  Common question words and
+# function words are added because LLM-generated queries frequently start
+# with "How do I...", "What is...", "Can I...", etc.
+#
+# We strip these client-side because the Solr deployment's text_general
+# field type references an empty stopwords.txt, so StopFilterFactory is
+# effectively a no-op for most queried fields (title, main_content,
+# heading_h1/h2, content, portal_synopsis, allTitle).  Only
+# text_en_splitting_tight (all_content) uses the real Lucene list.
+STOP_WORDS: frozenset[str] = frozenset(
+    {
+        # Lucene StopAnalyzer core (lang/stopwords_en.txt)
+        "a",
+        "an",
+        "and",
+        "are",
+        "as",
+        "at",
+        "be",
+        "but",
+        "by",
+        "for",
+        "if",
+        "in",
+        "into",
+        "is",
+        "it",
+        "no",
+        "not",
+        "of",
+        "on",
+        "or",
+        "such",
+        "that",
+        "the",
+        "their",
+        "then",
+        "there",
+        "these",
+        "they",
+        "this",
+        "to",
+        "was",
+        "will",
+        "with",
+        # Common question and function words (frequent in LLM queries)
+        "can",
+        "could",
+        "do",
+        "does",
+        "has",
+        "have",
+        "how",
+        "i",
+        "long",
+        "may",
+        "should",
+        "using",
+        "what",
+        "when",
+        "where",
+        "which",
+        "who",
+        "why",
+        "would",
+    }
+)
 
 
 class ServerConfig(BaseSettings):

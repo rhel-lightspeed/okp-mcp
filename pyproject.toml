@@ -10,7 +10,6 @@ dependencies = [
     "httpx",
     "pydantic-settings>=2.13.1",
     "rank-bm25",
-    "stop-words>=2025.11.4",
 ]
 
 [project.scripts]
