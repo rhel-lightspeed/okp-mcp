@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      statuses: write
     if: >-
       github.event.workflow_run.conclusion == 'success'
       && (
@@ -21,6 +22,17 @@ jobs:
         )
       )
     steps:
+      - name: Set pending commit status
+        if: github.event.workflow_run.event == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/${{ github.repository }}/statuses/${{ github.event.workflow_run.head_sha }} \
+            -f state=pending \
+            -f context="Functional Tests" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            -f description="Functional tests in progress..."
+
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
@@ -76,3 +88,44 @@ jobs:
       - name: Dump Solr logs on failure
         if: failure()
         run: docker logs redhat-okp
+
+      - name: Report success
+        if: success() && github.event.workflow_run.event == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/${{ github.repository }}/statuses/${{ github.event.workflow_run.head_sha }} \
+            -f state=success \
+            -f context="Functional Tests" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            -f description="Functional tests passed"
+
+      - name: Report failure
+        if: failure() && github.event.workflow_run.event == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/${{ github.repository }}/statuses/${{ github.event.workflow_run.head_sha }} \
+            -f state=failure \
+            -f context="Functional Tests" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            -f description="Functional tests failed"
+
+  # When CI/CD fails, report that functional tests were skipped so the
+  # commit status doesn't stay "pending" forever (or missing entirely).
+  skip-report:
+    runs-on: ubuntu-latest
+    permissions:
+      statuses: write
+    if: >-
+      github.event.workflow_run.event == 'pull_request'
+      && github.event.workflow_run.conclusion != 'success'
+    steps:
+      - name: Report skipped
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/${{ github.repository }}/statuses/${{ github.event.workflow_run.head_sha }} \
+            -f state=failure \
+            -f context="Functional Tests" \
+            -f description="Skipped: CI/CD did not pass"
