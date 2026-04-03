@@ -1287,6 +1287,54 @@ class TestExtractFacetCounts:
         # The trailing "solution" without a count is safely skipped
         assert result == {"documentKind": {"Cve": 10}}
 
+    def test_non_dict_facet_counts_returns_empty(self):
+        """Non-dict facet_counts value is treated as missing."""
+        result = _extract_facet_counts({"facet_counts": "unexpected"})
+        assert result == {}
+
+    def test_non_dict_facet_fields_returns_empty(self):
+        """Non-dict facet_fields value is treated as missing."""
+        result = _extract_facet_counts({"facet_counts": {"facet_fields": "bad"}})
+        assert result == {}
+
+    def test_non_list_pairs_skipped(self):
+        """Non-list facet pairs for a field are silently skipped."""
+        response = {
+            "facet_counts": {
+                "facet_fields": {
+                    "documentKind": "not_a_list",
+                    "product": ["RHEL", 10],
+                }
+            }
+        }
+        result = _extract_facet_counts(response)
+        assert "documentKind" not in result
+        assert result == {"product": {"RHEL": 10}}
+
+    def test_non_string_value_skipped(self):
+        """Non-string facet values within pairs are skipped."""
+        response = {
+            "facet_counts": {
+                "facet_fields": {
+                    "documentKind": [123, 10, "solution", 5],
+                }
+            }
+        }
+        result = _extract_facet_counts(response)
+        assert result == {"documentKind": {"solution": 5}}
+
+    def test_non_int_count_skipped(self):
+        """Non-integer count values within pairs are skipped."""
+        response = {
+            "facet_counts": {
+                "facet_fields": {
+                    "documentKind": ["Cve", "not_a_count", "solution", 5],
+                }
+            }
+        }
+        result = _extract_facet_counts(response)
+        assert result == {"documentKind": {"solution": 5}}
+
 
 # ---------------------------------------------------------------------------
 # Facet summary formatting
@@ -1334,6 +1382,12 @@ class TestFormatFacetSummary:
         """Empty facets dict returns empty string."""
         result = _format_facet_summary({})
         assert result == ""
+
+    def test_aliased_kinds_collapsed_into_single_label(self):
+        """Aliased kinds that share a label are aggregated into one entry."""
+        facets = {"documentKind": {"documentation": 5, "access-drupal10-node-type-page": 3, "Cve": 10}}
+        result = _format_facet_summary(facets)
+        assert result == "Result distribution: 10 CVE, 8 Documentation"
 
     def test_kind_facet_labels_cover_kind_labels(self):
         """_KIND_FACET_LABELS covers all keys in _KIND_LABELS for consistency."""

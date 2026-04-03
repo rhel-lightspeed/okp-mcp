@@ -42,6 +42,21 @@ class PortalChunk:
 # ---------------------------------------------------------------------------
 
 
+def _parse_facet_pairs(pairs: list | tuple) -> dict[str, int]:
+    """Convert a Solr alternating ``[value, count, ...]`` list into a dict.
+
+    Skips malformed entries where the value is not a string or the count is
+    not an int, and drops zero-count entries.  Handles odd-length lists
+    gracefully by ignoring a trailing orphan element.
+    """
+    counts: dict[str, int] = {}
+    for i in range(0, len(pairs) - 1, 2):
+        value, count = pairs[i], pairs[i + 1]
+        if isinstance(value, str) and isinstance(count, int) and count > 0:
+            counts[value] = count
+    return counts
+
+
 def _extract_facet_counts(solr_response: dict) -> dict[str, dict[str, int]]:
     """Extract facet field counts from a Solr response.
 
@@ -51,18 +66,20 @@ def _extract_facet_counts(solr_response: dict) -> dict[str, dict[str, int]]:
     with actual results.
 
     Returns an empty dict when the response has no ``facet_counts`` key
-    (e.g. in unit tests with minimal mock responses).
+    (e.g. in unit tests with minimal mock responses) or when the payload
+    contains unexpected types.
     """
-    facet_fields = solr_response.get("facet_counts", {}).get("facet_fields", {})
+    facet_counts = solr_response.get("facet_counts")
+    if not isinstance(facet_counts, dict):
+        return {}
+    facet_fields = facet_counts.get("facet_fields", {})
+    if not isinstance(facet_fields, dict):
+        return {}
     result: dict[str, dict[str, int]] = {}
     for field_name, pairs in facet_fields.items():
-        counts: dict[str, int] = {}
-        # Solr facet lists are always even-length ([value, count, ...]),
-        # but guard against a malformed trailing element to avoid IndexError.
-        for i in range(0, len(pairs) - 1, 2):
-            value, count = pairs[i], pairs[i + 1]
-            if count > 0:
-                counts[value] = count
+        if not isinstance(field_name, str) or not isinstance(pairs, (list, tuple)):
+            continue
+        counts = _parse_facet_pairs(pairs)
         if counts:
             result[field_name] = counts
     return result
@@ -683,10 +700,14 @@ def _format_facet_summary(facets: dict[str, dict[str, int]]) -> str:
     kind_counts = facets.get("documentKind", {})
     if not kind_counts:
         return ""
-    parts: list[str] = []
-    for kind, count in sorted(kind_counts.items(), key=lambda x: x[1], reverse=True):
+    # Aggregate by rendered label so aliased kinds (e.g. "documentation" and
+    # "access-drupal10-node-type-page" both mapping to "Documentation") are
+    # combined into a single entry.
+    label_counts: dict[str, int] = {}
+    for kind, count in kind_counts.items():
         label = _KIND_FACET_LABELS.get(kind, kind)
-        parts.append(f"{count} {label}")
+        label_counts[label] = label_counts.get(label, 0) + count
+    parts = [f"{count} {label}" for label, count in sorted(label_counts.items(), key=lambda x: x[1], reverse=True)]
     return "Result distribution: " + ", ".join(parts)
 
 
