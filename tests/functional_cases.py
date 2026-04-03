@@ -388,4 +388,21 @@ FUNCTIONAL_TEST_CASES = [
         ),
         id="RSPEED_2794",
     ),
+    # Verified against live Solr 2026-04-03: PASS
+    pytest.param(
+        FunctionalCase(
+            question="How to mount a kerberos CIFS share at boot time using a keytab?",
+            expected_docs=[
+                "6113681",
+                "262553",
+                "cifs",
+            ],
+            expected_content=[
+                ("sec=krb5", "krb5"),
+                "keytab",
+                ("fstab", "boot"),
+            ],
+        ),
+        id="RSPEED_1902",
+    ),
 ]
