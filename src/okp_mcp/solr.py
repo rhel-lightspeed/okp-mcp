@@ -57,6 +57,18 @@ def _is_numeric(token: str) -> bool:
     return bool(re.fullmatch(r"\d+(?:\.\d+)*", _normalize_query_token(token)))
 
 
+# Patterns for user-environment tokens that add noise to Solr queries.
+# IPv4 addresses (with optional CIDR) and common Linux NIC names carry
+# configuration-specific details that don't help find relevant docs.
+_IP_CIDR_RE = re.compile(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?:/\d{1,2})?$")
+_NIC_NAME_RE = re.compile(r"^(?:ens|enp|eth|em)\d", re.IGNORECASE)
+
+
+def _is_network_noise(token: str) -> bool:
+    """Return True for IP addresses, CIDR blocks, and NIC interface names."""
+    return bool(_IP_CIDR_RE.match(token) or _NIC_NAME_RE.match(token))
+
+
 def _clean_query(query: str) -> str:
     """Strip English stopwords and quote hyphenated compounds for SOLR relevance.
 
@@ -77,6 +89,11 @@ def _clean_query(query: str) -> str:
         # single-char wildcard, . triggers fuzzy proximity, etc.)
         stripped = t.rstrip(_TERM_TRIM_CHARS)
         if not stripped:
+            continue
+        # Drop IP addresses, CIDR blocks, and NIC names (e.g. 192.168.1.1/24,
+        # ens3) that carry user-specific configuration detail but don't help
+        # Solr find relevant documentation.
+        if _is_network_noise(stripped):
             continue
         if _is_numeric(stripped) or stripped.lower() not in STOP_WORDS:
             parts.append(stripped)
@@ -145,9 +162,13 @@ async def _solr_query(params: dict, client: httpx.AsyncClient | None = None, *, 
         # BM25 pivot: documents around 200 characters get neutral length treatment;
         # shorter docs score slightly higher, longer ones slightly lower.
         "hl.score.pivot": "200",
-        # Minimum match: for 1-2 terms all must match; for 5+ terms at least 75% must match.
-        # Keeps short queries precise while allowing longer queries some flexibility.
-        "mm": "2<-1 5<75%",
+        # Minimum match: for 1-2 terms all must match; for 5+ terms at least
+        # 75% must match; for 10+ terms relax to 50%.  Long queries (e.g.
+        # user-pasted commands with IP addresses and interface names) carry
+        # many environment-specific tokens that won't appear in any doc.
+        # Without the 10<50% clause, mm=75% on a 15-token query requires 12
+        # matches, which no bonding/LACP solution doc can satisfy.
+        "mm": "2<-1 5<75% 10<50%",
     }
     base_params.update(params)
     logger.info("SOLR query: q=%r, fq=%r", params.get("q"), params.get("fq"))
