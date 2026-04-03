@@ -754,7 +754,6 @@ dependencies = [
     { name = "httpx" },
     { name = "pydantic-settings" },
     { name = "rank-bm25" },
-    { name = "stop-words" },
 ]
 
 [package.dev-dependencies]
@@ -777,7 +776,6 @@ requires-dist = [
     { name = "httpx" },
     { name = "pydantic-settings", specifier = ">=2.13.1" },
     { name = "rank-bm25" },
-    { name = "stop-words", specifier = ">=2025.11.4" },
 ]
 
 [package.metadata.requires-dev]
@@ -1425,15 +1423,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/81/69/17425771797c36cded50b7fe44e850315d039f28b15901ab44839e70b593/starlette-1.0.0.tar.gz", hash = "sha256:6a4beaf1f81bb472fd19ea9b918b50dc3a77a6f2e190a12954b25e6ed5eea149", size = 2655289, upload-time = "2026-03-22T18:29:46.779Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/0b/c9/584bc9651441b4ba60cc4d557d8a547b5aff901af35bda3a4ee30c819b82/starlette-1.0.0-py3-none-any.whl", hash = "sha256:d3ec55e0bb321692d275455ddfd3df75fff145d009685eb40dc91fc66b03d38b", size = 72651, upload-time = "2026-03-22T18:29:45.111Z" },
-]
-
-[[package]]
-name = "stop-words"
-version = "2025.11.4"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/b7/cb/27ee3d3e0b7b1169269e83331c075b2dd3c4bcc1a005821174c32a273dc4/stop_words-2025.11.4.tar.gz", hash = "sha256:0459072b54b11e43a6fb4c5b05bda87d2accfc4f14c1697974f3739af0f7b43d", size = 68622, upload-time = "2025-11-03T21:07:42.359Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/fc/f5/992d668d21590ed39c6a9d1c62220e9b4b086a165e15fcb7580764cc7ceb/stop_words-2025.11.4-py3-none-any.whl", hash = "sha256:b3fc0722e42b722a9350aad59a8ba5850085a5b45a4ba9de390b4f5c4b86df25", size = 59496, upload-time = "2025-11-03T21:07:41.14Z" },
 ]
 
 [[package]]

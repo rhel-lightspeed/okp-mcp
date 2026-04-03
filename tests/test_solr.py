@@ -141,7 +141,7 @@ async def test_solr_query_respx_regression_guard(solr_mock, sample_solr_response
         ("the and ?", "the and ?"),
         ("", ""),
         ('"exact phrase" kernel', '"exact phrase" kernel'),
-        ("Can I run a RHEL 6 container on RHEL 9?", "RHEL 6 container RHEL 9"),
+        ("Can I run a RHEL 6 container on RHEL 9?", "run RHEL 6 container RHEL 9"),
         ("What version! of RHEL?", "version RHEL"),
         ('"RHEL 9?" support', '"RHEL 9?" support'),
         ("bond ip 192.168.1.1/24 gateway 10.0.0.1", "bond ip gateway"),
