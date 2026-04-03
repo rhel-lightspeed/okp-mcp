@@ -82,6 +82,9 @@ class IntentRule:
 #     and compatibility matrix boosts.  See functional test RSPEED_2482.
 #   - programming_language: Python/Ruby/etc. queries need Application Streams
 #     boosts.  See functional test RSPEED_2294.
+#   - gfs2: GFS2/Resilient Storage queries need removal/discontinuation boosts.
+#     Without them, "Is GFS2 available in RHEL 10?" returns generic "Is X
+#     available?" solutions.  See functional test RSPEED_2794.
 #   - ethtool: NIC driver debugging queries need msglvl highlight terms.
 #     See functional test RSPEED_2123.
 #   - vm: broadest intent, catches all VM/virtualization queries that didn't
@@ -195,6 +198,23 @@ INTENT_RULES: list[IntentRule] = [
             'main_content:("Application Stream" OR "programming languages")^10'
         ),
         highlight_terms='"Application Stream" "programming languages" version',
+    ),
+    # GFS2 / Resilient Storage queries need boosts for removal/discontinuation
+    # docs.  Without this, "Is GFS2 available in RHEL 10?" returns generic
+    # "Is X available in RHEL 10?" solutions because "available" + "RHEL" +
+    # "10" match many solution titles strongly, drowning out the specific
+    # GFS2 removal content from article 7092011 and the "Considerations in
+    # adopting RHEL 10" documentation.  See functional test RSPEED_2794.
+    IntentRule(
+        name="gfs2",
+        pattern=r"\b(?:gfs2|resilient\s+storage)\b",
+        bq=(
+            'allTitle:(GFS2 OR "Resilient Storage" OR discontinued OR removed)^30 '
+            'main_content:(GFS2 OR "Resilient Storage" OR discontinued OR removed OR "no longer")^15'
+        ),
+        highlight_terms='GFS2 "Resilient Storage" removed discontinued "no longer supported"',
+        dep_title_terms='GFS2 OR "Resilient Storage" OR "file system"',
+        dep_content_terms='GFS2 OR "Resilient Storage" OR "file system" OR discontinued',
     ),
     # ethtool / NIC driver queries need msglvl and message-level terms
     # injected into hl.q so Solr picks passages containing the actual

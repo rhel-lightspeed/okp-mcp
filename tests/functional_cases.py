@@ -371,4 +371,21 @@ FUNCTIONAL_TEST_CASES = [
         ),
         id="RSPEED_1931",
     ),
+    # Verified against live Solr 2026-04-03: PASS
+    pytest.param(
+        FunctionalCase(
+            question="Is GFS2 available in RHEL 10?",
+            expected_docs=[
+                "7092011",
+                "3290201",
+                "considerations_in_adopting_rhel_10",
+            ],
+            expected_content=[
+                ("removed", "discontinued"),
+                "resilient storage",
+                "gfs2",
+            ],
+        ),
+        id="RSPEED_2794",
+    ),
 ]
