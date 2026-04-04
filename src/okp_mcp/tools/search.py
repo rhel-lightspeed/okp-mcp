@@ -32,6 +32,12 @@ async def search_portal(
     answer directly without searching.
 
     IMPORTANT - interpreting results:
+    - The "Result distribution" line shows how many total documents matched per
+      category (e.g. "487 CVE, 3 Solution, 1 Documentation"). Use this to gauge
+      result quality: when one category dominates (especially CVEs), prioritize
+      results from underrepresented categories that better match the user's
+      question. Low counts across all categories means thin coverage; qualify
+      your answer accordingly.
     - Results marked 'Applicability: RHV only' apply to Red Hat Virtualization,
       NOT to standard RHEL KVM. Do not recommend RHV-only workarounds as the
       primary answer for RHEL questions.
@@ -47,13 +53,13 @@ async def search_portal(
     logger.info("search_portal: query=%r max_results=%d", query, max_results)
     try:
         app = get_app_context(ctx)
-        chunks, has_deprecation = await _run_portal_search(
+        chunks, has_deprecation, facets = await _run_portal_search(
             query,
             client=app.http_client,
             solr_endpoint=app.solr_endpoint,
             max_results=max_results,
         )
-        return _format_portal_results(chunks, has_deprecation, query, app.max_response_chars)
+        return _format_portal_results(chunks, has_deprecation, query, app.max_response_chars, facets=facets)
     except httpx.TimeoutException:
         logger.warning("Search timed out for query: %r", query, exc_info=True)
         return "The search timed out. Please try again with a simpler query."
