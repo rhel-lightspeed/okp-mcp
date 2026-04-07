@@ -30,7 +30,7 @@ dev = [
     "radon>=6.0.1",
     "respx>=0.22",
     "ruff>=0.15.8",
-    "ty>=0.0.26",
+    "ty>=0.0.27",
 ]
 
 [tool.pytest.ini_options]
