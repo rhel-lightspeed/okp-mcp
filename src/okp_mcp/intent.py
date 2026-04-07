@@ -88,7 +88,10 @@ class IntentRule:
 #   - ethtool: NIC driver debugging queries need msglvl highlight terms.
 #     See functional test RSPEED_2123.
 #   - vm: broadest intent, catches all VM/virtualization queries that didn't
-#     match a more specific intent above.
+#     match a more specific intent above.  Includes tool names (virt-manager,
+#     virsh, libvirt, cockpit) and hypervisor names (kvm) because LLMs often
+#     reduce user questions to bare tool names (e.g. "virt-manager RHEL 9")
+#     that miss the generic "virtual machine" / "virtualization" terms.
 INTENT_RULES: list[IntentRule] = [
     IntentRule(
         name="release_date",
@@ -230,7 +233,10 @@ INTENT_RULES: list[IntentRule] = [
     ),
     IntentRule(
         name="vm",
-        pattern=r"\b(?:vm|vms|virtual machines?|virtualization|hypervisors?)\b",
+        pattern=(
+            r"\b(?:vm|vms|virtual machines?|virtualization|hypervisors?"
+            r"|virt-manager|virsh|libvirt[a-z]*|cockpit|kvm)\b"
+        ),
         bq=(
             'title:(cockpit OR virtualization OR "virt-manager")^15 '
             'main_content:(cockpit OR "cockpit-machines" OR virsh)^5'

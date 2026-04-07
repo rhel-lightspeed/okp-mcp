@@ -449,6 +449,22 @@ class TestApplyMainBoosts:
 
     @pytest.mark.parametrize(
         "query",
+        [
+            "virt-manager RHEL 9",
+            "virsh list --all",
+            "libvirt daemon configuration",
+            "libvirtd won't start",
+            "cockpit virtual machines",
+            "kvm nested virtualization",
+        ],
+        ids=["virt-manager", "virsh", "libvirt", "libvirtd", "cockpit", "kvm"],
+    )
+    def test_vm_intent_matches_tool_names(self, query):
+        """VM tool/hypervisor names (virt-manager, virsh, libvirt*, cockpit, kvm) trigger VM intent."""
+        assert _get_rule("vm").matches(query)
+
+    @pytest.mark.parametrize(
+        "query",
         ["nvme tuning rhel 9", "jvm heap configuration", "evms partition"],
         ids=["nvme", "jvm", "evms"],
     )
