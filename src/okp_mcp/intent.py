@@ -85,6 +85,10 @@ class IntentRule:
 #   - gfs2: GFS2/Resilient Storage queries need removal/discontinuation boosts.
 #     Without them, "Is GFS2 available in RHEL 10?" returns generic "Is X
 #     available?" solutions.  See functional test RSPEED_2794.
+#   - rpm_ostree: rpm-ostree queries need RHEL for Edge / Atomic Host boosts.
+#     Without them, "how do i install a package using rpm-ostree?" is drowned
+#     by generic "install package" solutions (acroread, gnome-system-log).
+#     See functional tests RSPEED_1930, RSPEED_1929, RSPEED_1859.
 #   - ethtool: NIC driver debugging queries need msglvl highlight terms.
 #     See functional test RSPEED_2123.
 #   - vm: broadest intent, catches all VM/virtualization queries that didn't
@@ -215,6 +219,34 @@ INTENT_RULES: list[IntentRule] = [
         highlight_terms='GFS2 "Resilient Storage" removed discontinued "no longer supported"',
         dep_title_terms='GFS2 OR "Resilient Storage" OR "file system"',
         dep_content_terms='GFS2 OR "Resilient Storage" OR "file system" OR discontinued',
+    ),
+    # rpm-ostree queries need boosts for RHEL for Edge, Atomic Host, and
+    # Image Mode documentation.  Without this, "how do i install a package
+    # using rpm-ostree?" returns generic "install package on RHEL" solutions
+    # because "install", "package", and "system" each match thousands of
+    # unrelated docs, drowning out the rpm-ostree specific content from
+    # the RHEL for Edge docs and solution 3297891.
+    #
+    # The allTitle boost avoids generic "rpm-ostree" to prevent errata
+    # (RHBA/RHEA) from drowning out actual documentation.  The main_content
+    # boost targets specific rpm-ostree subcommands.
+    #
+    # RHEL 10 replaces user-facing rpm-ostree with bootc (image mode).
+    # RPM-OSTree remains as an internal implementation detail.  Boosting
+    # bootc/image mode docs alongside rpm-ostree docs gives the LLM
+    # context about the transition.
+    IntentRule(
+        name="rpm_ostree",
+        pattern=r"\brpm[\s-]?ostree\b",
+        bq=(
+            'allTitle:("RHEL for Edge" OR "Atomic Host" OR "image mode" OR bootc)^30 '
+            'main_content:("rpm-ostree install" OR "rpm-ostree rollback" OR "rpm-ostree status" '
+            'OR "rpm-ostree upgrade" OR "rpm-ostree kargs")^20'
+        ),
+        highlight_terms=(
+            '"rpm-ostree install" "rpm-ostree rollback" "rpm-ostree status" '
+            '"rpm-ostree upgrade" "rpm-ostree kargs" reboot deployment bootc'
+        ),
     ),
     # ethtool / NIC driver queries need msglvl and message-level terms
     # injected into hl.q so Solr picks passages containing the actual
