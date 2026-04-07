@@ -25,8 +25,7 @@
       "rangeStrategy": "bump"
     },
     {
-      "description": "Disable Python version updates in GitHub Actions",
-      "matchManagers": ["github-actions"],
+      "description": "Disable Python version updates everywhere (pinned to 3.12)",
       "matchPackageNames": ["python"],
       "enabled": false
     },
