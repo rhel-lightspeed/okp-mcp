@@ -498,4 +498,23 @@ FUNCTIONAL_TEST_CASES = [
         ),
         id="RSPEED_1813",
     ),
+    # Verified against live Solr 2026-04-07: PASS
+    # Solution 6906941 (Cockpit) surfaces first with "This module deprecates
+    # virt-manager tool".  The RHEL 9.0 Release Notes contain the authoritative
+    # deprecation statement but rank too low due to BM25 length normalization
+    # on the massive release notes document.
+    pytest.param(
+        FunctionalCase(
+            question="Can I use virt-manager to manage virtual machines in RHEL 9?",
+            expected_docs=[
+                "6906941",
+                "virt-manager",
+            ],
+            expected_content=[
+                ("deprecated", "deprecates"),
+                "cockpit",
+            ],
+        ),
+        id="virt_manager_rhel9_deprecated",
+    ),
 ]
