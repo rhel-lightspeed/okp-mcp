@@ -405,4 +405,97 @@ FUNCTIONAL_TEST_CASES = [
         ),
         id="RSPEED_1902",
     ),
+    # Verified against live Solr 2026-04-06: PASS
+    # Solution 32530 clearly states "Shrinking is not supported on a GFS2
+    # or XFS file system, so you cannot reduce the size of a logical volume
+    # that contains a GFS2 or XFS file system."
+    pytest.param(
+        FunctionalCase(
+            question="how do I shrink an LVM volume with XFS on it",
+            expected_docs=[
+                "32530",
+                "shrink",
+            ],
+            expected_content=[
+                ("not supported", "cannot"),
+                "xfs",
+                ("lvreduce", "shrink"),
+            ],
+        ),
+        id="RSPEED_1582",
+    ),
+    # Verified against live Solr 2026-04-06: PASS
+    # Solution 3592 documents the correct `sos report` command (not the
+    # deprecated `sosreport` binary) and the --upload option.
+    pytest.param(
+        FunctionalCase(
+            question="Can sos automatically upload the generated archive to Red Hat Customer Portal?",
+            expected_docs=[
+                "3592",
+                "2112",
+                "sos",
+            ],
+            expected_content=[
+                "sos report",
+                "--upload",
+                ("customer portal", "red hat support"),
+            ],
+        ),
+        id="RSPEED_1739",
+    ),
+    # Verified against live Solr 2026-04-06: PASS
+    # btrfs removal content surfaces via solution 887853 (btrfs in RHEL 7)
+    # and solution 58533 (filesystem compression / btrfs technology preview).
+    pytest.param(
+        FunctionalCase(
+            question="how do I use the btrfs filesystem in RHEL10",
+            expected_docs=[
+                "7020130",
+                "197643",
+                "btrfs",
+            ],
+            expected_content=[
+                ("removed", "not supported", "not available", "technology preview"),
+                "btrfs",
+            ],
+        ),
+        id="RSPEED_1584",
+    ),
+    # Verified against live Solr 2026-04-06: docs=PASS content=PASS
+    # grub2-mkconfig docs surface via solutions 3447531 and 7063369.
+    # Noise from JBoss EAP deprecation articles in deprecation side-query
+    # but core grub content is present.
+    pytest.param(
+        FunctionalCase(
+            question="How do I recreate the grub configuration file",
+            expected_docs=[
+                "3447531",
+                "grub",
+            ],
+            expected_content=[
+                "grub2-mkconfig",
+                ("grub.cfg", "grub2"),
+            ],
+        ),
+        id="RSPEED_1726",
+    ),
+    # Verified against live Solr 2026-04-06: docs=PASS content=PARTIAL
+    # Search returns subscription management articles but mixed with
+    # unrelated JBoss deprecation noise.  Solution 1282753 covers
+    # Satellite registration; article 11258 covers RHSM updates flow.
+    pytest.param(
+        FunctionalCase(
+            question="How can I register my RHEL system to Red Hat server using CLI?",
+            expected_docs=[
+                "1282753",
+                "11258",
+                "subscription-manager",
+            ],
+            expected_content=[
+                "subscription-manager",
+                ("register", "registration"),
+            ],
+        ),
+        id="RSPEED_1813",
+    ),
 ]
