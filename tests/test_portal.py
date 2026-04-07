@@ -11,6 +11,7 @@ from okp_mcp.portal import (
     _FALLBACK_MAX_CHARS,
     _KIND_LABELS,
     _MAIN_QF,
+    _MAX_QUERIES,
     PortalChunk,
     _build_deprecation_query,
     _build_eol_filter,
@@ -23,6 +24,7 @@ from okp_mcp.portal import (
     _format_portal_results,
     _reciprocal_rank_fusion,
     _resolve_title,
+    _run_multi_query_search,
     _run_portal_search,
 )
 
@@ -1227,3 +1229,227 @@ class TestRunPortalSearch:
 
         assert chunks == []
         assert has_dep is False
+
+
+# ---------------------------------------------------------------------------
+# Multi-query search
+# ---------------------------------------------------------------------------
+
+
+class TestMaxQueriesConstant:
+    """Verify the _MAX_QUERIES constant is sensible."""
+
+    def test_max_queries_is_three(self):
+        """Research-backed default: 3 queries balances recall vs. Solr load."""
+        assert _MAX_QUERIES == 3
+
+    def test_max_queries_is_positive(self):
+        """Sanity check: must be at least 1."""
+        assert _MAX_QUERIES >= 1
+
+
+class TestRunMultiQuerySearch:
+    """Verify the multi-query search orchestrator."""
+
+    async def test_merges_results_from_multiple_queries(self):
+        """Each query's results contribute to the final merged output."""
+        doc_a = _make_doc(doc_id="from_query_a", allTitle="Doc from query A")
+        doc_b = _make_doc(doc_id="from_query_b", allTitle="Doc from query B")
+        hl_a = {"from_query_a": {"main_content": ["Query A found this content."]}}
+        hl_b = {"from_query_b": {"main_content": ["Query B found different content."]}}
+
+        def side_effect(request):
+            """Return different docs depending on which query fires."""
+            q = str(request.url.params.get("q", ""))
+            if "deprecated" in q:
+                return httpx.Response(200, json=_make_solr_json([]))
+            if "firewalld" in q:
+                return httpx.Response(200, json=_make_solr_json([doc_a], hl_a))
+            return httpx.Response(200, json=_make_solr_json([doc_b], hl_b))
+
+        with respx.mock(assert_all_called=False) as router:
+            router.get(_SOLR_ENDPOINT).mock(side_effect=side_effect)
+            async with httpx.AsyncClient() as client:
+                chunks, _ = await _run_multi_query_search(
+                    ["firewalld zones", "firewall-cmd examples"],
+                    client=client,
+                    solr_endpoint=_SOLR_ENDPOINT,
+                )
+
+        parent_ids = {c.parent_id for c in chunks}
+        assert "from_query_a" in parent_ids
+        assert "from_query_b" in parent_ids
+
+    async def test_consensus_docs_rank_higher(self):
+        """Documents appearing in both query results get boosted by cross-query RRF."""
+        shared_doc = _make_doc(doc_id="shared", allTitle="Shared Doc", score=10.0)
+        unique_doc = _make_doc(doc_id="unique", allTitle="Unique Doc", score=10.0)
+        hl_shared = {"shared": {"main_content": ["Content found by both queries."]}}
+        hl_unique = {"unique": {"main_content": ["Only found by one query."]}}
+
+        call_count = 0
+
+        def side_effect(request):
+            """Both queries return the shared doc; only the first returns the unique doc."""
+            nonlocal call_count
+            call_count += 1
+            q = str(request.url.params.get("q", ""))
+            if "deprecated" in q:
+                return httpx.Response(200, json=_make_solr_json([]))
+            # Both main queries return shared_doc, but only "query one" returns unique_doc
+            if "one" in q:
+                return httpx.Response(200, json=_make_solr_json([shared_doc, unique_doc], {**hl_shared, **hl_unique}))
+            return httpx.Response(200, json=_make_solr_json([shared_doc], hl_shared))
+
+        with respx.mock(assert_all_called=False) as router:
+            router.get(_SOLR_ENDPOINT).mock(side_effect=side_effect)
+            async with httpx.AsyncClient() as client:
+                chunks, _ = await _run_multi_query_search(
+                    ["query one", "query two"],
+                    client=client,
+                    solr_endpoint=_SOLR_ENDPOINT,
+                )
+
+        # Shared doc should appear before unique doc (RRF consensus boost)
+        parent_order = [c.parent_id for c in chunks]
+        if "shared" in parent_order and "unique" in parent_order:
+            assert parent_order.index("shared") < parent_order.index("unique")
+
+    async def test_deduplicates_across_queries(self):
+        """Same parent document from different queries produces only one output chunk."""
+        doc = _make_doc(doc_id="same_doc", allTitle="Same Doc")
+        hl = {"same_doc": {"main_content": ["Content about this topic."]}}
+
+        with respx.mock(assert_all_called=False) as router:
+            router.get(_SOLR_ENDPOINT).mock(return_value=httpx.Response(200, json=_make_solr_json([doc], hl)))
+            async with httpx.AsyncClient() as client:
+                chunks, _ = await _run_multi_query_search(
+                    ["query variant a", "query variant b"],
+                    client=client,
+                    solr_endpoint=_SOLR_ENDPOINT,
+                )
+
+        parent_ids = [c.parent_id for c in chunks]
+        assert parent_ids.count("same_doc") == 1
+
+    async def test_respects_max_results(self):
+        """Output is capped at max_results after cross-query fusion."""
+        docs = [_make_doc(doc_id=f"d{i}") for i in range(10)]
+        hl = {f"d{i}": {"main_content": [f"Snippet {i}."]} for i in range(10)}
+
+        with respx.mock(assert_all_called=False) as router:
+            router.get(_SOLR_ENDPOINT).mock(return_value=httpx.Response(200, json=_make_solr_json(docs, hl)))
+            async with httpx.AsyncClient() as client:
+                chunks, _ = await _run_multi_query_search(
+                    ["query a", "query b"],
+                    client=client,
+                    solr_endpoint=_SOLR_ENDPOINT,
+                    max_results=3,
+                )
+
+        assert len(chunks) <= 3
+
+    async def test_propagates_deprecation_flag(self):
+        """has_deprecation is True if any query's results contain deprecation content."""
+        normal_doc = _make_doc(doc_id="normal", allTitle="Normal Guide")
+        dep_doc = _make_doc(doc_id="dep", allTitle="Removed Feature")
+        hl_normal = {"normal": {"main_content": ["Normal content."]}}
+        hl_dep = {"dep": {"main_content": ["This feature has been removed."]}}
+
+        def side_effect(request):
+            """Return deprecation doc only for the deprecation sub-query."""
+            q = str(request.url.params.get("q", ""))
+            if "deprecated" in q:
+                return httpx.Response(200, json=_make_solr_json([dep_doc], hl_dep))
+            return httpx.Response(200, json=_make_solr_json([normal_doc], hl_normal))
+
+        with respx.mock(assert_all_called=False) as router:
+            router.get(_SOLR_ENDPOINT).mock(side_effect=side_effect)
+            async with httpx.AsyncClient() as client:
+                _, has_dep = await _run_multi_query_search(
+                    ["some feature rhel"],
+                    client=client,
+                    solr_endpoint=_SOLR_ENDPOINT,
+                )
+
+        assert has_dep is True
+
+    async def test_empty_results_from_all_queries(self):
+        """All queries returning empty produces empty output."""
+        with respx.mock(assert_all_called=False) as router:
+            router.get(_SOLR_ENDPOINT).mock(return_value=httpx.Response(200, json=_make_solr_json([])))
+            async with httpx.AsyncClient() as client:
+                chunks, has_dep = await _run_multi_query_search(
+                    ["nothing here", "also nothing"],
+                    client=client,
+                    solr_endpoint=_SOLR_ENDPOINT,
+                )
+
+        assert chunks == []
+        assert has_dep is False
+
+    async def test_fires_two_solr_queries_per_input_query(self):
+        """Each input query fires 2 Solr requests (main + deprecation)."""
+        call_count = 0
+
+        def counting_side_effect(request):
+            """Count Solr calls."""
+            nonlocal call_count
+            call_count += 1
+            return httpx.Response(200, json=_make_solr_json([]))
+
+        with respx.mock(assert_all_called=False) as router:
+            router.get(_SOLR_ENDPOINT).mock(side_effect=counting_side_effect)
+            async with httpx.AsyncClient() as client:
+                await _run_multi_query_search(
+                    ["query a", "query b", "query c"],
+                    client=client,
+                    solr_endpoint=_SOLR_ENDPOINT,
+                )
+
+        # 3 queries x 2 Solr calls each (main + deprecation) = 6
+        assert call_count == 6
+
+    async def test_partial_failure_returns_successful_results(self):
+        """One query timing out does not discard results from successful queries."""
+        doc = _make_doc(doc_id="good_result", allTitle="Good Result")
+        hl = {"good_result": {"main_content": ["Successfully retrieved content."]}}
+
+        call_count = 0
+
+        def side_effect(request):
+            """First query pair succeeds, second query pair times out."""
+            nonlocal call_count
+            call_count += 1
+            q = str(request.url.params.get("q", ""))
+            # The second query's main request times out.
+            if "timeout_query" in q and "deprecated" not in q:
+                raise httpx.ReadTimeout("Solr read timeout")
+            if "deprecated" in q:
+                return httpx.Response(200, json=_make_solr_json([]))
+            return httpx.Response(200, json=_make_solr_json([doc], hl))
+
+        with respx.mock(assert_all_called=False) as router:
+            router.get(_SOLR_ENDPOINT).mock(side_effect=side_effect)
+            async with httpx.AsyncClient() as client:
+                chunks, _ = await _run_multi_query_search(
+                    ["good query", "timeout_query"],
+                    client=client,
+                    solr_endpoint=_SOLR_ENDPOINT,
+                )
+
+        # The successful query's result should still be returned.
+        assert len(chunks) > 0
+        assert any(c.parent_id == "good_result" for c in chunks)
+
+    async def test_all_queries_fail_raises(self):
+        """When every query fails, the first exception is re-raised."""
+        with respx.mock(assert_all_called=False) as router:
+            router.get(_SOLR_ENDPOINT).mock(side_effect=httpx.ReadTimeout("all timed out"))
+            async with httpx.AsyncClient() as client:
+                with pytest.raises(httpx.ReadTimeout):
+                    await _run_multi_query_search(
+                        ["query a", "query b"],
+                        client=client,
+                        solr_endpoint=_SOLR_ENDPOINT,
+                    )

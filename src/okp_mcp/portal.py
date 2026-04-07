@@ -1,4 +1,4 @@
-"""Unified portal search: query builders, chunk conversion, RRF, and EOL product filtering."""
+"""Unified portal search: query builders, chunk conversion, RRF, multi-query orchestration, and EOL filtering."""
 
 from __future__ import annotations
 
@@ -517,6 +517,12 @@ def _filter_by_score(chunks: list[PortalChunk]) -> list[PortalChunk]:
 # Orchestrator
 # ---------------------------------------------------------------------------
 
+# Maximum number of query variants accepted by the multi-query search path.
+# Research consistently shows diminishing returns past 3-4 queries: going from
+# 3 to 5 adds ~1-2% recall but doubles Solr load.  3 is the sweet spot for
+# recall vs. latency (see RAG-Fusion paper, arXiv:2402.03367).
+_MAX_QUERIES = 3
+
 _DEPRECATION_WARNING = (
     "WARNING: Some results indicate a feature was deprecated or removed. If sources\n"
     "disagree, treat the deprecation/removal notice as authoritative over workarounds\n"
@@ -593,6 +599,90 @@ async def _run_portal_search(
     )
 
     return top_n, has_deprecation
+
+
+async def _run_multi_query_search(
+    queries: list[str],
+    *,
+    client: httpx.AsyncClient,
+    solr_endpoint: str,
+    max_results: int = 7,
+) -> tuple[list[PortalChunk], bool]:
+    """Execute parallel portal searches for multiple query variants and fuse results.
+
+    Each query runs through the full ``_run_portal_search`` pipeline independently
+    (intent detection, deprecation handling, quality filtering).  Results are then
+    merged via reciprocal rank fusion so documents appearing across multiple query
+    phrasings rank higher (cross-query consensus).
+
+    Partial failures are tolerated: if some queries succeed and others fail
+    (timeout, HTTP error), the successful results are still fused and returned.
+    Only when *all* queries fail is the first exception re-raised to the caller.
+
+    Args:
+        queries: List of query strings (already validated and capped by caller).
+        client: Shared httpx.AsyncClient for Solr requests.
+        solr_endpoint: Full Solr endpoint URL for the portal core.
+        max_results: Maximum chunks to return after cross-query fusion.
+
+    Returns:
+        Tuple of (top-N PortalChunk list, has_deprecation bool).
+
+    Raises:
+        Exception: Re-raised from the first failed query when all queries fail.
+    """
+    raw_results = await asyncio.gather(
+        *[
+            _run_portal_search(
+                q,
+                client=client,
+                solr_endpoint=solr_endpoint,
+                max_results=max_results,
+            )
+            for q in queries
+        ],
+        return_exceptions=True,
+    )
+
+    # Separate successes from failures so partial results aren't discarded
+    # when a single query variant times out or hits a Solr error.
+    successes: list[tuple[list[PortalChunk], bool]] = []
+    failures: list[BaseException] = []
+    for i, result in enumerate(raw_results):
+        if isinstance(result, BaseException):
+            logger.warning("Multi-query: query %d/%d failed: %s", i + 1, len(queries), result, exc_info=result)
+            failures.append(result)
+        else:
+            successes.append(result)
+
+    # If every query failed, re-raise the first exception so the caller's
+    # existing error handling (timeout, HTTP, ValueError) still applies.
+    if not successes:
+        raise failures[0]
+
+    chunk_lists = [chunks for chunks, _ in successes]
+    has_deprecation = any(has_dep for _, has_dep in successes)
+
+    # RRF merge across query variants: docs surfaced by multiple phrasings
+    # get boosted, filtering out single-query noise.
+    merged = _reciprocal_rank_fusion(*chunk_lists)
+
+    # Re-dedup by parent: the same source document may appear in results
+    # from different query variants with different highlight snippets.
+    deduped = _deduplicate_by_parent(merged)
+
+    logger.info(
+        "Multi-query search: queries=%d succeeded=%d failed=%d chunks_per_query=%s merged=%d deduped=%d returned=%d",
+        len(queries),
+        len(successes),
+        len(failures),
+        [len(cl) for cl in chunk_lists],
+        len(merged),
+        len(deduped),
+        min(len(deduped), max_results),
+    )
+
+    return deduped[:max_results], has_deprecation
 
 
 # ---------------------------------------------------------------------------

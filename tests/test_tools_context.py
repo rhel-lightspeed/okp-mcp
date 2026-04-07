@@ -11,6 +11,7 @@ import pytest
 import okp_mcp  # noqa: F401 -- triggers @mcp.tool registration
 from okp_mcp import tools
 from okp_mcp.config import ServerConfig
+from okp_mcp.portal import _MAX_QUERIES
 from okp_mcp.server import mcp
 from okp_mcp.tools import _doc_id_filter, _escape_solr_phrase, _format_document, _normalize_doc_id
 
@@ -382,3 +383,181 @@ async def test_get_document_normalizes_full_url():
         # The normalized path (not the full URL) should reach the fetch function.
         call_args = mock_fetch.call_args
         assert call_args[0][0] == expected_path
+
+
+# --- search_portal multi-query validation tests ---
+
+
+class TestSearchPortalQueryValidation:
+    """Verify search_portal input normalization: str vs. list, empty filtering, capping."""
+
+    async def test_empty_string_returns_error(self):
+        """Empty string query returns a user-friendly error without calling Solr."""
+        result = await tools.search_portal(Mock(), "")
+        assert "Please provide" in result
+
+    async def test_whitespace_only_string_returns_error(self):
+        """Whitespace-only query returns a user-friendly error."""
+        result = await tools.search_portal(Mock(), "   ")
+        assert "Please provide" in result
+
+    async def test_empty_list_returns_error(self):
+        """Empty list returns a user-friendly error."""
+        result = await tools.search_portal(Mock(), [])
+        assert "Please provide" in result
+
+    async def test_list_of_empty_strings_returns_error(self):
+        """List containing only empty/whitespace strings returns an error."""
+        result = await tools.search_portal(Mock(), ["", "  ", ""])
+        assert "Please provide" in result
+
+    async def test_single_string_uses_single_query_path(self):
+        """A plain string routes through _run_portal_search, not _run_multi_query_search."""
+        mock_ctx = Mock()
+        mock_app = Mock()
+        mock_app.http_client = AsyncMock(spec=httpx.AsyncClient)
+        mock_app.solr_endpoint = _SOLR_ENDPOINT
+        mock_app.max_response_chars = 30_000
+
+        with (
+            patch("okp_mcp.tools.search.get_app_context", return_value=mock_app),
+            patch("okp_mcp.tools.search._run_portal_search", new_callable=AsyncMock) as mock_single,
+            patch("okp_mcp.tools.search._run_multi_query_search", new_callable=AsyncMock) as mock_multi,
+        ):
+            mock_single.return_value = ([], False)
+            await tools.search_portal(mock_ctx, "firewalld zones")
+
+        mock_single.assert_awaited_once()
+        mock_multi.assert_not_awaited()
+
+    async def test_list_with_one_entry_uses_single_query_path(self):
+        """A single-element list routes through _run_portal_search for efficiency."""
+        mock_ctx = Mock()
+        mock_app = Mock()
+        mock_app.http_client = AsyncMock(spec=httpx.AsyncClient)
+        mock_app.solr_endpoint = _SOLR_ENDPOINT
+        mock_app.max_response_chars = 30_000
+
+        with (
+            patch("okp_mcp.tools.search.get_app_context", return_value=mock_app),
+            patch("okp_mcp.tools.search._run_portal_search", new_callable=AsyncMock) as mock_single,
+            patch("okp_mcp.tools.search._run_multi_query_search", new_callable=AsyncMock) as mock_multi,
+        ):
+            mock_single.return_value = ([], False)
+            await tools.search_portal(mock_ctx, ["firewalld zones"])
+
+        mock_single.assert_awaited_once()
+        mock_multi.assert_not_awaited()
+
+    async def test_multiple_queries_use_multi_query_path(self):
+        """Two or more queries route through _run_multi_query_search."""
+        mock_ctx = Mock()
+        mock_app = Mock()
+        mock_app.http_client = AsyncMock(spec=httpx.AsyncClient)
+        mock_app.solr_endpoint = _SOLR_ENDPOINT
+        mock_app.max_response_chars = 30_000
+
+        with (
+            patch("okp_mcp.tools.search.get_app_context", return_value=mock_app),
+            patch("okp_mcp.tools.search._run_portal_search", new_callable=AsyncMock) as mock_single,
+            patch("okp_mcp.tools.search._run_multi_query_search", new_callable=AsyncMock) as mock_multi,
+        ):
+            mock_multi.return_value = ([], False)
+            await tools.search_portal(mock_ctx, ["firewalld zones", "firewall-cmd examples"])
+
+        mock_single.assert_not_awaited()
+        mock_multi.assert_awaited_once()
+
+    async def test_queries_capped_at_max(self):
+        """Excess queries beyond _MAX_QUERIES are silently dropped."""
+        mock_ctx = Mock()
+        mock_app = Mock()
+        mock_app.http_client = AsyncMock(spec=httpx.AsyncClient)
+        mock_app.solr_endpoint = _SOLR_ENDPOINT
+        mock_app.max_response_chars = 30_000
+
+        too_many = [f"query {i}" for i in range(_MAX_QUERIES + 5)]
+
+        with (
+            patch("okp_mcp.tools.search.get_app_context", return_value=mock_app),
+            patch("okp_mcp.tools.search._run_multi_query_search", new_callable=AsyncMock) as mock_multi,
+        ):
+            mock_multi.return_value = ([], False)
+            await tools.search_portal(mock_ctx, too_many)
+
+        # Only _MAX_QUERIES should reach the multi-query function.
+        passed_queries = mock_multi.call_args[0][0]
+        assert len(passed_queries) == _MAX_QUERIES
+
+    async def test_empty_entries_filtered_from_list(self):
+        """Empty/whitespace entries in a list are stripped before routing."""
+        mock_ctx = Mock()
+        mock_app = Mock()
+        mock_app.http_client = AsyncMock(spec=httpx.AsyncClient)
+        mock_app.solr_endpoint = _SOLR_ENDPOINT
+        mock_app.max_response_chars = 30_000
+
+        with (
+            patch("okp_mcp.tools.search.get_app_context", return_value=mock_app),
+            patch("okp_mcp.tools.search._run_portal_search", new_callable=AsyncMock) as mock_single,
+        ):
+            mock_single.return_value = ([], False)
+            # Two empties + one real query = single-query path
+            await tools.search_portal(mock_ctx, ["", "firewalld zones", "  "])
+
+        mock_single.assert_awaited_once()
+        passed_query = mock_single.call_args[0][0]
+        assert passed_query == "firewalld zones"
+
+    async def test_integer_query_returns_error(self):
+        """Non-string query (e.g. int) returns a friendly type error."""
+        result = await tools.search_portal(Mock(), 123)  # type: ignore[arg-type]  -- testing runtime validation
+        assert "must be a string" in result
+
+    async def test_list_with_non_string_items_returns_error(self):
+        """List containing non-string items returns a descriptive error."""
+        result = await tools.search_portal(Mock(), ["valid query", 123, None])  # type: ignore[list-item]  -- testing runtime validation
+        assert "non-string" in result
+        assert "123" in result
+
+    async def test_dict_query_returns_error(self):
+        """Dict query returns a friendly type error."""
+        result = await tools.search_portal(Mock(), {"q": "test"})  # type: ignore[arg-type]  -- testing runtime validation
+        assert "must be a string" in result
+
+    async def test_duplicate_queries_deduped(self):
+        """Duplicate queries after stripping are deduped to avoid RRF vote inflation."""
+        mock_ctx = Mock()
+        mock_app = Mock()
+        mock_app.http_client = AsyncMock(spec=httpx.AsyncClient)
+        mock_app.solr_endpoint = _SOLR_ENDPOINT
+        mock_app.max_response_chars = 30_000
+
+        with (
+            patch("okp_mcp.tools.search.get_app_context", return_value=mock_app),
+            patch("okp_mcp.tools.search._run_portal_search", new_callable=AsyncMock) as mock_single,
+        ):
+            mock_single.return_value = ([], False)
+            # "foo" and " foo " normalize to the same string.
+            await tools.search_portal(mock_ctx, ["foo", " foo ", "foo"])
+
+        # Should dedupe to single query, hitting single-query fast path.
+        mock_single.assert_awaited_once()
+
+    async def test_duplicate_queries_preserves_distinct(self):
+        """Queries that are different after stripping are all kept."""
+        mock_ctx = Mock()
+        mock_app = Mock()
+        mock_app.http_client = AsyncMock(spec=httpx.AsyncClient)
+        mock_app.solr_endpoint = _SOLR_ENDPOINT
+        mock_app.max_response_chars = 30_000
+
+        with (
+            patch("okp_mcp.tools.search.get_app_context", return_value=mock_app),
+            patch("okp_mcp.tools.search._run_multi_query_search", new_callable=AsyncMock) as mock_multi,
+        ):
+            mock_multi.return_value = ([], False)
+            await tools.search_portal(mock_ctx, ["foo", "bar"])
+
+        passed_queries = mock_multi.call_args[0][0]
+        assert passed_queries == ["foo", "bar"]
