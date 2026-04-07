@@ -517,4 +517,62 @@ FUNCTIONAL_TEST_CASES = [
         ),
         id="virt_manager_rhel9_deprecated",
     ),
+    # Verified against live Solr 2026-04-07: PASS
+    # CLA said rpm-ostree can't install packages; correct answer is
+    # `rpm-ostree install $package` followed by a reboot.
+    pytest.param(
+        FunctionalCase(
+            question="how do i install a package on a system using rpm-ostree?",
+            expected_docs=[
+                "3297891",
+                "composing_installing_and_managing_rhel_for_edge_images",
+                "rpm-ostree",
+            ],
+            expected_content=[
+                "rpm-ostree install",
+                ("reboot", "restart"),
+                ("package", "packages"),
+            ],
+        ),
+        id="RSPEED_1930",
+    ),
+    # Verified against live Solr 2026-04-07: PASS
+    # CLA gave fabricated commands (rpm-ostree split --list, rpm-ostree
+    # transaction rollback); correct answer is `rpm-ostree rollback` + reboot.
+    # Article 5719641 (RHEL for Edge videos) surfaces the correct command
+    # but its highlight snippet is a video description, too brief for
+    # "reboot" or "deployment" terms.
+    pytest.param(
+        FunctionalCase(
+            question="how do i rollback my system to a previous version using rpm-ostree",
+            expected_docs=[
+                "5719641",
+                "composing_installing_and_managing_rhel_for_edge_images",
+                "rpm-ostree",
+            ],
+            expected_content=[
+                "rpm-ostree rollback",
+                "previous",
+            ],
+        ),
+        id="RSPEED_1929",
+    ),
+    # Verified against live Solr 2026-04-07: PASS
+    # CLA said to use `rpm-ostree branch`; correct answer is
+    # `rpm-ostree status` to list deployments.
+    pytest.param(
+        FunctionalCase(
+            question="how do i see the list of deployments on a system using rpm-ostree?",
+            expected_docs=[
+                "5719641",
+                "composing_installing_and_managing_rhel_for_edge_images",
+                "rpm-ostree",
+            ],
+            expected_content=[
+                "rpm-ostree status",
+                ("deployment", "deployments"),
+            ],
+        ),
+        id="RSPEED_1859",
+    ),
 ]
