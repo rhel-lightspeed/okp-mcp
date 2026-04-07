@@ -78,6 +78,11 @@ async def search_portal(
     - Include the user's original phrasing as one of the queries.
     - For exact lookups (CVE IDs, KB numbers, erratum names), a single
       query is sufficient.
+    - Write each query as a complete question or sentence, not bare
+      keywords.  Full sentences contain context words (e.g. "virtual
+      machines", "deprecated") that significantly improve result quality.
+      BAD:  "virt-manager RHEL 9"
+      GOOD: "Is virt-manager supported for managing virtual machines in RHEL 9?"
 
     IMPORTANT - interpreting results:
     - Results marked 'Applicability: RHV only' apply to Red Hat Virtualization,
