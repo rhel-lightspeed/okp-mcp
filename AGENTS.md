@@ -56,6 +56,7 @@ Functional tests are **deselected by default** via `pytest_collection_modifyitem
 ```text
 src/okp_mcp/
   __init__.py    # entry point, main(), logging config, re-exports mcp
+  build_info.py  # Build-time metadata: git commit SHA + package version
   config.py      # ServerConfig (pydantic BaseSettings, MCP_* env vars)
   server.py      # FastMCP instance (single `mcp` object), AppContext, lifespan
   request_id.py  # Request ID context vars, FastMCP middleware, Starlette header middleware, logging filter
@@ -107,6 +108,7 @@ uv run okp-mcp [--transport ...] [--port ...]
   → __init__.py: main()
        ├─ CliApp.run(ServerConfig)     # parse CLI + MCP_* env vars
        ├─ _configure_logging()
+        ├─ log version + commit SHA     # build_info.py reads /app/COMMIT_SHA
         └─ mcp.run(transport=...)       # start FastMCP server
             → server.py: _app_lifespan()
                 ├─ creates shared httpx.AsyncClient
@@ -117,7 +119,8 @@ uv run okp-mcp [--transport ...] [--port ...]
 ## Module Dependencies
 
 ```text
-__init__.py → config, request_id, server, tools (side-effect import)
+__init__.py → build_info, config, request_id, server, tools (side-effect import)
+build_info.py → (standalone, reads ./COMMIT_SHA file)
 tools/__init__.py → tools/search.py, tools/document.py, tools/run_code.py
 tools/search.py → config, portal, server
 tools/document.py → content, server, solr, tools/shared.py

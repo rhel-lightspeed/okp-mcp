@@ -6,6 +6,7 @@ from pydantic_settings import CliApp
 
 from okp_mcp import server as _server
 from okp_mcp import tools as _tools  # noqa: F401 — import triggers @mcp.tool registration
+from okp_mcp.build_info import get_commit_sha, get_package_version
 from okp_mcp.config import ServerConfig
 from okp_mcp.request_id import RequestIDLogFilter, build_http_request_id_middleware
 from okp_mcp.server import mcp
@@ -44,6 +45,7 @@ def main() -> None:
     _server._server_config = config
     _configure_logging(config.log_level)
 
+    logger.info("okp-mcp %s (%s)", get_package_version(), get_commit_sha())
     logger.info("Starting MCP server with transport=%s", config.transport)
 
     if config.transport in ("sse", "streamable-http"):
