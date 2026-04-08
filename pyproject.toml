@@ -1,6 +1,6 @@
 [project]
 name = "okp-mcp"
-version = "0.1.0"
+version = "1.0.0"
 description = "MCP server for the Offline Knowledge Portal"
 readme = "README.md"
 authors = [{ name = "Major Hayden", email = "major@redhat.com" }]
