@@ -38,6 +38,11 @@ ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 
+# Bake the git commit SHA into the image at build time.
+# Tekton passes this via --build-arg; defaults to "development" for local builds.
+ARG COMMIT_SHA=development
+RUN printf '%s\n' "${COMMIT_SHA}" > /app/COMMIT_SHA
+
 # Default to streamable-http for networked container deployments.
 # Override with MCP_TRANSPORT=sse or MCP_TRANSPORT=stdio as needed.
 ENV MCP_TRANSPORT=streamable-http
