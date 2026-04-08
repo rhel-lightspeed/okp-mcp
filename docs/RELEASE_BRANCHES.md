@@ -14,7 +14,7 @@ We use semantic versioning: `MAJOR.MINOR.PATCH`.
 - **MINOR**: New features, intent rules, tool enhancements (backwards-compatible)
 - **PATCH**: Bug fixes, config changes, test additions
 
-Git tags use a `v` prefix: `v3.0.1`, `v3.1.0`, etc.
+Git tags use a `v` prefix: `v1.0.0`, `v1.1.0`, etc.
 
 ## Normal Deployment (no release branch)
 
@@ -23,8 +23,8 @@ Git tags use a `v` prefix: `v3.0.1`, `v3.1.0`, etc.
 ```bash
 git checkout main
 git pull origin main
-git tag -a v3.0.1 -m "v3.0.1: GFS2 intent rule, RAG-Fusion multi-query"
-git push origin v3.0.1
+git tag -a v1.0.0 -m "v1.0.0: initial stable release"
+git push origin v1.0.0
 ```
 
 ### 2. Verify the image exists
@@ -33,7 +33,7 @@ Konflux builds an image for every push to `main`, tagged with the commit SHA.
 
 ```bash
 # Get the SHA for the tag
-git rev-parse v3.0.1
+git rev-parse v1.0.0
 
 # Check if Konflux has built it
 skopeo list-tags docker://quay.io/redhat-user-workloads/rhel-lightspeed-tenant/okp-mcp \
@@ -53,7 +53,7 @@ Update `data/services/insights/rhel-lightspeed/cicd/saas.yml` in app-interface:
   ref: <commit-sha>
   parameters:
     IMAGE: quay.io/redhat-user-workloads/rhel-lightspeed-tenant/okp-mcp
-    # v3.0.1 (2026-04-07)
+    # v1.0.0 (2026-04-07)
     SOLR_BASE_URL: http://redhat-okp:8983
 ```
 
@@ -84,8 +84,8 @@ If `main` is in a deployable state, just deploy from `main` — no branch needed
 grep -A5 'okp-mcp-stage' path/to/saas.yml | grep ref
 
 # Create the branch from that SHA (use the version being hotfixed)
-git checkout -b release/3.0.x <deployed-sha>
-git push origin release/3.0.x
+git checkout -b release/1.0.x <deployed-sha>
+git push origin release/1.0.x
 ```
 
 ### 2. Apply the fix
@@ -110,8 +110,8 @@ git cherry-pick <fix-sha>
 Once the next deployment goes out from `main` (which includes the fix), delete the release branch:
 
 ```bash
-git push origin --delete release/3.0.x
-git branch -d release/3.0.x
+git push origin --delete release/1.0.x
+git branch -d release/1.0.x
 ```
 
 ## Branch Protection
