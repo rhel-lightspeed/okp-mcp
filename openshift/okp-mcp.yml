@@ -88,6 +88,7 @@ objects:
         service: rhel-lightspeed
         app: "${NAME}"
     spec:
+      sessionAffinity: ClientIP
       ports:
         - port: 8000
           protocol: TCP
