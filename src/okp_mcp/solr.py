@@ -202,7 +202,8 @@ async def _solr_query(params: dict, client: httpx.AsyncClient | None = None, *, 
         return _empty_response
 
     num_found = data["response"]["numFound"]
-    logger.info("SOLR returned %d result(s)", num_found)
+    num_docs = len(data["response"]["docs"])
+    logger.info("SOLR query matched %d total, returning %d docs", num_found, num_docs)
     return data
 
 
