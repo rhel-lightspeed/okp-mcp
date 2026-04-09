@@ -93,7 +93,9 @@ _DEPRECATION_FL = (
 # weights defined in solr._solr_query().  cve_details is a Solr `string` field
 # (not tokenized) so it cannot participate in edismax scoring; CVEs match via
 # allTitle, main_content, and all_content instead.
-_MAIN_QF = "title^5 main_content heading_h1^3 heading_h2 portal_synopsis^3 allTitle^3 content^2 all_content^1"
+_MAIN_QF = (
+    "title^5 main_content heading_h1^3 heading_h2 portal_synopsis^3 allTitle^3 content^2 all_content^1 syn_product^6"
+)
 
 
 def _build_eol_filter() -> str:
