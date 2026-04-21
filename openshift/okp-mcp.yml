@@ -105,7 +105,7 @@ parameters:
   - name: IMAGE
     displayName: Container Image
     description: The container image to deploy.
-    value: quay.io/redhat-user-workloads/rhel-lightspeed-tenant/okp-mcp
+    value: quay.io/redhat-services-prod/rhel-lightspeed-tenant/okp-mcp
     required: true
   - name: IMAGE_TAG
     displayName: Image Tag
