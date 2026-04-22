@@ -1,0 +1,5 @@
+# Persistent storage for the Solr search index.
+# Survives container restarts and upgrades.
+
+[Volume]
+VolumeName=okp-solr-data

@@ -1,0 +1,22 @@
+# OKP MCP server (connects to Solr over the shared network).
+
+[Unit]
+Description=OKP MCP server
+After=okp-solr.service
+Requires=okp-solr.service
+
+[Container]
+Image=quay.io/redhat-user-workloads/rhel-lightspeed-tenant/okp-mcp:latest
+ContainerName=okp-mcp
+Network=okp.network
+PublishPort=8000:8000
+
+Environment=MCP_TRANSPORT=streamable-http
+Environment=MCP_SOLR_URL=http://okp-solr:8983
+AutoUpdate=registry
+
+[Service]
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
