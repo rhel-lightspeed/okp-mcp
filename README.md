@@ -107,6 +107,14 @@ You should see a response with `serverInfo.name: "RHEL OKP Knowledge Base"`.
 podman pod rm -f okp
 ```
 
+### Alternative: podman-compose
+
+A `podman-compose.yml` is included for development use. It builds from source and is useful for local iteration, but note that `podman-compose` is not supported on RHEL.
+
+```bash
+OKP_ACCESS_KEY=<your-access-key> podman-compose up -d
+```
+
 ## Development
 
 Install dev dependencies:
