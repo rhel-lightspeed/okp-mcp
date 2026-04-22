@@ -69,7 +69,7 @@ The first start downloads and indexes content (~10 GB image, may take several mi
 podman logs -f redhat-okp
 ```
 
-Wait until you see `Started Solr server on port 8983`. Subsequent starts of the same container (`podman pod stop okp` / `podman pod start okp`) are faster because the index is cached. Removing the pod (`podman pod rm -f okp`) deletes the container and its index — the next `podman run` will re-download. To persist the index across recreations, add a named volume: `-v okp-solr-data:/opt/solr/server/solr/portal/data`.
+Wait until you see `Started Solr server on port 8983`. Subsequent starts of the same container (`podman pod stop okp` / `podman pod start okp`) are faster because the index is cached. Removing the pod (`podman pod rm -f okp`) deletes the container and its index — the next `podman run` will re-index the content. To persist the index across recreations, add a named volume: `-v okp-solr-data:/opt/solr/server/solr/portal/data`.
 
 ### 3. Start the MCP server
 
