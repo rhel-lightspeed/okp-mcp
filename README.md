@@ -36,21 +36,83 @@ Settings come from CLI arguments and `MCP_*` environment variables. CLI args tak
 
 Run `okp-mcp --help` for the full list.
 
-## Running with Compose
+## Running Locally
 
-Start the OKP Solr instance and MCP server together:
+Run the OKP Solr index and MCP server together using a podman pod.
+
+### Prerequisites
+
+- [Podman](https://podman.io/) installed
+- Authenticated to `registry.redhat.io` (`podman login registry.redhat.io`)
+- An OKP access key from <https://access.redhat.com/offline/access>
+
+### 1. Create a pod
+
+The pod groups both containers into a shared network namespace so they communicate via `localhost`. Ports are exposed at the pod level.
 
 ```bash
-podman login registry.redhat.io
-podman-compose up -d
+podman pod create --name okp -p 8983:8983 -p 8000:8000
 ```
 
-This pulls the OKP Solr image from `registry.redhat.io` (requires authentication) and builds the MCP server container locally.
+### 2. Start the OKP Solr index
 
-Build the MCP server image:
-
+```bash
+podman run -d --pod okp --name redhat-okp \
+  -e ACCESS_KEY=<your-access-key> \
+  -e SOLR_JETTY_HOST=0.0.0.0 \
+  registry.redhat.io/offline-knowledge-portal/rhokp-rhel9:latest
 ```
-podman build -t okp-mcp -f Containerfile .
+
+The first start downloads and indexes content (~10 GB image, may take several minutes). Watch progress with:
+
+```bash
+podman logs -f redhat-okp
+```
+
+Wait until you see `Started Solr server on port 8983`. Subsequent starts of the same container (`podman pod stop okp` / `podman pod start okp`) are faster because the index is cached. Removing the pod (`podman pod rm -f okp`) deletes the container and its index — the next `podman run` will re-index the content. To persist the index across recreations, add a named volume: `-v okp-solr-data:/opt/solr/server/solr/portal/data`.
+
+### 3. Start the MCP server
+
+```bash
+podman run -d --pod okp --name okp-mcp \
+  -e MCP_TRANSPORT=streamable-http \
+  -e MCP_SOLR_URL=http://localhost:8983 \
+  quay.io/redhat-user-workloads/rhel-lightspeed-tenant/okp-mcp
+```
+
+### 4. Verify
+
+Confirm Solr has data:
+
+```bash
+curl -s "http://localhost:8983/solr/portal/select?q=*:*&rows=0" | python3 -m json.tool
+```
+
+You should see `numFound` with a large number of documents (600k+).
+
+Confirm the MCP server responds:
+
+```bash
+curl -s -N -X POST http://localhost:8000/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc": "2.0", "method": "initialize", "params": {"protocolVersion": "2025-11-25", "capabilities": {}, "clientInfo": {"name": "test", "version": "1.0"}}, "id": 1}'
+```
+
+You should see a response with `serverInfo.name: "RHEL OKP Knowledge Base"`.
+
+### Cleanup
+
+```bash
+podman pod rm -f okp
+```
+
+### Alternative: podman-compose
+
+A `podman-compose.yml` is included for development use. It builds from source and is useful for local iteration, but note that `podman-compose` is not supported on RHEL.
+
+```bash
+OKP_ACCESS_KEY=<your-access-key> podman-compose up -d
 ```
 
 ## Development
