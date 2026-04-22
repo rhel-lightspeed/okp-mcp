@@ -69,7 +69,7 @@ The first start downloads and indexes content (~10 GB image, may take several mi
 podman logs -f redhat-okp
 ```
 
-Wait until you see `Started Solr server on port 8983`. Subsequent starts are faster because the index is cached in the container.
+Wait until you see `Started Solr server on port 8983`. Subsequent starts of the same container (`podman pod stop okp` / `podman pod start okp`) are faster because the index is cached. Removing the pod (`podman pod rm -f okp`) deletes the container and its index — the next `podman run` will re-download. To persist the index across recreations, add a named volume: `-v okp-solr-data:/opt/solr/server/solr/portal/data`.
 
 ### 3. Start the MCP server
 
@@ -96,7 +96,7 @@ Confirm the MCP server responds:
 curl -s -N -X POST http://localhost:8000/mcp \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
-  -d '{"jsonrpc": "2.0", "method": "initialize", "params": {"protocolVersion": "2025-03-26", "capabilities": {}, "clientInfo": {"name": "test", "version": "1.0"}}, "id": 1}'
+  -d '{"jsonrpc": "2.0", "method": "initialize", "params": {"protocolVersion": "2025-11-25", "capabilities": {}, "clientInfo": {"name": "test", "version": "1.0"}}, "id": 1}'
 ```
 
 You should see a response with `serverInfo.name: "RHEL OKP Knowledge Base"`.
