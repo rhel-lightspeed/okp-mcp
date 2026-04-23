@@ -3,11 +3,14 @@
 import logging
 
 from pydantic_settings import CliApp
+from starlette.middleware import Middleware as StarletteMiddleware
 
+from okp_mcp import metrics as _metrics  # noqa: F401 -- import registers @mcp.custom_route("/metrics")
 from okp_mcp import server as _server
-from okp_mcp import tools as _tools  # noqa: F401 — import triggers @mcp.tool registration
+from okp_mcp import tools as _tools  # noqa: F401 -- import triggers @mcp.tool registration
 from okp_mcp.build_info import get_commit_sha, get_package_version
 from okp_mcp.config import ServerConfig
+from okp_mcp.metrics import PrometheusMiddleware
 from okp_mcp.request_id import RequestIDLogFilter, build_http_request_id_middleware
 from okp_mcp.server import mcp
 
@@ -49,11 +52,13 @@ def main() -> None:
     logger.info("Starting MCP server with transport=%s", config.transport)
 
     if config.transport in ("sse", "streamable-http"):
+        http_middleware = build_http_request_id_middleware()
+        http_middleware.insert(0, StarletteMiddleware(PrometheusMiddleware))
         mcp.run(
             transport=config.transport,
             host=config.host,
             port=config.port,
-            middleware=build_http_request_id_middleware(),
+            middleware=http_middleware,
         )
     else:
         mcp.run(transport="stdio")

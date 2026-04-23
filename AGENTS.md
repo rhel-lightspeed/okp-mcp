@@ -60,6 +60,7 @@ src/okp_mcp/
   config.py      # ServerConfig (pydantic BaseSettings, MCP_* env vars)
   server.py      # FastMCP instance (single `mcp` object), AppContext, lifespan
   request_id.py  # Request ID context vars, FastMCP middleware, Starlette header middleware, logging filter
+  metrics.py     # Prometheus metrics: counters, histograms, /metrics endpoint, ASGI middleware
   intent.py      # Intent detection: IntentRule dataclass, INTENT_RULES registry, boost application
   portal.py      # Unified portal search: query builders, chunk conversion, RRF, single/multi-query orchestrators, formatting
   tools/
@@ -102,6 +103,7 @@ SECURITY.md            # Vulnerability reporting via GitHub Security Advisories
 |------|----------|-------|
 | Add a new MCP tool | `src/okp_mcp/tools/` | Add `@mcp.tool` async function in the relevant module and re-export it from `tools/__init__.py` |
 | Change request ID propagation or response headers | `src/okp_mcp/request_id.py`, `src/okp_mcp/__init__.py`, `src/okp_mcp/server.py` | `RequestIDContextMiddleware` mirrors FastMCP request IDs into logs, `RequestIDHeaderMiddleware` adds `X-Request-ID` to HTTP/SSE responses |
+| Add/modify Prometheus metrics | `src/okp_mcp/metrics.py` | Counters, histograms, `PrometheusMiddleware` ASGI class, `/metrics` custom route |
 | Add/modify intent detection | `src/okp_mcp/intent.py` | Append `IntentRule` to `INTENT_RULES` at the correct priority position |
 | Change portal search logic | `src/okp_mcp/portal.py` | Query builders, chunk conversion, RRF fusion, single/multi-query orchestrators, formatting |
 | Change Solr query logic | `src/okp_mcp/solr.py` | `_solr_query()` builds edismax params; `_clean_query()` for tokenization |
@@ -128,23 +130,25 @@ uv run okp-mcp [--transport ...] [--port ...]
             → server.py: _app_lifespan()
                 ├─ creates shared httpx.AsyncClient
                 └─ yields AppContext(...)
+            → metrics.py: registers /metrics custom_route + PrometheusMiddleware
             → tools/__init__.py: imports tool modules for @mcp.tool registration
 ```
 
 ## Module Dependencies
 
 ```text
-__init__.py → build_info, config, request_id, server, tools (side-effect import)
+__init__.py → build_info, config, metrics (side-effect import), request_id, server, tools (side-effect import)
 build_info.py → (standalone, reads ./COMMIT_SHA file)
 tools/__init__.py → tools/search.py, tools/document.py, tools/run_code.py
-tools/search.py → config, portal, server
-tools/document.py → content, server, solr, tools/shared.py
+tools/search.py → config, metrics, portal, server
+tools/document.py → content, metrics, server, solr, tools/shared.py
 tools/run_code.py → config, server
+metrics.py  → server (imports mcp for custom_route)
 request_id.py → fastmcp.server.dependencies, fastmcp.server.middleware, starlette
 intent.py   → config
 portal.py   → config, content, formatting, intent, solr
 formatting.py → content, solr
-solr.py     → config
+solr.py     → config, metrics
 server.py   → config
 content.py  → (standalone)
 ```

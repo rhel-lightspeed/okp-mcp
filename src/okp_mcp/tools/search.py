@@ -1,10 +1,12 @@
 """Portal search MCP tool."""
 
 import logging
+import time
 
 import httpx
 from fastmcp import Context
 
+from okp_mcp.metrics import TOOL_CALLS, TOOL_DURATION
 from okp_mcp.portal import _MAX_QUERIES, _format_portal_results, _run_multi_query_search, _run_portal_search
 from okp_mcp.server import get_app_context, mcp
 
@@ -94,17 +96,20 @@ async def search_portal(
     - When results list specific releases or dates (e.g. EUS availability per
       minor release), enumerate every release explicitly in your answer.
     """
-    normalized = _normalize_queries(query)
-    if isinstance(normalized, str):
-        return normalized  # validation error message
-    # Cap at _MAX_QUERIES to bound Solr load (research shows diminishing
-    # returns past 3 queries).
-    queries = normalized[:_MAX_QUERIES]
-
-    max_results = max(1, min(max_results, 20))
-    logger.info("search_portal: queries=%r max_results=%d", queries, max_results)
+    TOOL_CALLS.labels(tool="search_portal").inc()
+    _start = time.monotonic()
 
     try:
+        normalized = _normalize_queries(query)
+        if isinstance(normalized, str):
+            return normalized  # validation error message
+        # Cap at _MAX_QUERIES to bound Solr load (research shows diminishing
+        # returns past 3 queries).
+        queries = normalized[:_MAX_QUERIES]
+
+        max_results = max(1, min(max_results, 20))
+        logger.info("search_portal: queries=%r max_results=%d", queries, max_results)
+
         app = get_app_context(ctx)
 
         if len(queries) == 1:
@@ -134,3 +139,5 @@ async def search_portal(
     except ValueError:
         logger.exception("Search failed for queries: %r", queries)
         return "The knowledge base search returned an unexpected response. Please try again."
+    finally:
+        TOOL_DURATION.labels(tool="search_portal").observe(time.monotonic() - _start)
