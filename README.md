@@ -82,10 +82,12 @@ podman run -d --pod okp --name okp-mcp \
 
 ### 4. Verify
 
+> **Note:** The `-4` flag forces IPv4. On some systems (e.g. Fedora 43), `localhost` resolves to `::1` (IPv6), which causes a "Connection reset by peer" error. Use `-4` to avoid this.
+
 Confirm Solr has data:
 
 ```bash
-curl -s "http://localhost:8983/solr/portal/select?q=*:*&rows=0" | python3 -m json.tool
+curl -s -4 "http://localhost:8983/solr/portal/select?q=*:*&rows=0" | python3 -m json.tool
 ```
 
 You should see `numFound` with a large number of documents (600k+).
@@ -93,7 +95,7 @@ You should see `numFound` with a large number of documents (600k+).
 Confirm the MCP server responds:
 
 ```bash
-curl -s -N -X POST http://localhost:8000/mcp \
+curl -s -4 -N -X POST http://localhost:8000/mcp \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -d '{"jsonrpc": "2.0", "method": "initialize", "params": {"protocolVersion": "2025-11-25", "capabilities": {}, "clientInfo": {"name": "test", "version": "1.0"}}, "id": 1}'
