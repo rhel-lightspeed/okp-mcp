@@ -1,5 +1,10 @@
 # okp-mcp
 
+[![CI](https://github.com/rhel-lightspeed/okp-mcp/actions/workflows/build.yml/badge.svg)](https://github.com/rhel-lightspeed/okp-mcp/actions/workflows/build.yml)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/rhel-lightspeed/okp-mcp/badge)](https://scorecard.dev/viewer/?uri=github.com/rhel-lightspeed/okp-mcp)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Python: 3.12+](https://img.shields.io/badge/Python-3.12%2B-blue.svg)](https://www.python.org/)
+
 MCP server for the Red Hat Offline Knowledge Portal (OKP). Bridges LLM tool calls to the OKP Solr index so agents can search RHEL documentation, CVEs, errata, solutions, and articles.
 
 ## Quickstart
