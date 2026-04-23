@@ -77,6 +77,12 @@ tests/
   test_functional.py   # functional test runner: calls _run_portal_search() against live Solr, asserts on PortalChunk results
   test_portal.py       # portal.py unit tests: query builders, chunk conversion, RRF, formatting, single/multi-query orchestrators
   test_*.py            # unit test modules mirror src structure
+.github/
+  CODEOWNERS               # PR review assignment (@rhel-lightspeed/developers)
+  workflows/
+    build.yml              # CI/CD: lint, typecheck, radon, pytest matrix, container build+push
+    functional.yml         # Functional tests against live Solr (triggered after build.yml)
+    scorecard.yml          # OpenSSF Scorecard: security posture, weekly + push-to-main
 docs/
   SOLR_EXPLORATION.md     # Historical: original redhat-okp container schema map
 openshift/
@@ -87,6 +93,7 @@ quadlet/
   okp-solr.container   # OKP Solr search engine (rootless quadlet)
   okp-mcp.container    # OKP MCP server (rootless quadlet, depends on Solr)
   README.md            # quadlet install, usage, management, troubleshooting
+SECURITY.md            # Vulnerability reporting via GitHub Security Advisories
 ```
 
 ## Where to Look
@@ -105,6 +112,7 @@ quadlet/
 | Mock Solr responses | `tests/conftest.py` | `solr_mock` fixture uses respx |
 | Deploy to OpenShift | `openshift/okp-mcp.yml` | Template with params: IMAGE, IMAGE_TAG, REPLICAS, etc. |
 | Run locally with systemd | `quadlet/` | Rootless quadlet files: `.container`, `.network`, `.volume`; see `quadlet/README.md` |
+| Modify CI/CD workflows | `.github/workflows/` | `build.yml` (test+container), `functional.yml` (Solr integration), `scorecard.yml` (OpenSSF) |
 | Solr schema reference | `docs/SOLR_EXPLORATION.md` | Historical: original redhat-okp container schema map |
 
 ## Boot Sequence
