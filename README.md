@@ -107,6 +107,10 @@ You should see a response with `serverInfo.name: "RHEL OKP Knowledge Base"`.
 podman pod rm -f okp
 ```
 
+### Alternative: systemd quadlets
+
+For a systemd-managed setup with automatic restart, boot persistence, and journald logging, see [`quadlet/README.md`](quadlet/README.md).
+
 ### Alternative: podman-compose
 
 A `podman-compose.yml` is included for development use. It builds from source and is useful for local iteration, but note that `podman-compose` is not supported on RHEL.

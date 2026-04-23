@@ -1,0 +1,25 @@
+# Red Hat OKP Solr search engine.
+# First start pulls ~10 GB and takes several minutes to index.
+
+[Unit]
+Description=OKP Solr search engine
+
+[Container]
+Image=registry.redhat.io/offline-knowledge-portal/rhokp-rhel9:latest
+ContainerName=okp-solr
+Network=okp.network
+PublishPort=8983:8983
+Volume=okp-solr-data.volume:/opt/solr/server/solr/portal/data
+
+Environment=SOLR_JETTY_HOST=0.0.0.0
+EnvironmentFile=%h/.config/okp-mcp/solr.env
+
+# Graceful shutdown window before forcible stop.
+PodmanArgs=--stop-timeout=30
+
+[Service]
+Restart=on-failure
+TimeoutStartSec=600
+
+[Install]
+WantedBy=default.target

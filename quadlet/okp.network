@@ -1,0 +1,5 @@
+# Shared network for OKP containers.
+# Containers on this network resolve each other by ContainerName via DNS.
+
+[Network]
+NetworkName=okp

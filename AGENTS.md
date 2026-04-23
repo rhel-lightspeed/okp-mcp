@@ -81,6 +81,12 @@ docs/
   SOLR_EXPLORATION.md     # Historical: original redhat-okp container schema map
 openshift/
   okp-mcp.yml   # OpenShift deployment template (Deployment, Service, ServiceAccount)
+quadlet/
+  okp.network          # shared podman network for container DNS resolution
+  okp-solr-data.volume # persistent Solr index volume
+  okp-solr.container   # OKP Solr search engine (rootless quadlet)
+  okp-mcp.container    # OKP MCP server (rootless quadlet, depends on Solr)
+  README.md            # quadlet install, usage, management, troubleshooting
 ```
 
 ## Where to Look
@@ -98,6 +104,7 @@ openshift/
 | Add functional test case | `tests/functional_cases.py` | Add `FunctionalCase` to `FUNCTIONAL_TEST_CASES` list |
 | Mock Solr responses | `tests/conftest.py` | `solr_mock` fixture uses respx |
 | Deploy to OpenShift | `openshift/okp-mcp.yml` | Template with params: IMAGE, IMAGE_TAG, REPLICAS, etc. |
+| Run locally with systemd | `quadlet/` | Rootless quadlet files: `.container`, `.network`, `.volume`; see `quadlet/README.md` |
 | Solr schema reference | `docs/SOLR_EXPLORATION.md` | Historical: original redhat-okp container schema map |
 
 ## Boot Sequence
