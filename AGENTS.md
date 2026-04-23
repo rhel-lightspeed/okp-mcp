@@ -19,12 +19,24 @@ uv run okp-mcp --transport streamable-http --port 8000  # explicit HTTP mode
 
 ```bash
 make ci          # full suite: lint + typecheck + radon + test
+make setup       # install deps + pre-commit hooks
 make lint        # ruff check src/ tests/
 make format      # ruff format src/ tests/
 make typecheck   # ty check src/
 make radon       # cyclomatic complexity gate (A/B only, C+ fails)
 make test        # pytest with coverage
 ```
+
+## Pre-commit Hooks
+
+Install with `pre-commit install` (or `make setup`). Hooks run automatically on `git commit`:
+
+- **ruff** (lint + format): Auto-fixes lint issues and enforces formatting
+- **gitleaks**: Blocks commits containing secrets or credentials
+- **trailing-whitespace**: Strips trailing spaces (preserves markdown line breaks)
+- **end-of-file-fixer**: Ensures files end with a newline
+- **check-toml / check-yaml**: Validates config file syntax
+- **check-merge-conflict**: Catches unresolved merge conflict markers
 
 ## Running Tests
 
@@ -79,6 +91,7 @@ tests/
   test_functional.py   # functional test runner: calls _run_portal_search() against live Solr, asserts on PortalChunk results
   test_portal.py       # portal.py unit tests: query builders, chunk conversion, RRF, formatting, single/multi-query orchestrators
   test_*.py            # unit test modules mirror src structure
+.pre-commit-config.yaml  # pre-commit hook definitions (ruff, gitleaks, whitespace, YAML/TOML checks)
 .github/
   CODEOWNERS               # PR review assignment (@rhel-lightspeed/developers)
   workflows/
@@ -115,6 +128,7 @@ SECURITY.md            # Vulnerability reporting via GitHub Security Advisories
 | Mock Solr responses | `tests/conftest.py` | `solr_mock` fixture uses respx |
 | Deploy to OpenShift | `openshift/okp-mcp.yml` | Template with params: IMAGE, IMAGE_TAG, REPLICAS, etc. |
 | Run locally with systemd | `quadlet/` | Rootless quadlet files: `.container`, `.network`, `.volume`; see `quadlet/README.md` |
+| Modify pre-commit hooks | `.pre-commit-config.yaml` | Runs on every commit: ruff, gitleaks, whitespace, YAML/TOML checks |
 | Modify CI/CD workflows | `.github/workflows/` | `build.yml` (test+container), `functional.yml` (Solr integration), `scorecard.yml` (OpenSSF) |
 | Solr schema reference | `docs/SOLR_EXPLORATION.md` | Historical: original redhat-okp container schema map |
 
