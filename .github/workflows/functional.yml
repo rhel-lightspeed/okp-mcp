@@ -6,6 +6,8 @@ on:
     workflows: [CI/CD]
     types: [completed]
 
+permissions: read-all
+
 env:
   OKP_IMAGE_TAG: '1.1.9-1775158501'
 
