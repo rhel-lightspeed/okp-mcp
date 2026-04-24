@@ -794,7 +794,7 @@ dev = [
 requires-dist = [
     { name = "fastmcp", specifier = ">=3.2.4" },
     { name = "httpx" },
-    { name = "prometheus-client", specifier = ">=0.21" },
+    { name = "prometheus-client", specifier = ">=0.25.0" },
     { name = "pydantic-settings", specifier = ">=2.13.1" },
     { name = "rank-bm25" },
 ]

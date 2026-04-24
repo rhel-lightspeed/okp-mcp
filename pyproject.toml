@@ -8,7 +8,7 @@ requires-python = ">=3.12"
 dependencies = [
     "fastmcp>=3.2.4",
     "httpx",
-    "prometheus_client>=0.21",
+    "prometheus_client>=0.25.0",
     "pydantic-settings>=2.13.1",
     "rank-bm25",
 ]
