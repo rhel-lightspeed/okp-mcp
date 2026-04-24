@@ -10,8 +10,8 @@ from dataclasses import dataclass
 import httpx
 from fastmcp import Context, FastMCP
 
-from .config import ServerConfig
-from .request_id import RequestIDContextMiddleware
+from okp_mcp.config import ServerConfig
+from okp_mcp.request_id import RequestIDContextMiddleware
 
 logger = logging.getLogger(__name__)
 

@@ -14,7 +14,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from .config import logger
+from okp_mcp.config import logger
 
 # ---------------------------------------------------------------------------
 # Intent rule dataclass

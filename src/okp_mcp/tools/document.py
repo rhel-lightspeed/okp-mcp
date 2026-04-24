@@ -6,10 +6,10 @@ from urllib.parse import urlsplit
 import httpx
 from fastmcp import Context
 
-from ..content import _select_within_budget, doc_uri, strip_boilerplate, truncate_content
-from ..server import get_app_context, mcp
-from ..solr import _clean_query, _extract_relevant_section, _get_highlight_snippets, _solr_query
-from .shared import DOCUMENT_FL
+from okp_mcp.content import _select_within_budget, doc_uri, strip_boilerplate, truncate_content
+from okp_mcp.server import get_app_context, mcp
+from okp_mcp.solr import _clean_query, _extract_relevant_section, _get_highlight_snippets, _solr_query
+from okp_mcp.tools.shared import DOCUMENT_FL
 
 logger = logging.getLogger("okp_mcp.tools.get_document")
 

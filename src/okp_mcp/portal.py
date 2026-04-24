@@ -9,11 +9,11 @@ from dataclasses import dataclass, field, replace
 
 import httpx
 
-from .config import logger
-from .content import _select_within_budget, doc_uri, strip_boilerplate
-from .formatting import _annotate_result
-from .intent import apply_deprecation_boosts, apply_main_boosts
-from .solr import _clean_query, _filter_rhv_sentences, _solr_query
+from okp_mcp.config import logger
+from okp_mcp.content import _select_within_budget, doc_uri, strip_boilerplate
+from okp_mcp.formatting import _annotate_result
+from okp_mcp.intent import apply_deprecation_boosts, apply_main_boosts
+from okp_mcp.solr import _clean_query, _filter_rhv_sentences, _solr_query
 
 
 @dataclass
