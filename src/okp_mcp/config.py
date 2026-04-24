@@ -3,7 +3,7 @@
 import logging
 from typing import Literal
 
-from pydantic import Field, computed_field
+from pydantic import Field, SecretStr, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Configure logging
@@ -120,6 +120,10 @@ class ServerConfig(BaseSettings):
         default=30_000,
         ge=1,
         description="Maximum characters in a single tool response",
+    )
+    glitchtip_dsn: SecretStr | None = Field(
+        default=None,
+        description="GlitchTip/Sentry DSN for exception reporting",
     )
 
     @computed_field
