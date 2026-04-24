@@ -11,7 +11,7 @@ dependencies = [
     "prometheus_client>=0.25.0",
     "pydantic-settings>=2.13.1",
     "rank-bm25",
-    "sentry-sdk[httpx]>=2.35.0",
+    "sentry-sdk[httpx]>=2.58.0",
 ]
 
 [project.scripts]
