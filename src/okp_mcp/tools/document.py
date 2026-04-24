@@ -1,12 +1,14 @@
 """Document retrieval MCP tool and supporting helpers."""
 
 import logging
+import time
 from urllib.parse import urlsplit
 
 import httpx
 from fastmcp import Context
 
 from okp_mcp.content import _select_within_budget, doc_uri, strip_boilerplate, truncate_content
+from okp_mcp.metrics import TOOL_CALLS, TOOL_DURATION
 from okp_mcp.server import get_app_context, mcp
 from okp_mcp.solr import _clean_query, _extract_relevant_section, _get_highlight_snippets, _solr_query
 from okp_mcp.tools.shared import DOCUMENT_FL
@@ -222,6 +224,9 @@ async def get_document(ctx: Context, doc_id: str, query: str = "") -> str:
     Use the URL from search results as doc_id. Pass query (the original
     search question) to get BM25-scored relevant passages instead of raw truncated content.
     """
+    TOOL_CALLS.labels(tool="get_document").inc()
+    _start = time.monotonic()
+
     doc_id = _normalize_doc_id(doc_id)
     logger.info("get_document: doc_id=%r query=%r", doc_id, query)
     try:
@@ -244,3 +249,5 @@ async def get_document(ctx: Context, doc_id: str, query: str = "") -> str:
     except (httpx.HTTPError, ValueError):
         logger.exception("get_document failed for doc_id=%r query=%r", doc_id, query)
         return f"Unable to fetch document {doc_id}. The knowledge base may be temporarily unavailable."
+    finally:
+        TOOL_DURATION.labels(tool="get_document").observe(time.monotonic() - _start)

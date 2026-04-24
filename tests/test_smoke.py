@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from pydantic import ValidationError
 
+from okp_mcp.metrics import PrometheusMiddleware
 from okp_mcp.request_id import RequestIDHeaderMiddleware
 
 
@@ -17,15 +18,17 @@ def _mock_mcp_run():
 
 
 def _assert_http_run(mock_mcp, transport: str, host: str, port: int) -> None:
-    """HTTP transports include the request ID response middleware."""
+    """HTTP transports include Prometheus and request ID response middleware."""
     mock_mcp.run.assert_called_once()
     _, kwargs = mock_mcp.run.call_args
 
     assert kwargs["transport"] == transport
     assert kwargs["host"] == host
     assert kwargs["port"] == port
-    assert len(kwargs["middleware"]) == 1
-    assert kwargs["middleware"][0].cls is RequestIDHeaderMiddleware
+    assert len(kwargs["middleware"]) == 2
+    middleware_classes = [m.cls for m in kwargs["middleware"]]
+    assert middleware_classes[0] is PrometheusMiddleware
+    assert middleware_classes[1] is RequestIDHeaderMiddleware
 
 
 def test_module_imports():
