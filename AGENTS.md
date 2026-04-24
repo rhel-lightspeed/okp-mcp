@@ -161,11 +161,11 @@ No circular imports. `content.py` has zero internal dependencies.
 - **Target**: Python 3.12+ (CI tests 3.12, 3.13, 3.14)
 - **Line length**: 120 characters
 - **Formatter**: ruff format
-- **Linter**: ruff check with rules: E, F, W, I (isort), UP, S (security), B (bugbear), A, C4, SIM
+- **Linter**: ruff check with rules: E, F, W, I (isort), UP, S (security), B (bugbear), A, C4, SIM, TID252 (ban relative imports)
 
 ### Imports
 - Order: stdlib, third-party, first-party (enforced by ruff `I` rule)
-- **Never use relative imports.** Always use absolute imports with the full package name (`from okp_mcp.config import ServerConfig`, not `from .config import ServerConfig`)
+- **ZERO relative imports.** Always use absolute imports with the full package name (`from okp_mcp.config import ServerConfig`, not `from .config import ServerConfig`). This is enforced by ruff rule `TID252` and will fail CI.
 - Side-effect imports get a `noqa` comment explaining why:
   ```python
   from okp_mcp import tools as _tools  # noqa: F401 -- triggers @mcp.tool registration
