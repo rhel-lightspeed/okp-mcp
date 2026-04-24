@@ -55,4 +55,3 @@ select = ["E", "F", "W", "I", "UP", "S", "B", "A", "C4", "SIM", "TID252"]
 
 [tool.ty.environment]
 python-version = "3.12"
-

@@ -129,10 +129,11 @@ OKP_ACCESS_KEY=<your-access-key> podman-compose up -d
 
 ## Development
 
-Install dev dependencies:
+Install dev dependencies and pre-commit hooks:
 
 ```
 uv sync --group dev
+pre-commit install
 ```
 
 Run the full CI suite locally:

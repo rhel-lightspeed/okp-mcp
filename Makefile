@@ -1,4 +1,4 @@
-.PHONY: lint format typecheck radon test ci
+.PHONY: lint format typecheck radon test ci setup
 
 lint:
 	uv run ruff check src/ tests/
@@ -18,3 +18,7 @@ test:
 	uv run pytest -v --cov=okp_mcp --cov-report=term-missing
 
 ci: lint typecheck radon test
+
+setup:
+	uv sync --group dev
+	pre-commit install
