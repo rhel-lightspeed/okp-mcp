@@ -59,6 +59,12 @@ objects:
                   value: "${LOG_LEVEL}"
                 - name: MCP_SOLR_URL
                   value: "${SOLR_BASE_URL}"
+                - name: MCP_GLITCHTIP_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: "${GLITCHTIP_SECRET_NAME}"
+                      key: dsn
+                      optional: true
               livenessProbe:
                 tcpSocket:
                   port: 8000
@@ -143,3 +149,11 @@ parameters:
     displayName: Solr Base URL
     description: Base URL of the OKP Solr instance.
     value: http://redhat-okp:8983
+  - name: GLITCHTIP_SECRET_NAME
+    displayName: GlitchTip Secret Name
+    description: >-
+      Name of the OpenShift secret containing the GlitchTip DSN
+      (key: dsn). The secret must exist in the namespace when
+      configured; error reporting is disabled at the application
+      level when the DSN value is blank.
+    value: okp-mcp-glitchtip

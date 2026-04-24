@@ -61,6 +61,29 @@ def test_main_defaults_to_streamable_http(_mock_mcp_run):
     _assert_http_run(_mock_mcp_run, transport="streamable-http", host="0.0.0.0", port=8000)
 
 
+def test_main_initializes_error_reporting(_mock_mcp_run):
+    """Configured GlitchTip setup runs before the server starts."""
+    from okp_mcp import main
+
+    call_order: list[str] = []
+
+    with (
+        patch("sys.argv", ["okp-mcp"]),
+        patch.dict("os.environ", {"MCP_GLITCHTIP_DSN": "https://glitchtip.example.com/1"}),
+        patch("okp_mcp.initialize_error_reporting") as initialize_error_reporting,
+    ):
+        initialize_error_reporting.side_effect = lambda _cfg: call_order.append("init")
+        _mock_mcp_run.run.side_effect = lambda *args, **kwargs: call_order.append("run")
+        main()
+
+    initialize_error_reporting.assert_called_once()
+    glitchtip_dsn = initialize_error_reporting.call_args.args[0].glitchtip_dsn
+    assert glitchtip_dsn is not None
+    assert glitchtip_dsn.get_secret_value() == "https://glitchtip.example.com/1"
+    assert call_order == ["init", "run"]
+    _assert_http_run(_mock_mcp_run, transport="streamable-http", host="0.0.0.0", port=8000)
+
+
 def test_main_stdio_transport(_mock_mcp_run):
     """stdio transport calls mcp.run without host/port."""
     from okp_mcp import main

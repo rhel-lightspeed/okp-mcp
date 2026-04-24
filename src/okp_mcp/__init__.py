@@ -13,6 +13,7 @@ from okp_mcp.config import ServerConfig
 from okp_mcp.metrics import PrometheusMiddleware
 from okp_mcp.request_id import RequestIDLogFilter, build_http_request_id_middleware
 from okp_mcp.server import mcp
+from okp_mcp.telemetry import initialize_error_reporting
 
 __all__ = ["mcp", "main"]
 
@@ -47,6 +48,7 @@ def main() -> None:
     config = CliApp.run(ServerConfig)
     _server._server_config = config
     _configure_logging(config.log_level)
+    initialize_error_reporting(config)
 
     logger.info("okp-mcp %s (%s)", get_package_version(), get_commit_sha())
     logger.info("Starting MCP server with transport=%s", config.transport)

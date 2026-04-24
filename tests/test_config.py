@@ -18,6 +18,7 @@ def test_defaults():
     assert config.port == 8000
     assert config.log_level == "INFO"
     assert config.solr_url == "http://localhost:8983"
+    assert config.glitchtip_dsn is None
 
 
 @pytest.mark.parametrize(
@@ -34,7 +35,7 @@ def test_valid_transports(transport):
 def test_invalid_transport_rejected():
     """Transport values outside the Literal choices raise ValidationError."""
     with pytest.raises(ValidationError, match="transport"):
-        ServerConfig(transport="websocket")
+        CliApp.run(ServerConfig, cli_args=["--transport", "websocket"])
 
 
 def test_env_var_loading():
@@ -63,12 +64,23 @@ def test_cli_args_via_cli_app():
     """CliApp.run parses CLI arguments into ServerConfig."""
     config = CliApp.run(
         ServerConfig,
-        cli_args=["--transport", "sse", "--host", "127.0.0.1", "--port", "3000"],
+        cli_args=[
+            "--transport",
+            "sse",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "3000",
+            "--glitchtip_dsn",
+            "https://example.com/1",
+        ],
     )
 
     assert config.transport == "sse"
     assert config.host == "127.0.0.1"
     assert config.port == 3000
+    assert config.glitchtip_dsn is not None
+    assert config.glitchtip_dsn.get_secret_value() == "https://example.com/1"
 
 
 def test_cli_overrides_env_var():
@@ -88,6 +100,23 @@ def test_env_var_overrides_default():
         config = ServerConfig()
 
     assert config.port == 9999
+
+
+def test_glitchtip_dsn_from_env():
+    """MCP_GLITCHTIP_DSN env var configures exception reporting."""
+    with patch.dict("os.environ", {"MCP_GLITCHTIP_DSN": "https://glitchtip.example.com/1"}):
+        config = ServerConfig()
+
+    assert config.glitchtip_dsn is not None
+    assert config.glitchtip_dsn.get_secret_value() == "https://glitchtip.example.com/1"
+
+
+def test_glitchtip_dsn_is_masked_in_config_repr():
+    """Configured GlitchTip DSNs are masked when config objects are represented."""
+    config = ServerConfig(glitchtip_dsn="https://glitchtip.example.com/1")
+
+    assert "https://glitchtip.example.com/1" not in repr(config)
+    assert "**********" in repr(config)
 
 
 def test_port_type_coercion():

@@ -36,8 +36,9 @@ Settings come from CLI arguments and `MCP_*` environment variables. CLI args tak
 | `--transport` | `MCP_TRANSPORT` | `streamable-http` | `stdio`, `sse`, or `streamable-http` |
 | `--host` | `MCP_HOST` | `0.0.0.0` | Bind address for HTTP transports |
 | `--port` | `MCP_PORT` | `8000` | Bind port for HTTP transports |
-| `--log-level` | `MCP_LOG_LEVEL` | `INFO` | Python log level |
-| `--solr-url` | `MCP_SOLR_URL` | `http://localhost:8983` | Base URL of the Solr instance |
+| `--log_level` | `MCP_LOG_LEVEL` | `INFO` | Python log level |
+| `--solr_url` | `MCP_SOLR_URL` | `http://localhost:8983` | Base URL of the Solr instance |
+| `--glitchtip_dsn` | `MCP_GLITCHTIP_DSN` | unset | Optional GlitchTip/Sentry DSN for exception reporting |
 
 Run `okp-mcp --help` for the full list.
 

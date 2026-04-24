@@ -1,6 +1,6 @@
 # AGENTS.md - okp-mcp
 
-MCP server bridging LLM tool calls to a Solr-indexed Red Hat knowledge base (docs, CVEs, errata, solutions). Built on FastMCP + httpx + pydantic-settings.
+MCP server bridging LLM tool calls to a Solr-indexed Red Hat knowledge base (docs, CVEs, errata, solutions). Built on FastMCP + httpx + pydantic-settings + sentry-sdk.
 
 ## Maintenance Rule
 
@@ -58,6 +58,7 @@ src/okp_mcp/
   __init__.py    # entry point, main(), logging config, re-exports mcp
   build_info.py  # Build-time metadata: git commit SHA + package version
   config.py      # ServerConfig (pydantic BaseSettings, MCP_* env vars)
+  telemetry.py   # Optional GlitchTip/Sentry exception reporting setup
   server.py      # FastMCP instance (single `mcp` object), AppContext, lifespan
   request_id.py  # Request ID context vars, FastMCP middleware, Starlette header middleware, logging filter
   metrics.py     # Prometheus metrics: counters, histograms, /metrics endpoint, ASGI middleware
@@ -125,8 +126,9 @@ uv run okp-mcp [--transport ...] [--port ...]
   → __init__.py: main()
        ├─ CliApp.run(ServerConfig)     # parse CLI + MCP_* env vars
        ├─ _configure_logging()
-        ├─ log version + commit SHA     # build_info.py reads /app/COMMIT_SHA
-        └─ mcp.run(transport=...)       # start FastMCP server
+       ├─ telemetry.initialize_error_reporting()  # no-op unless MCP_GLITCHTIP_DSN is set
+       ├─ log version + commit SHA     # build_info.py reads /app/COMMIT_SHA
+       └─ mcp.run(transport=...)       # start FastMCP server
             → server.py: _app_lifespan()
                 ├─ creates shared httpx.AsyncClient
                 └─ yields AppContext(...)
@@ -137,7 +139,7 @@ uv run okp-mcp [--transport ...] [--port ...]
 ## Module Dependencies
 
 ```text
-__init__.py → build_info, config, metrics (side-effect import), request_id, server, tools (side-effect import)
+__init__.py → build_info, config, metrics (side-effect import), request_id, server, telemetry, tools (side-effect import)
 build_info.py → (standalone, reads ./COMMIT_SHA file)
 tools/__init__.py → tools/search.py, tools/document.py, tools/run_code.py
 tools/search.py → config, metrics, portal, server
@@ -150,6 +152,7 @@ portal.py   → config, content, formatting, intent, solr
 formatting.py → content, solr
 solr.py     → config, metrics
 server.py   → config
+telemetry.py → build_info, config, sentry_sdk
 content.py  → (standalone)
 ```
 
@@ -221,6 +224,8 @@ No circular imports. `content.py` has zero internal dependencies.
 ## Configuration Pattern
 
 Config uses `pydantic_settings.BaseSettings` with `MCP_` env prefix. CLI via `CliApp.run()`. Precedence: CLI > env vars > defaults. Derived values use `@computed_field`.
+
+Optional GlitchTip/Sentry exception reporting is configured with `MCP_GLITCHTIP_DSN` / `--glitchtip_dsn`. Missing or empty DSNs are handled as a no-op for local development.
 
 Module-level constant `STOP_WORDS` lives in `config.py` outside the class to avoid circular import issues. The Solr endpoint is no longer a module-level constant — it flows through `ServerConfig.solr_endpoint` → `AppContext.solr_endpoint` at runtime.
 
