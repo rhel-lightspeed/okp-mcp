@@ -1,6 +1,6 @@
 """MCP tool definitions for RHEL OKP knowledge base search."""
 
-from .document import (
+from okp_mcp.tools.document import (
     _doc_id_filter,
     _escape_solr_phrase,
     _fetch_document_raw,
@@ -9,8 +9,8 @@ from .document import (
     _normalize_doc_id,
     get_document,
 )
-from .run_code import run_code
-from .search import search_portal
+from okp_mcp.tools.run_code import run_code
+from okp_mcp.tools.search import search_portal
 
 __all__ = [
     "_doc_id_filter",

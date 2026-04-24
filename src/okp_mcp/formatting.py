@@ -2,8 +2,8 @@
 
 import re
 
-from .content import doc_uri, strip_boilerplate
-from .solr import _extract_relevant_section, _get_highlights
+from okp_mcp.content import doc_uri, strip_boilerplate
+from okp_mcp.solr import _extract_relevant_section, _get_highlights
 
 EOL_PRODUCT_MENTIONS = [
     ("Red Hat Virtualization", "RHV"),

@@ -4,7 +4,7 @@ import logging
 
 from fastmcp import Context
 
-from ..server import mcp
+from okp_mcp.server import mcp
 
 logger = logging.getLogger("okp_mcp.tools.run_code")
 

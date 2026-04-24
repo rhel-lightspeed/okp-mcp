@@ -160,8 +160,8 @@ No circular imports. `content.py` has zero internal dependencies.
 - **Linter**: ruff check with rules: E, F, W, I (isort), UP, S (security), B (bugbear), A, C4, SIM
 
 ### Imports
-- Order: stdlib, third-party, relative (enforced by ruff `I` rule)
-- Use relative imports within the package (`from .config import ServerConfig`)
+- Order: stdlib, third-party, first-party (enforced by ruff `I` rule)
+- **Never use relative imports.** Always use absolute imports with the full package name (`from okp_mcp.config import ServerConfig`, not `from .config import ServerConfig`)
 - Side-effect imports get a `noqa` comment explaining why:
   ```python
   from okp_mcp import tools as _tools  # noqa: F401 -- triggers @mcp.tool registration

@@ -5,7 +5,7 @@ import re
 import httpx
 from rank_bm25 import BM25Plus  # pyright: ignore[reportMissingImports]
 
-from .config import STOP_WORDS, logger
+from okp_mcp.config import STOP_WORDS, logger
 
 
 def _split_quoted_and_plain(text: str) -> list[str]:

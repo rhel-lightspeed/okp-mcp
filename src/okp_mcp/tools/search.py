@@ -5,8 +5,8 @@ import logging
 import httpx
 from fastmcp import Context
 
-from ..portal import _MAX_QUERIES, _format_portal_results, _run_multi_query_search, _run_portal_search
-from ..server import get_app_context, mcp
+from okp_mcp.portal import _MAX_QUERIES, _format_portal_results, _run_multi_query_search, _run_portal_search
+from okp_mcp.server import get_app_context, mcp
 
 logger = logging.getLogger("okp_mcp.tools.search_portal")
 
