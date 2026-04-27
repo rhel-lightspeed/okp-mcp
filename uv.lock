@@ -812,7 +812,7 @@ dev = [
     { name = "radon", specifier = ">=6.0.1" },
     { name = "respx", specifier = ">=0.23.1" },
     { name = "ruff", specifier = ">=0.15.11" },
-    { name = "ty", specifier = ">=0.0.31" },
+    { name = "ty", specifier = ">=0.0.32" },
 ]
 
 [[package]]
