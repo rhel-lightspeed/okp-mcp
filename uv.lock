@@ -796,7 +796,7 @@ requires-dist = [
     { name = "fastmcp", specifier = ">=3.2.4" },
     { name = "httpx" },
     { name = "prometheus-client", specifier = ">=0.25.0" },
-    { name = "pydantic-settings", specifier = ">=2.13.1" },
+    { name = "pydantic-settings", specifier = ">=2.14.0" },
     { name = "rank-bm25" },
     { name = "sentry-sdk", extras = ["httpx"], specifier = ">=2.58.0" },
 ]
