@@ -72,7 +72,7 @@ data:
             {
               "datasource": { "type": "prometheus", "uid": "${datasource}" },
               "editorMode": "code",
-              "expr": "sum(rate(okp_http_requests_total{namespace=\"$namespace\", job=\"okp-mcp\", status!~\"5..\"}[5m])) / sum(rate(okp_http_requests_total{namespace=\"$namespace\", job=\"okp-mcp\"}[5m])) * 100",
+              "expr": "sum(rate(okp_http_requests_total{namespace=\"$namespace\", job=\"okp-mcp\", status!~\"5..\"}[5m])) / clamp_min(sum(rate(okp_http_requests_total{namespace=\"$namespace\", job=\"okp-mcp\"}[5m])), 1e-10) * 100",
               "legendFormat": "HTTP Success",
               "instant": true,
               "refId": "A"
@@ -114,7 +114,7 @@ data:
             {
               "datasource": { "type": "prometheus", "uid": "${datasource}" },
               "editorMode": "code",
-              "expr": "sum(rate(okp_solr_queries_total{namespace=\"$namespace\", job=\"okp-mcp\", status=\"success\"}[5m])) / sum(rate(okp_solr_queries_total{namespace=\"$namespace\", job=\"okp-mcp\"}[5m])) * 100",
+              "expr": "sum(rate(okp_solr_queries_total{namespace=\"$namespace\", job=\"okp-mcp\", status=\"success\"}[5m])) / clamp_min(sum(rate(okp_solr_queries_total{namespace=\"$namespace\", job=\"okp-mcp\"}[5m])), 1e-10) * 100",
               "legendFormat": "Solr Success",
               "instant": true,
               "refId": "A"
@@ -419,7 +419,7 @@ data:
             {
               "datasource": { "type": "prometheus", "uid": "${datasource}" },
               "editorMode": "code",
-              "expr": "time() - process_start_time_seconds{namespace=\"$namespace\", job=\"okp-mcp\"}",
+              "expr": "min(time() - process_start_time_seconds{namespace=\"$namespace\", job=\"okp-mcp\"})",
               "legendFormat": "Uptime",
               "instant": true,
               "refId": "A"
@@ -444,7 +444,7 @@ data:
             {
               "datasource": { "type": "prometheus", "uid": "${datasource}" },
               "editorMode": "code",
-              "expr": "sum(rate(okp_http_requests_total{namespace=\"$namespace\", job=\"okp-mcp\", status!~\"5..\"}[5m])) / sum(rate(okp_http_requests_total{namespace=\"$namespace\", job=\"okp-mcp\"}[5m])) * 100",
+              "expr": "sum(rate(okp_http_requests_total{namespace=\"$namespace\", job=\"okp-mcp\", status!~\"5..\"}[5m])) / clamp_min(sum(rate(okp_http_requests_total{namespace=\"$namespace\", job=\"okp-mcp\"}[5m])), 1e-10) * 100",
               "legendFormat": "HTTP",
               "range": true,
               "refId": "A"
@@ -452,7 +452,7 @@ data:
             {
               "datasource": { "type": "prometheus", "uid": "${datasource}" },
               "editorMode": "code",
-              "expr": "sum(rate(okp_solr_queries_total{namespace=\"$namespace\", job=\"okp-mcp\", status=\"success\"}[5m])) / sum(rate(okp_solr_queries_total{namespace=\"$namespace\", job=\"okp-mcp\"}[5m])) * 100",
+              "expr": "sum(rate(okp_solr_queries_total{namespace=\"$namespace\", job=\"okp-mcp\", status=\"success\"}[5m])) / clamp_min(sum(rate(okp_solr_queries_total{namespace=\"$namespace\", job=\"okp-mcp\"}[5m])), 1e-10) * 100",
               "legendFormat": "Solr",
               "range": true,
               "refId": "B"
@@ -496,7 +496,7 @@ data:
         }
       ],
       "schemaVersion": 39,
-      "tags": [],
+      "tags": ["okp-mcp", "slo"],
       "templating": {
         "list": [
           {
