@@ -72,7 +72,7 @@ data:
             {
               "datasource": { "type": "prometheus", "uid": "${datasource}" },
               "editorMode": "code",
-              "expr": "sum(rate(okp_http_requests_total{namespace=\"$namespace\", job=\"okp-mcp\", status!~\"5..\"}[5m])) / clamp_min(sum(rate(okp_http_requests_total{namespace=\"$namespace\", job=\"okp-mcp\"}[5m])), 1e-10) * 100",
+              "expr": "sum(rate(okp_http_requests_total{namespace=\"$namespace\", job=\"okp-mcp\", path!=\"/metrics\", status!~\"5..\"}[5m])) / clamp_min(sum(rate(okp_http_requests_total{namespace=\"$namespace\", job=\"okp-mcp\", path!=\"/metrics\"}[5m])), 1e-10) * 100",
               "legendFormat": "HTTP Success",
               "instant": true,
               "refId": "A"
@@ -156,7 +156,7 @@ data:
             {
               "datasource": { "type": "prometheus", "uid": "${datasource}" },
               "editorMode": "code",
-              "expr": "histogram_quantile(0.95, sum(rate(okp_http_request_duration_seconds_bucket{namespace=\"$namespace\", job=\"okp-mcp\"}[5m])) by (le))",
+              "expr": "histogram_quantile(0.95, sum(rate(okp_http_request_duration_seconds_bucket{namespace=\"$namespace\", job=\"okp-mcp\", path!=\"/metrics\"}[5m])) by (le))",
               "legendFormat": "P95",
               "instant": true,
               "refId": "A"
@@ -247,7 +247,7 @@ data:
             {
               "datasource": { "type": "prometheus", "uid": "${datasource}" },
               "editorMode": "code",
-              "expr": "sum(rate(okp_http_requests_total{namespace=\"$namespace\", job=\"okp-mcp\", status=~\"5..\"}[5m]))",
+              "expr": "sum(rate(okp_http_requests_total{namespace=\"$namespace\", job=\"okp-mcp\", path!=\"/metrics\", status=~\"5..\"}[5m]))",
               "legendFormat": "5xx",
               "instant": true,
               "refId": "A"
@@ -288,7 +288,7 @@ data:
             {
               "datasource": { "type": "prometheus", "uid": "${datasource}" },
               "editorMode": "code",
-              "expr": "sum(rate(okp_http_requests_total{namespace=\"$namespace\", job=\"okp-mcp\", status=~\"4..\"}[5m]))",
+              "expr": "sum(rate(okp_http_requests_total{namespace=\"$namespace\", job=\"okp-mcp\", path!=\"/metrics\", status=~\"4..\"}[5m]))",
               "legendFormat": "4xx",
               "instant": true,
               "refId": "A"
@@ -444,7 +444,7 @@ data:
             {
               "datasource": { "type": "prometheus", "uid": "${datasource}" },
               "editorMode": "code",
-              "expr": "sum(rate(okp_http_requests_total{namespace=\"$namespace\", job=\"okp-mcp\", status!~\"5..\"}[5m])) / clamp_min(sum(rate(okp_http_requests_total{namespace=\"$namespace\", job=\"okp-mcp\"}[5m])), 1e-10) * 100",
+              "expr": "sum(rate(okp_http_requests_total{namespace=\"$namespace\", job=\"okp-mcp\", path!=\"/metrics\", status!~\"5..\"}[5m])) / clamp_min(sum(rate(okp_http_requests_total{namespace=\"$namespace\", job=\"okp-mcp\", path!=\"/metrics\"}[5m])), 1e-10) * 100",
               "legendFormat": "HTTP",
               "range": true,
               "refId": "A"
@@ -477,7 +477,7 @@ data:
             {
               "datasource": { "type": "prometheus", "uid": "${datasource}" },
               "editorMode": "code",
-              "expr": "histogram_quantile(0.95, sum(rate(okp_http_request_duration_seconds_bucket{namespace=\"$namespace\", job=\"okp-mcp\"}[5m])) by (le))",
+              "expr": "histogram_quantile(0.95, sum(rate(okp_http_request_duration_seconds_bucket{namespace=\"$namespace\", job=\"okp-mcp\", path!=\"/metrics\"}[5m])) by (le))",
               "legendFormat": "HTTP P95",
               "range": true,
               "refId": "A"
