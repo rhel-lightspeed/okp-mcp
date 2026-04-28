@@ -189,13 +189,19 @@ async def test_prometheus_middleware_normalizes_unknown_paths_to_other():
         """Return an empty HTTP request body."""
         return {"type": "http.request", "body": b""}
 
-    before = _get_counter("okp_http_requests", {"method": "GET", "path": "OTHER", "status": "404"})
+    other_labels = {"method": "GET", "path": "OTHER", "status": "404"}
+    raw_labels = {"method": "GET", "path": "/some/random/scan", "status": "404"}
+    before = _get_counter("okp_http_requests", other_labels)
+    before_raw = _get_counter("okp_http_requests", raw_labels)
 
     middleware = PrometheusMiddleware(mock_app)
     await middleware({"type": "http", "method": "GET", "path": "/some/random/scan"}, mock_receive, mock_send)
 
-    after = _get_counter("okp_http_requests", {"method": "GET", "path": "OTHER", "status": "404"})
+    after = _get_counter("okp_http_requests", other_labels)
     assert after == before + 1
+
+    # The raw path must never appear as its own label value (cardinality guard).
+    assert _get_counter("okp_http_requests", raw_labels) == before_raw
 
 
 # ---------------------------------------------------------------------------

@@ -78,6 +78,13 @@ class PrometheusMiddleware:
         status_code = 500
         recorded = False
 
+        def _emit_metrics(current_status_code: int) -> None:
+            """Record HTTP request count and duration once per request."""
+            duration = time.monotonic() - start
+            labels = {"method": method, "path": path, "status": str(current_status_code)}
+            HTTP_REQUESTS.labels(**labels).inc()
+            HTTP_REQUEST_DURATION.labels(**labels).observe(duration)
+
         async def send_wrapper(message: Message) -> None:
             nonlocal status_code, recorded
             if message["type"] == "http.response.start":
@@ -85,9 +92,7 @@ class PrometheusMiddleware:
                 # Record TTFB so SSE/streaming connections don't inflate the histogram
                 # with full connection lifetime.
                 if not recorded:
-                    duration = time.monotonic() - start
-                    HTTP_REQUESTS.labels(method=method, path=path, status=str(status_code)).inc()
-                    HTTP_REQUEST_DURATION.labels(method=method, path=path, status=str(status_code)).observe(duration)
+                    _emit_metrics(status_code)
                     recorded = True
             await send(message)
 
@@ -96,9 +101,7 @@ class PrometheusMiddleware:
         finally:
             # Fallback for cases where headers never sent (e.g. app crash before response).
             if not recorded:
-                duration = time.monotonic() - start
-                HTTP_REQUESTS.labels(method=method, path=path, status=str(status_code)).inc()
-                HTTP_REQUEST_DURATION.labels(method=method, path=path, status=str(status_code)).observe(duration)
+                _emit_metrics(status_code)
 
 
 @mcp.custom_route("/metrics", methods=["GET"])
