@@ -20,6 +20,14 @@ __all__ = ["mcp", "main"]
 logger = logging.getLogger(__name__)
 
 
+class _MetricsAccessLogFilter(logging.Filter):
+    """Drop uvicorn access log entries for GET /metrics (Prometheus scrapes)."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        """Return False to suppress /metrics lines, True for everything else."""
+        return '"GET /metrics HTTP/' not in record.getMessage()
+
+
 def _configure_logging(log_level: str) -> None:
     """Configure logging at the given level."""
     logging.basicConfig(
@@ -31,6 +39,9 @@ def _configure_logging(log_level: str) -> None:
     # httpx logs every HTTP request at INFO with the full URL-encoded query string.
     # Our solr.py already logs query params in readable form, so this is redundant noise.
     logging.getLogger("httpx").setLevel(logging.WARNING)
+
+    # Prometheus scrapes /metrics every ~15s, flooding logs with useless access lines.
+    logging.getLogger("uvicorn.access").addFilter(_MetricsAccessLogFilter())
 
     request_id_filter = RequestIDLogFilter()
     root_logger = logging.getLogger()
