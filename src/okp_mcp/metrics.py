@@ -10,18 +10,23 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from okp_mcp.server import mcp
 
+# Allowlist of known paths to prevent unbounded label cardinality.
+# Unknown paths are bucketed as "OTHER" so rogue or scan traffic
+# cannot create arbitrary time series.
+_KNOWN_PATHS: frozenset[str] = frozenset({"/mcp", "/sse", "/metrics"})
+
 # ---------------------------------------------------------------------------
 # HTTP-level metrics (recorded by PrometheusMiddleware)
 # ---------------------------------------------------------------------------
 HTTP_REQUESTS = Counter(
     "okp_http_requests_total",
     "Total HTTP requests received by the MCP server",
-    ["method", "status"],
+    ["method", "path", "status"],
 )
 HTTP_REQUEST_DURATION = Histogram(
     "okp_http_request_duration_seconds",
     "HTTP request duration in seconds",
-    ["method", "status"],
+    ["method", "path", "status"],
 )
 
 # ---------------------------------------------------------------------------
@@ -67,6 +72,8 @@ class PrometheusMiddleware:
             return
 
         method = scope.get("method", "UNKNOWN")
+        raw_path = scope.get("path", "UNKNOWN")
+        path = raw_path if raw_path in _KNOWN_PATHS else "OTHER"
         start = time.monotonic()
         status_code = 500
         recorded = False
@@ -79,8 +86,8 @@ class PrometheusMiddleware:
                 # with full connection lifetime.
                 if not recorded:
                     duration = time.monotonic() - start
-                    HTTP_REQUESTS.labels(method=method, status=str(status_code)).inc()
-                    HTTP_REQUEST_DURATION.labels(method=method, status=str(status_code)).observe(duration)
+                    HTTP_REQUESTS.labels(method=method, path=path, status=str(status_code)).inc()
+                    HTTP_REQUEST_DURATION.labels(method=method, path=path, status=str(status_code)).observe(duration)
                     recorded = True
             await send(message)
 
@@ -90,8 +97,8 @@ class PrometheusMiddleware:
             # Fallback for cases where headers never sent (e.g. app crash before response).
             if not recorded:
                 duration = time.monotonic() - start
-                HTTP_REQUESTS.labels(method=method, status=str(status_code)).inc()
-                HTTP_REQUEST_DURATION.labels(method=method, status=str(status_code)).observe(duration)
+                HTTP_REQUESTS.labels(method=method, path=path, status=str(status_code)).inc()
+                HTTP_REQUEST_DURATION.labels(method=method, path=path, status=str(status_code)).observe(duration)
 
 
 @mcp.custom_route("/metrics", methods=["GET"])

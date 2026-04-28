@@ -55,12 +55,12 @@ async def test_prometheus_middleware_records_http_request_counter():
         """Capture sent ASGI messages."""
         sent.append(message)
 
-    before = _get_counter("okp_http_requests", {"method": "POST", "status": "200"})
+    before = _get_counter("okp_http_requests", {"method": "POST", "path": "/mcp", "status": "200"})
 
     middleware = PrometheusMiddleware(mock_app)
     await middleware({"type": "http", "method": "POST", "path": "/mcp"}, mock_receive, mock_send)
 
-    after = _get_counter("okp_http_requests", {"method": "POST", "status": "200"})
+    after = _get_counter("okp_http_requests", {"method": "POST", "path": "/mcp", "status": "200"})
     assert after == before + 1
     assert len(sent) == 2
 
@@ -82,12 +82,13 @@ async def test_prometheus_middleware_records_duration_histogram():
         """Return an empty HTTP request body."""
         return {"type": "http.request", "body": b""}
 
-    before = _get_histogram_count("okp_http_request_duration_seconds", {"method": "GET", "status": "200"})
+    duration_labels = {"method": "GET", "path": "/mcp", "status": "200"}
+    before = _get_histogram_count("okp_http_request_duration_seconds", duration_labels)
 
     middleware = PrometheusMiddleware(mock_app)
-    await middleware({"type": "http", "method": "GET", "path": "/metrics"}, mock_receive, mock_send)
+    await middleware({"type": "http", "method": "GET", "path": "/mcp"}, mock_receive, mock_send)
 
-    after = _get_histogram_count("okp_http_request_duration_seconds", {"method": "GET", "status": "200"})
+    after = _get_histogram_count("okp_http_request_duration_seconds", duration_labels)
     assert after == before + 1
 
 
@@ -108,12 +109,12 @@ async def test_prometheus_middleware_captures_error_status_codes():
         """Return an empty HTTP request body."""
         return {"type": "http.request", "body": b""}
 
-    before = _get_counter("okp_http_requests", {"method": "POST", "status": "500"})
+    before = _get_counter("okp_http_requests", {"method": "POST", "path": "/mcp", "status": "500"})
 
     middleware = PrometheusMiddleware(error_app)
     await middleware({"type": "http", "method": "POST", "path": "/mcp"}, mock_receive, mock_send)
 
-    after = _get_counter("okp_http_requests", {"method": "POST", "status": "500"})
+    after = _get_counter("okp_http_requests", {"method": "POST", "path": "/mcp", "status": "500"})
     assert after == before + 1
 
 
@@ -126,16 +127,16 @@ async def test_prometheus_middleware_passes_through_non_http_scopes():
         nonlocal called
         called = True
 
-    before_get = _get_counter("okp_http_requests", {"method": "GET", "status": "200"})
-    before_post = _get_counter("okp_http_requests", {"method": "POST", "status": "200"})
+    before_get = _get_counter("okp_http_requests", {"method": "GET", "path": "/mcp", "status": "200"})
+    before_post = _get_counter("okp_http_requests", {"method": "POST", "path": "/mcp", "status": "200"})
 
     middleware = PrometheusMiddleware(mock_app)
     await middleware({"type": "websocket"}, None, None)
 
     assert called
     # No HTTP metrics should have been recorded.
-    assert _get_counter("okp_http_requests", {"method": "GET", "status": "200"}) == before_get
-    assert _get_counter("okp_http_requests", {"method": "POST", "status": "200"}) == before_post
+    assert _get_counter("okp_http_requests", {"method": "GET", "path": "/mcp", "status": "200"}) == before_get
+    assert _get_counter("okp_http_requests", {"method": "POST", "path": "/mcp", "status": "200"}) == before_post
 
 
 async def test_prometheus_middleware_records_metrics_on_app_exception():
@@ -145,8 +146,9 @@ async def test_prometheus_middleware_records_metrics_on_app_exception():
         """ASGI app that crashes before sending a response."""
         raise RuntimeError("boom")
 
-    before = _get_counter("okp_http_requests", {"method": "POST", "status": "500"})
-    before_duration = _get_histogram_count("okp_http_request_duration_seconds", {"method": "POST", "status": "500"})
+    error_labels = {"method": "POST", "path": "/mcp", "status": "500"}
+    before = _get_counter("okp_http_requests", error_labels)
+    before_duration = _get_histogram_count("okp_http_request_duration_seconds", error_labels)
 
     async def receive():
         """Stub ASGI receive callable."""
@@ -164,10 +166,36 @@ async def test_prometheus_middleware_records_metrics_on_app_exception():
         )
 
     # Status defaults to 500 when no http.response.start was sent.
-    after = _get_counter("okp_http_requests", {"method": "POST", "status": "500"})
-    after_duration = _get_histogram_count("okp_http_request_duration_seconds", {"method": "POST", "status": "500"})
+    after = _get_counter("okp_http_requests", error_labels)
+    after_duration = _get_histogram_count("okp_http_request_duration_seconds", error_labels)
     assert after == before + 1
     assert after_duration == before_duration + 1
+
+
+async def test_prometheus_middleware_normalizes_unknown_paths_to_other():
+    """Unknown paths are bucketed as OTHER to prevent label cardinality explosion."""
+    sent: list[dict] = []
+
+    async def mock_app(scope, receive, send):
+        """Minimal ASGI app returning 404."""
+        await send({"type": "http.response.start", "status": 404, "headers": []})
+        await send({"type": "http.response.body", "body": b"not found"})
+
+    async def mock_send(message):
+        """Capture sent ASGI messages."""
+        sent.append(message)
+
+    async def mock_receive():
+        """Return an empty HTTP request body."""
+        return {"type": "http.request", "body": b""}
+
+    before = _get_counter("okp_http_requests", {"method": "GET", "path": "OTHER", "status": "404"})
+
+    middleware = PrometheusMiddleware(mock_app)
+    await middleware({"type": "http", "method": "GET", "path": "/some/random/scan"}, mock_receive, mock_send)
+
+    after = _get_counter("okp_http_requests", {"method": "GET", "path": "OTHER", "status": "404"})
+    assert after == before + 1
 
 
 # ---------------------------------------------------------------------------
@@ -197,8 +225,8 @@ async def test_metrics_endpoint_content_type():
 
 def test_metric_label_names():
     """Verify expected label names on each metric family."""
-    assert HTTP_REQUESTS._labelnames == ("method", "status")
-    assert HTTP_REQUEST_DURATION._labelnames == ("method", "status")
+    assert HTTP_REQUESTS._labelnames == ("method", "path", "status")
+    assert HTTP_REQUEST_DURATION._labelnames == ("method", "path", "status")
     assert TOOL_CALLS._labelnames == ("tool",)
     assert TOOL_DURATION._labelnames == ("tool",)
     assert SOLR_QUERIES._labelnames == ("status",)
