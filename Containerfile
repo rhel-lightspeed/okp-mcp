@@ -1,5 +1,5 @@
 # Stage 1: Builder - UBI 10 full image has Python 3.12 + pip
-FROM registry.access.redhat.com/ubi10:latest@sha256:c9591e8051717c975e58292d63677ad62eb0bdcfb695d74c5036852d1dbae5a1 AS builder
+FROM registry.access.redhat.com/ubi10:latest@sha256:ff3bc6edd7f424bbf18ab671ce60f96593101e64f2c1a56eb5008b6bc3473310 AS builder
 
 WORKDIR /build
 
