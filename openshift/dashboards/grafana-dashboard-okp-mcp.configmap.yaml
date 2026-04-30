@@ -64,8 +64,8 @@ data:
             {
               "datasource": { "type": "prometheus", "uid": "${datasource}" },
               "editorMode": "code",
-              "expr": "sum(rate(okp_http_requests_total{namespace=\"$namespace\", job=\"okp-mcp\", path!=\"/metrics\"}[$__rate_interval])) by (method)",
-              "legendFormat": "{{method}}",
+              "expr": "sum(rate(okp_http_requests_total{namespace=\"$namespace\", job=\"okp-mcp\", path!=\"/metrics\", method=\"POST\"}[$__rate_interval]))",
+              "legendFormat": "POST",
               "range": true,
               "refId": "A"
             }
@@ -98,8 +98,8 @@ data:
             {
               "datasource": { "type": "prometheus", "uid": "${datasource}" },
               "editorMode": "code",
-              "expr": "sum(rate(okp_http_requests_total{namespace=\"$namespace\", job=\"okp-mcp\", path!=\"/metrics\", status=~\"[45]..\"}[$__rate_interval])) by (method, status)",
-              "legendFormat": "{{method}} {{status}}",
+              "expr": "sum(rate(okp_http_requests_total{namespace=\"$namespace\", job=\"okp-mcp\", path!=\"/metrics\", method=\"POST\", status=~\"[45]..\"}[$__rate_interval])) by (status)",
+              "legendFormat": "POST {{status}}",
               "range": true,
               "refId": "A"
             }
@@ -132,8 +132,8 @@ data:
             {
               "datasource": { "type": "prometheus", "uid": "${datasource}" },
               "editorMode": "code",
-              "expr": "histogram_quantile(0.95, sum(rate(okp_http_request_duration_seconds_bucket{namespace=\"$namespace\", job=\"okp-mcp\", path!=\"/metrics\"}[$__rate_interval])) by (le, method))",
-              "legendFormat": "{{method}}",
+              "expr": "histogram_quantile(0.95, sum(rate(okp_http_request_duration_seconds_bucket{namespace=\"$namespace\", job=\"okp-mcp\", path!=\"/metrics\", method=\"POST\"}[$__rate_interval])) by (le))",
+              "legendFormat": "POST",
               "range": true,
               "refId": "A"
             }
@@ -160,7 +160,7 @@ data:
                 "lineInterpolation": "linear",
                 "fillOpacity": 10
               },
-              "color": { "mode": "shades", "fixedColor": "blue" }
+              "color": { "mode": "palette-classic" }
             },
             "overrides": []
           },
@@ -194,7 +194,7 @@ data:
                 "lineInterpolation": "linear",
                 "fillOpacity": 10
               },
-              "color": { "mode": "fixed", "fixedColor": "yellow" }
+              "color": { "mode": "palette-classic" }
             },
             "overrides": []
           },
@@ -228,7 +228,7 @@ data:
                 "lineInterpolation": "linear",
                 "fillOpacity": 10
               },
-              "color": { "mode": "fixed", "fixedColor": "yellow" }
+              "color": { "mode": "palette-classic" }
             },
             "overrides": []
           },
