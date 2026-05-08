@@ -11,6 +11,9 @@ from okp_mcp.config import ServerConfig
 from okp_mcp.metrics import (
     HTTP_REQUEST_DURATION,
     HTTP_REQUESTS,
+    INTENT_DEPRECATION_SKIPPED,
+    INTENT_MATCHED,
+    INTENT_NO_MATCH,
     SOLR_QUERIES,
     SOLR_QUERY_DURATION,
     TOOL_CALLS,
@@ -216,6 +219,9 @@ async def test_metrics_endpoint_returns_prometheus_format():
     assert b"okp_http_requests_total" in response.body
     assert b"okp_tool_calls_total" in response.body
     assert b"okp_solr_queries_total" in response.body
+    assert b"okp_intent_matched_total" in response.body
+    assert b"okp_intent_no_match_total" in response.body
+    assert b"okp_intent_deprecation_skipped_total" in response.body
 
 
 async def test_metrics_endpoint_content_type():
@@ -237,6 +243,9 @@ def test_metric_label_names():
     assert TOOL_DURATION._labelnames == ("tool",)
     assert SOLR_QUERIES._labelnames == ("status",)
     assert SOLR_QUERY_DURATION._labelnames == ("status",)
+    assert INTENT_MATCHED._labelnames == ("intent", "query_path")
+    assert INTENT_NO_MATCH._labelnames == ("query_path",)
+    assert INTENT_DEPRECATION_SKIPPED._labelnames == ("intent",)
 
 
 # ---------------------------------------------------------------------------

@@ -15,6 +15,7 @@ import re
 from dataclasses import dataclass
 
 from okp_mcp.config import logger
+from okp_mcp.metrics import INTENT_DEPRECATION_SKIPPED, INTENT_MATCHED, INTENT_NO_MATCH
 
 # ---------------------------------------------------------------------------
 # Intent rule dataclass
@@ -315,7 +316,10 @@ def apply_main_boosts(params: dict, query_lower: str, cleaned_query: str) -> Non
                 params["hl.q"] = f"{cleaned_query} {rule.highlight_terms}"
             boosted = "bq + hl.q" if rule.highlight_terms else "bq"
             logger.info("Intent boost: applied '%s' to main query (%s)", rule.name, boosted)
+            INTENT_MATCHED.labels(intent=rule.name, query_path="main").inc()
             return
+
+    INTENT_NO_MATCH.labels(query_path="main").inc()
 
 
 def apply_deprecation_boosts(params: dict, query_lower: str) -> None:
@@ -346,6 +350,7 @@ def apply_deprecation_boosts(params: dict, query_lower: str) -> None:
         # release_date first (no dep terms) and must not fall through
         # to VM deprecation boosts.
         if not rule.dep_title_terms:
+            INTENT_DEPRECATION_SKIPPED.labels(intent=rule.name).inc()
             return
         existing_bq = params.get("bq", "")
         params["bq"] = (
@@ -356,4 +361,7 @@ def apply_deprecation_boosts(params: dict, query_lower: str) -> None:
         logger.info(
             "Intent boost: applied '%s' to deprecation query (^%d/^%d)", rule.name, _DEP_TITLE_BOOST, _DEP_CONTENT_BOOST
         )
+        INTENT_MATCHED.labels(intent=rule.name, query_path="deprecation").inc()
         return
+
+    INTENT_NO_MATCH.labels(query_path="deprecation").inc()

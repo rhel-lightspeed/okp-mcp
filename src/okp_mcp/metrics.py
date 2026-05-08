@@ -44,6 +44,38 @@ TOOL_DURATION = Histogram(
 )
 
 # ---------------------------------------------------------------------------
+# Intent detection metrics (recorded by intent.py instrumentation)
+# ---------------------------------------------------------------------------
+
+# Tracks which intent rules fire and on which query path (main vs deprecation).
+# Labels: intent=<rule name>, query_path=<"main"|"deprecation">
+# Bounded cardinality: current 12 rule names x 2 paths = 24 series.
+INTENT_MATCHED = Counter(
+    "okp_intent_matched_total",
+    "Intent rule matched a user query",
+    ["intent", "query_path"],
+)
+
+# Incremented when no intent rule matches a query, indicating a coverage gap
+# in the intent registry.  High values suggest new rules are needed.
+# Labels: query_path=<"main"|"deprecation">
+INTENT_NO_MATCH = Counter(
+    "okp_intent_no_match_total",
+    "No intent rule matched the user query",
+    ["query_path"],
+)
+
+# Counts queries where an intent rule matched in the deprecation path but
+# the rule has no dep_title_terms, causing an early return with no boost.
+# Distinguishes "deliberately no deprecation boost" from "no match at all".
+# Labels: intent=<rule name that caused the skip>
+INTENT_DEPRECATION_SKIPPED = Counter(
+    "okp_intent_deprecation_skipped_total",
+    "Intent matched but skipped deprecation boost (no dep_title_terms)",
+    ["intent"],
+)
+
+# ---------------------------------------------------------------------------
 # Solr backend metrics (recorded by solr.py instrumentation)
 # ---------------------------------------------------------------------------
 SOLR_QUERIES = Counter(
