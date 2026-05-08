@@ -13,6 +13,12 @@ from okp_mcp.config import logger
 from okp_mcp.content import _select_within_budget, doc_uri, strip_boilerplate
 from okp_mcp.formatting import _annotate_result
 from okp_mcp.intent import apply_deprecation_boosts, apply_main_boosts
+from okp_mcp.metrics import (
+    SEARCH_DEPRECATION_DETECTED,
+    SEARCH_RESULT_COUNT,
+    SEARCH_SCORE_FILTER_DROPPED,
+    SEARCH_ZERO_RESULTS,
+)
 from okp_mcp.solr import _clean_query, _filter_rhv_sentences, _solr_query
 
 
@@ -502,9 +508,14 @@ def _filter_by_score(chunks: list[PortalChunk]) -> list[PortalChunk]:
     kept = [c for c in chunks if c.score is None or c.score >= threshold]
 
     if len(kept) < len(chunks):
+        dropped = len(chunks) - len(kept)
+        # Intentionally ungated: fires per Solr sub-query (not per user
+        # search) so it measures raw Solr relevance quality, unlike the
+        # other three search quality metrics which emit once per user search.
+        SEARCH_SCORE_FILTER_DROPPED.inc(dropped)
         logger.info(
             "Score filter: dropped %d/%d chunks below %.1f%% of top score (%.1f)",
-            len(chunks) - len(kept),
+            dropped,
             len(chunks),
             _MIN_SCORE_RATIO * 100,
             top_score,
@@ -540,6 +551,7 @@ async def _run_portal_search(
     # current status, but avoids returning low-relevance tail results
     # that inflate the tool response without improving answer quality.
     max_results: int = 7,
+    emit_quality_metrics: bool = True,
 ) -> tuple[list[PortalChunk], bool]:
     """Execute the unified portal search pipeline.
 
@@ -553,6 +565,10 @@ async def _run_portal_search(
             at module level; the actual type is enforced by ``_solr_query``).
         solr_endpoint: Full Solr endpoint URL for the portal core.
         max_results: Maximum chunks to return after deduplication.
+        emit_quality_metrics: Whether to record search quality Prometheus
+            metrics.  Set to ``False`` when called as a sub-query inside
+            ``_run_multi_query_search`` so metrics count user-visible
+            searches, not individual query variants.
 
     Returns:
         Tuple of (top-N PortalChunk list, has_deprecation bool).
@@ -587,6 +603,13 @@ async def _run_portal_search(
 
     dep_parent_ids = {d.parent_id for d in dep_chunks if d.parent_id is not None}
     has_deprecation = any(c.parent_id in dep_parent_ids for c in top_n if c.parent_id is not None)
+
+    if emit_quality_metrics:
+        SEARCH_RESULT_COUNT.observe(len(top_n))
+        if not top_n:
+            SEARCH_ZERO_RESULTS.inc()
+        if has_deprecation:
+            SEARCH_DEPRECATION_DETECTED.inc()
 
     logger.info(
         "Portal search: query=%r main=%d dep=%d merged=%d deduped=%d returned=%d",
@@ -638,6 +661,7 @@ async def _run_multi_query_search(
                 client=client,
                 solr_endpoint=solr_endpoint,
                 max_results=max_results,
+                emit_quality_metrics=False,
             )
             for q in queries
         ],
@@ -671,6 +695,13 @@ async def _run_multi_query_search(
     # from different query variants with different highlight snippets.
     deduped = _deduplicate_by_parent(merged)
 
+    top_n = deduped[:max_results]
+    SEARCH_RESULT_COUNT.observe(len(top_n))
+    if not top_n:
+        SEARCH_ZERO_RESULTS.inc()
+    if has_deprecation:
+        SEARCH_DEPRECATION_DETECTED.inc()
+
     logger.info(
         "Multi-query search: queries=%d succeeded=%d failed=%d chunks_per_query=%s merged=%d deduped=%d returned=%d",
         len(queries),
@@ -679,10 +710,10 @@ async def _run_multi_query_search(
         [len(cl) for cl in chunk_lists],
         len(merged),
         len(deduped),
-        min(len(deduped), max_results),
+        len(top_n),
     )
 
-    return deduped[:max_results], has_deprecation
+    return top_n, has_deprecation
 
 
 # ---------------------------------------------------------------------------
