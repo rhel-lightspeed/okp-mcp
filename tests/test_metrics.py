@@ -14,6 +14,10 @@ from okp_mcp.metrics import (
     INTENT_DEPRECATION_SKIPPED,
     INTENT_MATCHED,
     INTENT_NO_MATCH,
+    SEARCH_DEPRECATION_DETECTED,
+    SEARCH_RESULT_COUNT,
+    SEARCH_SCORE_FILTER_DROPPED,
+    SEARCH_ZERO_RESULTS,
     SOLR_QUERIES,
     SOLR_QUERY_DURATION,
     TOOL_CALLS,
@@ -222,6 +226,10 @@ async def test_metrics_endpoint_returns_prometheus_format():
     assert b"okp_intent_matched_total" in response.body
     assert b"okp_intent_no_match_total" in response.body
     assert b"okp_intent_deprecation_skipped_total" in response.body
+    assert b"okp_search_result_count" in response.body
+    assert b"okp_search_zero_results_total" in response.body
+    assert b"okp_search_score_filter_dropped_total" in response.body
+    assert b"okp_search_deprecation_detected_total" in response.body
 
 
 async def test_metrics_endpoint_content_type():
@@ -246,6 +254,10 @@ def test_metric_label_names():
     assert INTENT_MATCHED._labelnames == ("intent", "query_path")
     assert INTENT_NO_MATCH._labelnames == ("query_path",)
     assert INTENT_DEPRECATION_SKIPPED._labelnames == ("intent",)
+    assert SEARCH_RESULT_COUNT._labelnames == ()
+    assert SEARCH_ZERO_RESULTS._labelnames == ()
+    assert SEARCH_SCORE_FILTER_DROPPED._labelnames == ()
+    assert SEARCH_DEPRECATION_DETECTED._labelnames == ()
 
 
 # ---------------------------------------------------------------------------

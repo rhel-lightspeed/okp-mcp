@@ -89,6 +89,41 @@ SOLR_QUERY_DURATION = Histogram(
     ["status"],
 )
 
+# ---------------------------------------------------------------------------
+# Search quality metrics (recorded by portal.py pipeline instrumentation)
+# ---------------------------------------------------------------------------
+
+# Distribution of final result counts returned to the caller.  The zero
+# bucket doubles as a zero-result detector when read as a rate, but the
+# dedicated counter below is cheaper for alerting.
+SEARCH_RESULT_COUNT = Histogram(
+    "okp_search_result_count",
+    "Number of chunks returned by a portal search",
+    buckets=(0, 1, 2, 3, 5, 7, 10, 15, 25),
+)
+
+# Fires when a portal search pipeline produces zero results, enabling
+# direct alerting without histogram bucket arithmetic.
+SEARCH_ZERO_RESULTS = Counter(
+    "okp_search_zero_results_total",
+    "Portal searches that returned zero results",
+)
+
+# Counts low-quality chunks removed by the score filter.  A sustained
+# high rate may indicate Solr relevance tuning issues.
+SEARCH_SCORE_FILTER_DROPPED = Counter(
+    "okp_search_score_filter_dropped_total",
+    "Chunks dropped by the score quality filter",
+)
+
+# Fires when at least one deprecation-sourced document survives into the
+# final result set.  Useful for tracking how often users hit deprecated
+# or removed features.
+SEARCH_DEPRECATION_DETECTED = Counter(
+    "okp_search_deprecation_detected_total",
+    "Searches where deprecated/removed content appeared in results",
+)
+
 
 class PrometheusMiddleware:
     """ASGI middleware that records HTTP request count and duration."""

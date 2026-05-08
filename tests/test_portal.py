@@ -3,6 +3,7 @@
 import httpx
 import pytest
 import respx
+from prometheus_client import REGISTRY
 
 from okp_mcp.intent import INTENT_RULES, IntentRule, apply_deprecation_boosts, apply_main_boosts
 from okp_mcp.portal import (
@@ -20,6 +21,7 @@ from okp_mcp.portal import (
     _docs_to_chunks,
     _fallback_cve,
     _fallback_errata,
+    _filter_by_score,
     _format_portal_chunk,
     _format_portal_results,
     _reciprocal_rank_fusion,
@@ -1469,3 +1471,166 @@ class TestRunMultiQuerySearch:
                         client=client,
                         solr_endpoint=_SOLR_ENDPOINT,
                     )
+
+
+# ---------------------------------------------------------------------------
+# Search quality metrics
+# ---------------------------------------------------------------------------
+
+
+def _get_counter(name: str, labels: dict | None = None) -> float:
+    """Read the current value of a Prometheus counter, defaulting to 0."""
+    return REGISTRY.get_sample_value(f"{name}_total", labels or {}) or 0.0
+
+
+def _get_histogram_count(name: str, labels: dict | None = None) -> float:
+    """Read the sample count of a Prometheus histogram."""
+    return REGISTRY.get_sample_value(f"{name}_count", labels or {}) or 0.0
+
+
+class TestSearchQualityMetrics:
+    """Verify search quality Prometheus metrics fire at the correct pipeline stages."""
+
+    async def test_result_count_histogram_observed(self):
+        """_run_portal_search observes the result count histogram."""
+        doc = _make_doc(doc_id="m1", allTitle="Metric Doc")
+        hl = {"m1": {"main_content": ["Some content."]}}
+        before = _get_histogram_count("okp_search_result_count")
+
+        with respx.mock(assert_all_called=False) as router:
+            router.get(_SOLR_ENDPOINT).mock(return_value=httpx.Response(200, json=_make_solr_json([doc], hl)))
+            async with httpx.AsyncClient() as client:
+                await _run_portal_search("metric test", client=client, solr_endpoint=_SOLR_ENDPOINT)
+
+        assert _get_histogram_count("okp_search_result_count") == before + 1
+
+    async def test_zero_results_counter_incremented(self):
+        """Zero-result searches increment the dedicated counter."""
+        before = _get_counter("okp_search_zero_results")
+
+        with respx.mock(assert_all_called=False) as router:
+            router.get(_SOLR_ENDPOINT).mock(return_value=httpx.Response(200, json=_make_solr_json([])))
+            async with httpx.AsyncClient() as client:
+                await _run_portal_search("nonexistent query", client=client, solr_endpoint=_SOLR_ENDPOINT)
+
+        assert _get_counter("okp_search_zero_results") == before + 1
+
+    async def test_zero_results_counter_not_incremented_for_hits(self):
+        """Searches that return results do not increment the zero-result counter."""
+        doc = _make_doc(doc_id="hit1", allTitle="Found Doc")
+        hl = {"hit1": {"main_content": ["Found this."]}}
+        before = _get_counter("okp_search_zero_results")
+
+        with respx.mock(assert_all_called=False) as router:
+            router.get(_SOLR_ENDPOINT).mock(return_value=httpx.Response(200, json=_make_solr_json([doc], hl)))
+            async with httpx.AsyncClient() as client:
+                await _run_portal_search("found query", client=client, solr_endpoint=_SOLR_ENDPOINT)
+
+        assert _get_counter("okp_search_zero_results") == before
+
+    async def test_deprecation_detected_counter_incremented(self):
+        """Deprecation content in results increments the detection counter."""
+        normal_doc = _make_doc(doc_id="norm1", allTitle="Normal Doc")
+        dep_doc = _make_doc(doc_id="dep1", allTitle="Removed Feature")
+        hl_normal = {"norm1": {"main_content": ["Normal content."]}}
+        hl_dep = {"dep1": {"main_content": ["Feature was removed."]}}
+        before = _get_counter("okp_search_deprecation_detected")
+
+        def side_effect(request):
+            """Return deprecation doc only for the deprecation sub-query."""
+            q = str(request.url.params.get("q", ""))
+            if "deprecated" in q:
+                return httpx.Response(200, json=_make_solr_json([dep_doc], hl_dep))
+            return httpx.Response(200, json=_make_solr_json([normal_doc], hl_normal))
+
+        with respx.mock(assert_all_called=False) as router:
+            router.get(_SOLR_ENDPOINT).mock(side_effect=side_effect)
+            async with httpx.AsyncClient() as client:
+                _, has_dep = await _run_portal_search(
+                    "deprecated feature", client=client, solr_endpoint=_SOLR_ENDPOINT
+                )
+
+        assert has_dep is True
+        assert _get_counter("okp_search_deprecation_detected") == before + 1
+
+    async def test_deprecation_counter_not_incremented_without_deprecation(self):
+        """Non-deprecation searches do not increment the deprecation counter."""
+        doc = _make_doc(doc_id="clean1", allTitle="Clean Doc")
+        hl = {"clean1": {"main_content": ["Clean content."]}}
+        before = _get_counter("okp_search_deprecation_detected")
+
+        def side_effect(request):
+            """Return the doc only for the main query, empty for deprecation."""
+            q = str(request.url.params.get("q", ""))
+            if "deprecated" in q:
+                return httpx.Response(200, json=_make_solr_json([]))
+            return httpx.Response(200, json=_make_solr_json([doc], hl))
+
+        with respx.mock(assert_all_called=False) as router:
+            router.get(_SOLR_ENDPOINT).mock(side_effect=side_effect)
+            async with httpx.AsyncClient() as client:
+                _, has_dep = await _run_portal_search(
+                    "clean query", client=client, solr_endpoint=_SOLR_ENDPOINT
+                )
+
+        assert has_dep is False
+        assert _get_counter("okp_search_deprecation_detected") == before
+
+    async def test_multi_query_emits_metrics_once(self):
+        """Multi-query search emits quality metrics once per user search, not per sub-query."""
+        doc = _make_doc(doc_id="mq1", allTitle="Multi Query Doc")
+        hl = {"mq1": {"main_content": ["Multi query content."]}}
+        hist_before = _get_histogram_count("okp_search_result_count")
+        zero_before = _get_counter("okp_search_zero_results")
+
+        def side_effect(request):
+            """Return doc for main queries, empty for deprecation sub-queries."""
+            q = str(request.url.params.get("q", ""))
+            if "deprecated" in q:
+                return httpx.Response(200, json=_make_solr_json([]))
+            return httpx.Response(200, json=_make_solr_json([doc], hl))
+
+        with respx.mock(assert_all_called=False) as router:
+            router.get(_SOLR_ENDPOINT).mock(side_effect=side_effect)
+            async with httpx.AsyncClient() as client:
+                await _run_multi_query_search(
+                    ["query one", "query two"],
+                    client=client,
+                    solr_endpoint=_SOLR_ENDPOINT,
+                )
+
+        # Histogram should increment exactly once (the fused result), not twice (per sub-query).
+        assert _get_histogram_count("okp_search_result_count") == hist_before + 1
+        assert _get_counter("okp_search_zero_results") == zero_before
+
+    def test_score_filter_dropped_counter_incremented(self):
+        """Score filter increments the dropped counter for low-quality chunks."""
+        high = PortalChunk(doc_id="h1", score=100.0)
+        low = PortalChunk(doc_id="l1", score=1.0)
+        before = _get_counter("okp_search_score_filter_dropped")
+
+        result = _filter_by_score([high, low])
+
+        assert len(result) == 1
+        assert result[0].doc_id == "h1"
+        assert _get_counter("okp_search_score_filter_dropped") == before + 1
+
+    def test_score_filter_no_increment_when_all_kept(self):
+        """Score filter does not increment when all chunks pass."""
+        c1 = PortalChunk(doc_id="c1", score=100.0)
+        c2 = PortalChunk(doc_id="c2", score=95.0)
+        before = _get_counter("okp_search_score_filter_dropped")
+
+        result = _filter_by_score([c1, c2])
+
+        assert len(result) == 2
+        assert _get_counter("okp_search_score_filter_dropped") == before
+
+    def test_score_filter_empty_input_no_increment(self):
+        """Empty input does not trigger the score filter counter."""
+        before = _get_counter("okp_search_score_filter_dropped")
+
+        result = _filter_by_score([])
+
+        assert result == []
+        assert _get_counter("okp_search_score_filter_dropped") == before
