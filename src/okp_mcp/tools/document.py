@@ -8,7 +8,14 @@ import httpx
 from fastmcp import Context
 
 from okp_mcp.content import _select_within_budget, doc_uri, strip_boilerplate, truncate_content
-from okp_mcp.metrics import TOOL_CALLS, TOOL_DURATION
+from okp_mcp.metrics import (
+    DOCUMENT_HIGHLIGHT_FALLBACK,
+    DOCUMENT_HIGHLIGHT_USED,
+    DOCUMENT_NOT_FOUND,
+    DOCUMENT_NUDGE,
+    TOOL_CALLS,
+    TOOL_DURATION,
+)
 from okp_mcp.server import get_app_context, mcp
 from okp_mcp.solr import _clean_query, _extract_relevant_section, _get_highlight_snippets, _solr_query
 from okp_mcp.tools.shared import DOCUMENT_FL
@@ -123,6 +130,7 @@ def _format_document_content(
     # Documentation without a query is almost always useless (first 1500 chars
     # is typically a table of contents). Nudge the caller to be specific.
     if is_documentation and not query:
+        DOCUMENT_NUDGE.inc()
         return (
             "\n\nThis is a large documentation page. "
             "Pass a query to get_document to extract the most relevant passages."
@@ -140,15 +148,19 @@ def _format_document_content(
 
     if is_documentation:
         if highlight_snippets:
+            DOCUMENT_HIGHLIGHT_USED.inc()
             doc_budget = min(max_chars, _DOCUMENTATION_MAX_CHARS)
             return _format_document_passages(highlight_snippets, query, doc_budget, current_result)
+        DOCUMENT_HIGHLIGHT_FALLBACK.inc()
         extracted = _extract_relevant_section(
             content, query, per_section=_DOCUMENTATION_PER_SECTION, max_sections=_DOCUMENTATION_MAX_SECTIONS
         )
         return f"\n\nContent:\n{extracted}"
 
     if not highlight_snippets:
+        DOCUMENT_HIGHLIGHT_FALLBACK.inc()
         return f"\n\nContent:\n{_extract_relevant_section(content, query, max_sections=8)}"
+    DOCUMENT_HIGHLIGHT_USED.inc()
     return f"\n\nContent:\n{' ... '.join(highlight_snippets)}"
 
 
@@ -240,6 +252,7 @@ async def get_document(ctx: Context, doc_id: str, query: str = "") -> str:
 
         docs = data["response"]["docs"]
         if not docs:
+            DOCUMENT_NOT_FOUND.inc()
             return f"Document not found: {doc_id}"
 
         return await _format_document(docs[0], data, doc_id, query, app.max_response_chars)
