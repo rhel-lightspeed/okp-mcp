@@ -9,6 +9,10 @@ from prometheus_client import REGISTRY
 
 from okp_mcp.config import ServerConfig
 from okp_mcp.metrics import (
+    DOCUMENT_HIGHLIGHT_FALLBACK,
+    DOCUMENT_HIGHLIGHT_USED,
+    DOCUMENT_NOT_FOUND,
+    DOCUMENT_NUDGE,
     HTTP_REQUEST_DURATION,
     HTTP_REQUESTS,
     INTENT_DEPRECATION_SKIPPED,
@@ -230,6 +234,10 @@ async def test_metrics_endpoint_returns_prometheus_format():
     assert b"okp_search_zero_results_total" in response.body
     assert b"okp_search_score_filter_dropped_total" in response.body
     assert b"okp_search_deprecation_detected_total" in response.body
+    assert b"okp_document_not_found_total" in response.body
+    assert b"okp_document_nudge_total" in response.body
+    assert b"okp_document_highlight_used_total" in response.body
+    assert b"okp_document_highlight_fallback_total" in response.body
 
 
 async def test_metrics_endpoint_content_type():
@@ -258,6 +266,10 @@ def test_metric_label_names():
     assert SEARCH_ZERO_RESULTS._labelnames == ()
     assert SEARCH_SCORE_FILTER_DROPPED._labelnames == ()
     assert SEARCH_DEPRECATION_DETECTED._labelnames == ()
+    assert DOCUMENT_NOT_FOUND._labelnames == ()
+    assert DOCUMENT_NUDGE._labelnames == ()
+    assert DOCUMENT_HIGHLIGHT_USED._labelnames == ()
+    assert DOCUMENT_HIGHLIGHT_FALLBACK._labelnames == ()
 
 
 # ---------------------------------------------------------------------------

@@ -125,6 +125,44 @@ SEARCH_DEPRECATION_DETECTED = Counter(
 )
 
 
+# ---------------------------------------------------------------------------
+# Document retrieval metrics (recorded by tools/document.py instrumentation)
+# ---------------------------------------------------------------------------
+
+# Fires when a get_document lookup returns no matching Solr document,
+# indicating the LLM passed a stale or fabricated doc ID.  A sustained
+# high rate suggests search_portal result URLs are drifting from the
+# Solr index.
+DOCUMENT_NOT_FOUND = Counter(
+    "okp_document_not_found_total",
+    "Document ID lookups that returned no results",
+)
+
+# Fires when a documentation page is requested without a query, causing
+# a nudge response instead of content.  Tracks how often LLMs skip the
+# query parameter on large docs.
+DOCUMENT_NUDGE = Counter(
+    "okp_document_nudge_total",
+    "Documentation pages served a nudge instead of content (no query)",
+)
+
+# Fires when Solr highlighting produces usable snippets for a document
+# retrieval.  Compare against DOCUMENT_HIGHLIGHT_FALLBACK to gauge
+# highlighting health.
+DOCUMENT_HIGHLIGHT_USED = Counter(
+    "okp_document_highlight_used_total",
+    "Document retrievals that used Solr highlight snippets",
+)
+
+# Fires when a query-based document retrieval falls back to local BM25
+# paragraph extraction because Solr returned no highlights.  A high
+# ratio vs DOCUMENT_HIGHLIGHT_USED signals Solr highlighting issues.
+DOCUMENT_HIGHLIGHT_FALLBACK = Counter(
+    "okp_document_highlight_fallback_total",
+    "Document retrievals that fell back to BM25 extraction (no highlights)",
+)
+
+
 class PrometheusMiddleware:
     """ASGI middleware that records HTTP request count and duration."""
 
