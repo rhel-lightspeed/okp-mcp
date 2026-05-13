@@ -11,14 +11,14 @@ dependencies = [
     "prometheus_client>=0.25.0",
     "pydantic-settings>=2.14.0",
     "rank-bm25",
-    "sentry-sdk[httpx]>=2.58.0",
+    "sentry-sdk[httpx]>=2.59.0",
 ]
 
 [project.scripts]
 okp-mcp = "okp_mcp:main"
 
 [build-system]
-requires = ["uv_build>=0.11.8,<0.11.9"]
+requires = ["uv_build>=0.11.11,<0.11.12"]
 build-backend = "uv_build"
 
 [dependency-groups]
@@ -32,7 +32,7 @@ dev = [
     "radon>=6.0.1",
     "respx>=0.23.1",
     "ruff>=0.15.12",
-    "ty>=0.0.33",
+    "ty>=0.0.34",
 ]
 
 [tool.pytest.ini_options]
