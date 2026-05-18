@@ -18,7 +18,7 @@ dependencies = [
 okp-mcp = "okp_mcp:main"
 
 [build-system]
-requires = ["uv_build>=0.11.12,<0.11.13"]
+requires = ["uv_build>=0.11.13,<0.11.14"]
 build-backend = "uv_build"
 
 [dependency-groups]
@@ -32,7 +32,7 @@ dev = [
     "radon>=6.0.1",
     "respx>=0.23.1",
     "ruff>=0.15.12",
-    "ty>=0.0.34",
+    "ty>=0.0.35",
 ]
 
 [tool.pytest.ini_options]
