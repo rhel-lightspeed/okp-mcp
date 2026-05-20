@@ -825,7 +825,7 @@ requires-dist = [
     { name = "prometheus-client", specifier = ">=0.25.0" },
     { name = "pydantic-settings", specifier = ">=2.14.1" },
     { name = "rank-bm25" },
-    { name = "sentry-sdk", extras = ["httpx"], specifier = ">=2.59.0" },
+    { name = "sentry-sdk", extras = ["httpx"], specifier = ">=2.60.0" },
 ]
 
 [package.metadata.requires-dev]
