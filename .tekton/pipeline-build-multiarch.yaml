@@ -83,6 +83,11 @@ spec:
       default: "false"
       type: string
 
+    - name: build-source-image
+      description: Build a source image.
+      default: "false"
+      type: string
+
     - name: tag-prefix
       description: Prefix added to additional tags
       type: string
@@ -319,6 +324,41 @@ spec:
 
           - name: kind
             value: task
+
+    - name: build-source-image
+      params:
+        - name: BINARY_IMAGE
+          value: $(tasks.build-image-index.results.IMAGE_URL)
+
+        - name: BINARY_IMAGE_DIGEST
+          value: $(tasks.build-image-index.results.IMAGE_DIGEST)
+
+        - name: SOURCE_ARTIFACT
+          value: $(tasks.prefetch-dependencies.results.SOURCE_ARTIFACT)
+
+        - name: CACHI2_ARTIFACT
+          value: $(tasks.prefetch-dependencies.results.CACHI2_ARTIFACT)
+
+      runAfter:
+        - build-image-index
+
+      taskRef:
+        resolver: bundles
+        params:
+          - name: name
+            value: source-build-oci-ta
+
+          - name: bundle
+            value: quay.io/konflux-ci/tekton-catalog/task-source-build-oci-ta:0.3@sha256:0917cfc7772e82cb8e74743c2104f43bcf2596aceafe87eec6fce69a8cac5f06
+
+          - name: kind
+            value: task
+
+      when:
+        - input: $(params.build-source-image)
+          operator: in
+          values:
+            - "true"
 
     - name: deprecated-base-image-check
       params:
