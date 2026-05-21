@@ -1,0 +1,152 @@
+---
+# OpenShift Template: rhel-lightspeed QE trigger Job
+#
+# Deployed by saas-tests.yml after each successful staging deployment.
+# This Job does ONE thing: call the GitLab CI pipeline trigger API for the
+# auto-qe-gating project.  The actual QE tests run in GitLab CI, not here.
+#
+# Parameters auto-injected by saas-file-2:
+#   IMAGE_TAG   — abbreviated commit SHA (first N chars of ref, used in Job name)
+#   COMMIT_SHA  — full 40-char commit SHA (passed to the pipeline for reporting)
+#
+# Parameters supplied by saas-tests.yml:
+#   SERVICE_NAME  — e.g. "lightspeed-stack"
+#
+# Required OCP Secret (managed via app-interface vault-secret integration):
+#   name: auto-qe-trigger
+#   keys:
+#     gitlab-url     — base URL of the GitLab instance
+#     project-id     — numeric project ID of the auto-qe-gating GitLab project
+#     trigger-token  — GitLab pipeline trigger token (masked)
+
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: rhel-lightspeed-qe-trigger
+parameters:
+  - name: IMAGE_TAG
+    description: >
+      Abbreviated commit SHA (first N chars of ref).
+      Used in the Job name to keep it under the 63-char Kubernetes limit.
+      Populated automatically by saas-file-2.
+    required: true
+
+  - name: COMMIT_SHA
+    description: >
+      Full 40-char commit SHA of the deployment that just succeeded.
+      Populated automatically by saas-file-2.  Passed to the auto-qe
+      pipeline for reporting and traceability.
+    required: true
+
+  - name: SERVICE_NAME
+    description: >
+      Name of the service that was deployed (e.g. lightspeed-stack).
+      Passed from the saas-tests.yml parameters block.
+    required: true
+
+  - name: JOBID
+    description: >
+      Random suffix to ensure the Job name is unique on every run.
+      Allows re-runs from the OpenShift console without name conflicts.
+    generate: expression
+    from: "[0-9a-z]{7}"
+
+objects:
+  # ── ServiceAccount ──────────────────────────────────────────────────────────
+  - apiVersion: v1
+    kind: ServiceAccount
+    metadata:
+      name: qe-trigger-sa
+    automountServiceAccountToken: false
+
+  # ── Job ─────────────────────────────────────────────────────────────────────
+  - apiVersion: batch/v1
+    kind: Job
+    metadata:
+      # IMAGE_TAG (abbreviated) keeps the name under the 63-char K8s limit.
+      # JOBID ensures a fresh Job is created even if IMAGE_TAG hasn't changed.
+      name: qe-trigger-${SERVICE_NAME}-${IMAGE_TAG}-${JOBID}
+      labels:
+        app: rhel-lightspeed-qe-trigger
+        service: ${SERVICE_NAME}
+    spec:
+      backoffLimit: 0
+      ttlSecondsAfterFinished: 3600
+      template:
+        spec:
+          serviceAccountName: qe-trigger-sa
+          automountServiceAccountToken: false
+          restartPolicy: Never
+          containers:
+            - name: trigger
+              image: registry.access.redhat.com/ubi9/ubi-minimal:9.6
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -euo pipefail
+
+                  # Ensure curl is available (ubi-minimal includes curl-minimal,
+                  # but guard against future image changes).
+                  if ! command -v curl >/dev/null 2>&1; then
+                    microdnf install -y curl && microdnf clean all
+                  fi
+
+                  echo "Triggering auto-qe-gating for service=${SERVICE_NAME} sha=${COMMIT_SHA}"
+
+                  # Disable set -e for the curl call so we can capture and log
+                  # failures (DNS errors, timeouts) instead of silently exiting.
+                  set +e
+                  HTTP_STATUS=$(
+                    curl --silent \
+                      --show-error \
+                      --output /tmp/response.json \
+                      --write-out "%{http_code}" \
+                      --connect-timeout 10 \
+                      --max-time 60 \
+                      --request POST \
+                      "${GITLAB_URL}/api/v4/projects/${GITLAB_PROJECT_ID}/trigger/pipeline" \
+                      --form "token=${GITLAB_TRIGGER_TOKEN}" \
+                      --form "ref=main" \
+                      --form "variables[SERVICE_NAME]=${SERVICE_NAME}" \
+                      --form "variables[DEPLOYED_SHA]=${COMMIT_SHA}" \
+                      --form "variables[TRIGGER_SOURCE]=promotion-channel"
+                  )
+                  CURL_EXIT=$?
+                  set -e
+
+                  if [ "${CURL_EXIT}" -ne 0 ]; then
+                    echo "ERROR: curl failed with exit code ${CURL_EXIT}"
+                    cat /tmp/response.json 2>/dev/null || true
+                    exit 1
+                  elif [ "${HTTP_STATUS}" -ge 200 ] && [ "${HTTP_STATUS}" -lt 300 ]; then
+                    echo "auto-qe-gating pipeline triggered successfully"
+                    cat /tmp/response.json
+                  else
+                    echo "ERROR: trigger failed with HTTP ${HTTP_STATUS}"
+                    cat /tmp/response.json
+                    exit 1
+                  fi
+              env:
+                - name: GITLAB_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: auto-qe-trigger
+                      key: gitlab-url
+                - name: GITLAB_PROJECT_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: auto-qe-trigger
+                      key: project-id
+                - name: GITLAB_TRIGGER_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: auto-qe-trigger
+                      key: trigger-token
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 32Mi
+                limits:
+                  cpu: 50m
+                  memory: 64Mi
