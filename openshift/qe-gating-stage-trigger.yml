@@ -1,9 +1,11 @@
 ---
-# OpenShift Template: rhel-lightspeed QE trigger Job
+# OpenShift Template: rhel-lightspeed QE gating trigger Job
 #
 # Deployed by saas-tests.yml after each successful staging deployment.
-# This Job does ONE thing: call the GitLab CI pipeline trigger API for the
-# auto-qe-gating project.  The actual QE tests run in GitLab CI, not here.
+# Triggers the cla-tests compare pipeline (which includes goose-tests
+# as a dependency) and polls it to completion.  The Job exits 0 only
+# if QE tests pass, so the Tekton PipelineRun — and therefore the
+# promotion channel — only succeeds when gating passes.
 #
 # Parameters auto-injected by saas-file-2:
 #   IMAGE_TAG   — abbreviated commit SHA (first N chars of ref, used in Job name)
@@ -16,8 +18,9 @@
 #   name: auto-qe-trigger
 #   keys:
 #     gitlab-url     — base URL of the GitLab instance
-#     project-id     — numeric project ID of the auto-qe-gating GitLab project
-#     trigger-token  — GitLab pipeline trigger token (masked)
+#     project-id     — numeric project ID of the cla-tests GitLab project
+#     trigger-token  — pipeline trigger token for cla-tests
+#     api-token      — read_api token for polling pipeline status
 
 apiVersion: template.openshift.io/v1
 kind: Template
@@ -34,7 +37,7 @@ parameters:
   - name: COMMIT_SHA
     description: >
       Full 40-char commit SHA of the deployment that just succeeded.
-      Populated automatically by saas-file-2.  Passed to the auto-qe
+      Populated automatically by saas-file-2.  Passed to the cla-tests
       pipeline for reporting and traceability.
     required: true
 
@@ -52,19 +55,10 @@ parameters:
     from: "[0-9a-z]{7}"
 
 objects:
-  # ── ServiceAccount ──────────────────────────────────────────────────────────
-  - apiVersion: v1
-    kind: ServiceAccount
-    metadata:
-      name: qe-trigger-sa
-    automountServiceAccountToken: false
-
   # ── Job ─────────────────────────────────────────────────────────────────────
   - apiVersion: batch/v1
     kind: Job
     metadata:
-      # IMAGE_TAG (abbreviated) keeps the name under the 63-char K8s limit.
-      # JOBID ensures a fresh Job is created even if IMAGE_TAG hasn't changed.
       name: qe-trigger-${SERVICE_NAME}-${IMAGE_TAG}-${JOBID}
       labels:
         app: rhel-lightspeed-qe-trigger
@@ -72,9 +66,12 @@ objects:
     spec:
       backoffLimit: 0
       ttlSecondsAfterFinished: 3600
+      # activeDeadlineSeconds caps the total Job runtime.
+      # The cla-tests compare pipeline can take up to 2 hours;
+      # 3 hours gives headroom for scheduling and API latency.
+      activeDeadlineSeconds: 10800
       template:
         spec:
-          serviceAccountName: qe-trigger-sa
           automountServiceAccountToken: false
           restartPolicy: Never
           containers:
@@ -86,21 +83,24 @@ objects:
                 - |
                   set -euo pipefail
 
-                  # Ensure curl is available (ubi-minimal includes curl-minimal,
-                  # but guard against future image changes).
+                  # Ensure curl is available
                   if ! command -v curl >/dev/null 2>&1; then
                     microdnf install -y curl && microdnf clean all
                   fi
 
-                  echo "Triggering auto-qe-gating for service=${SERVICE_NAME} sha=${COMMIT_SHA}"
+                  POLL_INTERVAL=60
+                  MAX_WAIT=7200  # 2 hours
 
-                  # Disable set -e for the curl call so we can capture and log
-                  # failures (DNS errors, timeouts) instead of silently exiting.
+                  echo "=== QE Gating: service=${SERVICE_NAME} sha=${COMMIT_SHA} ==="
+
+                  # ── 1. Trigger the cla-tests compare pipeline ──────────────
+                  echo "Triggering cla-tests compare pipeline..."
+
                   set +e
-                  HTTP_STATUS=$(
+                  TRIGGER_RESPONSE=$(
                     curl --silent \
                       --show-error \
-                      --output /tmp/response.json \
+                      --output /tmp/trigger.json \
                       --write-out "%{http_code}" \
                       --connect-timeout 10 \
                       --max-time 60 \
@@ -108,6 +108,7 @@ objects:
                       "${GITLAB_URL}/api/v4/projects/${GITLAB_PROJECT_ID}/trigger/pipeline" \
                       --form "token=${GITLAB_TRIGGER_TOKEN}" \
                       --form "ref=main" \
+                      --form "variables[CLA_TESTS_RUN_COMPARE]=true" \
                       --form "variables[SERVICE_NAME]=${SERVICE_NAME}" \
                       --form "variables[DEPLOYED_SHA]=${COMMIT_SHA}" \
                       --form "variables[TRIGGER_SOURCE]=promotion-channel"
@@ -117,16 +118,80 @@ objects:
 
                   if [ "${CURL_EXIT}" -ne 0 ]; then
                     echo "ERROR: curl failed with exit code ${CURL_EXIT}"
-                    cat /tmp/response.json 2>/dev/null || true
-                    exit 1
-                  elif [ "${HTTP_STATUS}" -ge 200 ] && [ "${HTTP_STATUS}" -lt 300 ]; then
-                    echo "auto-qe-gating pipeline triggered successfully"
-                    cat /tmp/response.json
-                  else
-                    echo "ERROR: trigger failed with HTTP ${HTTP_STATUS}"
-                    cat /tmp/response.json
+                    cat /tmp/trigger.json 2>/dev/null || true
                     exit 1
                   fi
+
+                  if [ "${TRIGGER_RESPONSE}" -lt 200 ] || [ "${TRIGGER_RESPONSE}" -ge 300 ]; then
+                    echo "ERROR: trigger failed with HTTP ${TRIGGER_RESPONSE}"
+                    cat /tmp/trigger.json
+                    exit 1
+                  fi
+
+                  # Extract pipeline ID and URL from trigger response.
+                  # Parse with grep/cut since jq is not available in ubi-minimal.
+                  PIPELINE_ID=$(grep -o '"id":[0-9]*' /tmp/trigger.json | head -1 | cut -d: -f2)
+                  PIPELINE_URL=$(grep -o '"web_url":"[^"]*"' /tmp/trigger.json | head -1 | cut -d'"' -f4)
+
+                  if [ -z "${PIPELINE_ID}" ]; then
+                    echo "ERROR: could not extract pipeline ID from response"
+                    cat /tmp/trigger.json
+                    exit 1
+                  fi
+
+                  echo "Pipeline triggered: #${PIPELINE_ID}"
+                  echo "URL: ${PIPELINE_URL}"
+
+                  # ── 2. Poll pipeline until completion ──────────────────────
+                  echo "Polling pipeline status every ${POLL_INTERVAL}s (max ${MAX_WAIT}s)..."
+
+                  ELAPSED=0
+                  while [ "${ELAPSED}" -lt "${MAX_WAIT}" ]; do
+                    sleep "${POLL_INTERVAL}"
+                    ELAPSED=$((ELAPSED + POLL_INTERVAL))
+
+                    set +e
+                    STATUS=$(
+                      curl --silent \
+                        --show-error \
+                        --connect-timeout 10 \
+                        --max-time 30 \
+                        --header "PRIVATE-TOKEN: ${GITLAB_API_TOKEN}" \
+                        "${GITLAB_URL}/api/v4/projects/${GITLAB_PROJECT_ID}/pipelines/${PIPELINE_ID}" \
+                      | grep -o '"status":"[^"]*"' | head -1 | cut -d'"' -f4
+                    )
+                    CURL_EXIT=$?
+                    set -e
+
+                    if [ "${CURL_EXIT}" -ne 0 ] || [ -z "${STATUS}" ]; then
+                      echo "Warning: failed to poll status (${ELAPSED}s elapsed), retrying..."
+                      continue
+                    fi
+
+                    echo "Pipeline #${PIPELINE_ID}: ${STATUS} (${ELAPSED}s elapsed)"
+
+                    case "${STATUS}" in
+                      success)
+                        echo "=== QE Gating PASSED ==="
+                        exit 0
+                        ;;
+                      failed|canceled)
+                        echo "=== QE Gating FAILED (${STATUS}) ==="
+                        echo "See: ${PIPELINE_URL}"
+                        exit 1
+                        ;;
+                      skipped)
+                        echo "=== QE Gating SKIPPED ==="
+                        echo "See: ${PIPELINE_URL}"
+                        exit 1
+                        ;;
+                    esac
+                    # pending, running, created — keep polling
+                  done
+
+                  echo "ERROR: timed out after ${MAX_WAIT}s waiting for pipeline #${PIPELINE_ID}"
+                  echo "See: ${PIPELINE_URL}"
+                  exit 1
               env:
                 - name: GITLAB_URL
                   valueFrom:
@@ -143,6 +208,11 @@ objects:
                     secretKeyRef:
                       name: auto-qe-trigger
                       key: trigger-token
+                - name: GITLAB_API_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: auto-qe-trigger
+                      key: api-token
               resources:
                 requests:
                   cpu: 10m
