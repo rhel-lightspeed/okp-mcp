@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [{ name = "Major Hayden", email = "major@redhat.com" }]
 requires-python = ">=3.12"
 dependencies = [
-    "fastmcp>=3.2.4",
+    "fastmcp>=3.3.1",
     "httpx",
     "prometheus_client>=0.25.0",
     "pydantic-settings>=2.14.1",
@@ -18,7 +18,7 @@ dependencies = [
 okp-mcp = "okp_mcp:main"
 
 [build-system]
-requires = ["uv_build>=0.11.14,<0.11.15"]
+requires = ["uv_build>=0.11.15,<0.11.16"]
 build-backend = "uv_build"
 
 [dependency-groups]
@@ -32,7 +32,7 @@ dev = [
     "radon>=6.0.1",
     "respx>=0.23.1",
     "ruff>=0.15.13",
-    "ty>=0.0.35",
+    "ty>=0.0.37",
 ]
 
 [tool.pytest.ini_options]
