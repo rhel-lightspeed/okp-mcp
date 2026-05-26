@@ -101,7 +101,8 @@ tests/
 docs/
   SOLR_EXPLORATION.md     # Historical: original redhat-okp container schema map
 openshift/
-  okp-mcp.yml   # OpenShift deployment template (Deployment, Service, ServiceAccount)
+  okp-mcp.yml                   # OpenShift deployment template (Deployment, Service, ServiceAccount)
+  qe-gating-stage-trigger.yml   # OpenShift Job template that triggers the auto-qe-gating GitLab pipeline after staging deploys
 quadlet/
   okp.network          # shared podman network for container DNS resolution
   okp-solr-data.volume # persistent Solr index volume
@@ -127,6 +128,7 @@ SECURITY.md            # Vulnerability reporting via GitHub Security Advisories
 | Add functional test case | `tests/functional_cases.py` | Add `FunctionalCase` to `FUNCTIONAL_TEST_CASES` list |
 | Mock Solr responses | `tests/conftest.py` | `solr_mock` fixture uses respx |
 | Deploy to OpenShift | `openshift/okp-mcp.yml` | Template with params: IMAGE, IMAGE_TAG, REPLICAS, etc. |
+| Trigger QE pipeline after staging deploy | `openshift/qe-gating-stage-trigger.yml` | OpenShift Job template; calls the GitLab CI trigger API for the auto-qe-gating project. Secret `auto-qe-trigger` supplies `gitlab-url`, `project-id`, `trigger-token`. |
 | Run locally with systemd | `quadlet/` | Rootless quadlet files: `.container`, `.network`, `.volume`; see `quadlet/README.md` |
 | Modify pre-commit hooks | `.pre-commit-config.yaml` | Runs on every commit: ruff, gitleaks, whitespace, YAML/TOML checks |
 | Modify CI/CD workflows | `.github/workflows/` | `build.yml` (test+container), `functional.yml` (Solr integration), `scorecard.yml` (OpenSSF) |
