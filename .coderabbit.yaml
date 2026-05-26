@@ -30,8 +30,12 @@ reviews:
     description:
       mode: warning
 
+  # Auto-review disabled to conserve quota. Trigger reviews manually by
+  # commenting `@coderabbitai review` on a PR, or run locally via the
+  # CodeRabbit CLI (see AGENTS.md). Pre-PR local reviews use the same
+  # config when invoked with `-c .coderabbit.yaml`.
   auto_review:
-    enabled: true
+    enabled: false
     drafts: false
     auto_pause_after_reviewed_commits: 0
     base_branches:
