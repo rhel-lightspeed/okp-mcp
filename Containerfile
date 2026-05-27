@@ -18,7 +18,7 @@ RUN uv pip install . --no-deps && \
     sed -i 's|^#!.*python.*|#!/app/.venv/bin/python3|' /build/.venv/bin/okp-mcp
 
 # Stage 2: Runtime - minimal UBI 10 Python 3.12 image
-FROM registry.access.redhat.com/ubi10/python-312-minimal:latest@sha256:43d3f052d85b62f6591f2980fd8ad9f79602329c389618e70ef48d3306ac0209
+FROM registry.access.redhat.com/ubi10/python-312-minimal:latest@sha256:da336bc214ac27e4c5c096f3f5f058b5292529720468f479395c108e4fd836a0
 
 WORKDIR /app
 
