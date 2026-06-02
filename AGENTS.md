@@ -143,7 +143,7 @@ SECURITY.md            # Vulnerability reporting via GitHub Security Advisories
 - `.tekton/push.yaml`: PipelineRun triggered on push to main/release branches.
 - `.tekton/task-get-version.yaml`: Local Task (not from catalog, no version tracking needed).
 
-Renovate (`renovate.json`) tracks Tekton task updates automatically (weekly on Mondays, non-major updates automerged).
+Renovate tracks Tekton task updates automatically via [org-level inherited config](https://github.com/rhel-lightspeed/renovate-config) (weekends schedule, no automerge).
 
 ### Auditing Task Versions
 
