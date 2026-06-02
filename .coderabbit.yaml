@@ -1,65 +1,20 @@
 # CodeRabbit Configuration for okp-mcp
-# Docs: https://docs.coderabbit.ai/configuration/
+# Inherits org-wide defaults from rhel-lightspeed/coderabbit.
+# Only repo-specific overrides below.
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
 
-language: en-US
+inheritance: true
+
 tone_instructions: >
   You are a brilliant but world-weary senior developer who has seen too much.
   Deliver feedback with dry wit and gentle sarcasm, but always be helpful.
   Use programming puns when the opportunity arises.
 
 reviews:
-  profile: chill
-  collapse_walkthrough: false
-  poem: false
-  request_changes_workflow: true
-  high_level_summary: false
-  high_level_summary_placeholder: "@coderabbitai summary"
-  abort_on_close: true
-  review_status: true
-  suggested_labels: false
-  suggested_reviewers: false
-  in_progress_fortune: false
-
-  pre_merge_checks:
-    title:
-      mode: "off"
-    docstrings:
-      mode: warning
-      threshold: 80
-    description:
-      mode: warning
-
-  # Auto-review disabled to conserve quota. Trigger reviews manually by
-  # commenting `@coderabbitai review` on a PR, or run locally via the
-  # CodeRabbit CLI (see AGENTS.md). Pre-PR local reviews use the same
-  # config when invoked with `-c .coderabbit.yaml`.
-  auto_review:
-    enabled: false
-    drafts: false
-    auto_pause_after_reviewed_commits: 0
-    base_branches:
-      - main
-    ignore_title_keywords:
-      - "WIP"
-      - "[WIP]"
-      - "DO NOT MERGE"
-
-  path_filters:
-    - "!**/__pycache__/**"
-    - "!**/.venv/**"
-    - "!**/.pytest_cache/**"
-    - "!**/.ruff_cache/**"
-    - "!**/dist/**"
-    - "!**/*.egg-info/**"
-    - "!**/htmlcov/**"
-    - "!**/.coverage"
-    - "!**/uv.lock"
-
   path_instructions:
     - path: "src/**/*.py"
       instructions: |
-        Focus on security and correctness:
+        okp-mcp project conventions:
         - All Solr queries must use parameterized values, not string interpolation
         - Verify async/await patterns (no blocking calls in async functions)
         - httpx calls must use AsyncClient as context manager with timeouts
@@ -80,7 +35,7 @@ reviews:
         - Use @computed_field for derived values
         - Check for secure defaults
 
-    - path: "src/**/tools.py"
+    - path: "src/**/tools/*.py"
       instructions: |
         MCP tool definitions:
         - All tool functions must be async
@@ -92,40 +47,9 @@ reviews:
 
     - path: "tests/**/*.py"
       instructions: |
-        Focus on test quality and meaningfulness:
-        - Tests should verify behavior, not just chase coverage
+        Testing conventions:
         - Use respx for HTTP mocking (not responses or aioresponses)
         - Prefer parameterized tests over duplicate test functions
-        - Mock specs should be provided where applicable
         - Use pytest.raises with nullcontext() pattern, not boolean flags
-        - Use fixtures for reusable test components, not helper functions
         - Async tests run without @pytest.mark.asyncio (asyncio_mode = "auto")
         - Don't nitpick coverage percentages
-
-    - path: "pyproject.toml"
-      instructions: |
-        Check dependency versions and configuration consistency.
-        Dev tools: uv (package manager), ruff (linting/formatting), ty (type checking), pytest (testing), radon (complexity).
-
-    - path: ".github/workflows/**"
-      instructions: "Validate workflow syntax and security (no secrets in logs)"
-
-    - path: "Makefile"
-      instructions: |
-        Makefile validation:
-        - .PHONY declarations for all non-file targets
-        - Avoid flags that are already defaults
-
-    - path: "Containerfile"
-      instructions: "Use Podman + Containerfile conventions (not Docker + Dockerfile)"
-
-chat:
-  auto_reply: true
-
-knowledge_base:
-  learnings:
-    scope: global
-  code_guidelines:
-    enabled: true
-    filePatterns:
-      - "**/AGENTS.md"
