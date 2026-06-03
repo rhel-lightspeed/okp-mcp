@@ -88,6 +88,11 @@ objects:
                     microdnf install -y curl && microdnf clean all
                   fi
 
+                  # Install Red Hat internal CA so curl trusts gitlab.cee.redhat.com
+                  curl -sk -o /etc/pki/ca-trust/source/anchors/RH-IT-Root-CAs.pem \
+                    https://certs.corp.redhat.com/certs/Current-IT-Root-CAs.pem \
+                    && update-ca-trust
+
                   POLL_INTERVAL=60
                   MAX_WAIT=7200  # 2 hours
 
