@@ -83,15 +83,10 @@ objects:
                 - |
                   set -euo pipefail
 
-                  # Ensure curl is available
-                  if ! command -v curl >/dev/null 2>&1; then
-                    microdnf install -y curl && microdnf clean all
-                  fi
-
-                  # Install Red Hat internal CA so curl trusts gitlab.cee.redhat.com
-                  curl -sk -o /etc/pki/ca-trust/source/anchors/RH-IT-Root-CAs.pem \
-                    https://certs.corp.redhat.com/certs/Current-IT-Root-CAs.pem \
-                    && update-ca-trust
+                  # Install curl and Red Hat internal CA bundle so curl trusts
+                  # gitlab.cee.redhat.com. The redhat-internal-cert-install package
+                  # adds the Red Hat IT root CAs to the system trust store.
+                  microdnf install -y curl redhat-internal-cert-install && microdnf clean all
 
                   POLL_INTERVAL=60
                   MAX_WAIT=7200  # 2 hours
@@ -116,7 +111,9 @@ objects:
                       --form "variables[CLA_TESTS_RUN_COMPARE]=true" \
                       --form "variables[SERVICE_NAME]=${SERVICE_NAME}" \
                       --form "variables[DEPLOYED_SHA]=${COMMIT_SHA}" \
-                      --form "variables[TRIGGER_SOURCE]=promotion-channel"
+                      --form "variables[TRIGGER_SOURCE]=promotion-channel" \
+                      --form "variables[PLAN]=level2" \
+                      --form "variables[CLA_TESTS_PACKAGE_SOURCE_PROFILE]=cdn"
                   )
                   CURL_EXIT=$?
                   set -e
