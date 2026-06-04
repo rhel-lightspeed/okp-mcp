@@ -74,19 +74,30 @@ objects:
         spec:
           automountServiceAccountToken: false
           restartPolicy: Never
+          volumes:
+            - name: rh-ca-bundle
+              secret:
+                secretName: auto-qe-trigger
+                items:
+                  - key: ca-bundle
+                    path: RH-IT-Root-CAs.pem
           containers:
             - name: trigger
               image: registry.access.redhat.com/ubi9/ubi-minimal:9.6
+              volumeMounts:
+                - name: rh-ca-bundle
+                  mountPath: /etc/pki/ca-trust/source/anchors/RH-IT-Root-CAs.pem
+                  subPath: RH-IT-Root-CAs.pem
+                  readOnly: true
               command:
                 - /bin/sh
                 - -c
                 - |
                   set -euo pipefail
 
-                  # Install Red Hat internal CA so curl trusts gitlab.cee.redhat.com.
-                  # curl-minimal is already included in ubi-minimal, no need to install curl.
-                  curl -sk -o /etc/pki/ca-trust/source/anchors/RH-IT-Root-CAs.pem \
-                    https://certs.corp.redhat.com/certs/Current-IT-Root-CAs.pem
+                  # Red Hat IT root CAs are mounted from the auto-qe-trigger
+                  # secret (ca-bundle key). Update the system trust store so
+                  # curl verifies gitlab.cee.redhat.com's certificate.
                   update-ca-trust
 
                   POLL_INTERVAL=60
