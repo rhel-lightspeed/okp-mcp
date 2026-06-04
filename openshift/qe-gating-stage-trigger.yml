@@ -125,7 +125,8 @@ objects:
                       --form "variables[DEPLOYED_SHA]=${COMMIT_SHA}" \
                       --form "variables[TRIGGER_SOURCE]=promotion-channel" \
                       --form "variables[PLAN]=level2" \
-                      --form "variables[CLA_TESTS_PACKAGE_SOURCE_PROFILE]=cdn"
+                      --form "variables[CLA_TESTS_PACKAGE_SOURCE_PROFILE]=cdn" \
+                      --form "variables[COMPOSE]=RHEL-9.8.0-Nightly"
                   )
                   CURL_EXIT=$?
                   set -e
