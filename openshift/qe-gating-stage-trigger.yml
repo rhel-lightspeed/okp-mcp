@@ -86,19 +86,19 @@ objects:
               image: registry.access.redhat.com/ubi9/ubi-minimal:9.6
               volumeMounts:
                 - name: rh-ca-bundle
-                  mountPath: /etc/pki/ca-trust/source/anchors/RH-IT-Root-CAs.pem
-                  subPath: RH-IT-Root-CAs.pem
+                  mountPath: /tmp/rh-ca
                   readOnly: true
+
               command:
                 - /bin/sh
                 - -c
                 - |
                   set -euo pipefail
 
-                  # Red Hat IT root CAs are mounted from the auto-qe-trigger
-                  # secret (ca-bundle key). Update the system trust store so
-                  # curl verifies gitlab.cee.redhat.com's certificate.
-                  update-ca-trust
+                  # Build a combined CA bundle: system CAs + Red Hat IT root CAs
+                  # mounted from the auto-qe-trigger secret (ca-bundle key).
+                  cat /etc/pki/tls/certs/ca-bundle.crt /tmp/rh-ca/RH-IT-Root-CAs.pem \
+                    > /tmp/combined-ca-bundle.pem
 
                   POLL_INTERVAL=60
                   MAX_WAIT=7200  # 2 hours
@@ -207,6 +207,11 @@ objects:
                   echo "See: ${PIPELINE_URL}"
                   exit 1
               env:
+                # Combined CA bundle: system CAs + Red Hat IT CAs.
+                # Cannot use update-ca-trust because OpenShift runs
+                # containers as non-root.
+                - name: CURL_CA_BUNDLE
+                  value: /tmp/combined-ca-bundle.pem
                 - name: GITLAB_URL
                   valueFrom:
                     secretKeyRef:
