@@ -1,26 +1,30 @@
-# Stage 1: Builder - UBI 10 full image has Python 3.12 + pip
-FROM registry.access.redhat.com/ubi10:latest@sha256:0dd39702a460602f3c15a9f5abd7620de550a8d23ffcb249c0ad4aa163ec60ae AS builder
+# Common base image
+FROM registry.access.redhat.com/ubi10/python-312-minimal:latest@sha256:da336bc214ac27e4c5c096f3f5f058b5292529720468f479395c108e4fd836a0 AS base
+
+# Stage 1: Builder
+FROM base AS builder
 
 WORKDIR /build
 
-# Install pip then uv for fast, reproducible dependency resolution
-RUN dnf install -y python3-pip && dnf clean all && python3 -m pip install uv
+# Install uv for fast, reproducible dependency resolution
+RUN python3 -m venv tools && tools/bin/pip install uv
 
 # Copy dependency files first for layer caching
 COPY pyproject.toml uv.lock README.md ./
 
-# Install production dependencies only (skip the project itself for now)
-RUN uv sync --no-dev --no-install-project
+# Specify uv project, virtual environment, and Python executable
+ENV UV_PROJECT=/build
+ENV UV_PROJECT_ENVIRONMENT="${APP_ROOT}"
+ENV UV_PYTHON=/usr/bin/python3
 
-# Copy source and install the package itself (no deps, already installed)
+# Copy source and install the package
 COPY src/ ./src/
-RUN uv pip install . --no-deps && \
-    sed -i 's|^#!.*python.*|#!/app/.venv/bin/python3|' /build/.venv/bin/okp-mcp
+RUN tools/bin/uv sync --no-cache --locked --no-dev --no-editable
 
 # Stage 2: Runtime - minimal UBI 10 Python 3.12 image
-FROM registry.access.redhat.com/ubi10/python-312-minimal:latest@sha256:da336bc214ac27e4c5c096f3f5f058b5292529720468f479395c108e4fd836a0
+FROM base
 
-WORKDIR /app
+WORKDIR "${APP_ROOT}"
 
 LABEL com.redhat.component=okp-mcp
 LABEL description="MCP server for the RHEL Offline Knowledge Portal"
@@ -29,19 +33,18 @@ LABEL summary="OKP MCP Server"
 LABEL vendor="Red Hat, Inc."
 
 # Copy the virtual environment from builder
-COPY --from=builder /build/.venv /app/.venv
+COPY --from=builder "$APP_ROOT" "$APP_ROOT"
 
 # License required by Red Hat preflight certification
 COPY LICENSE /licenses/LICENSE
 
-ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 
 # Bake the git commit SHA into the image at build time.
 # Tekton passes this via --build-arg; defaults to "development" for local builds.
 ARG COMMIT_SHA=development
-RUN printf '%s\n' "${COMMIT_SHA}" > /app/COMMIT_SHA
+RUN printf '%s\n' "${COMMIT_SHA}" > "${APP_ROOT}/COMMIT_SHA"
 
 # Default to streamable-http for networked container deployments.
 # Override with MCP_TRANSPORT=sse or MCP_TRANSPORT=stdio as needed.
