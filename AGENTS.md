@@ -188,7 +188,7 @@ uv run okp-mcp [--transport ...] [--port ...]
        ├─ CliApp.run(ServerConfig)     # parse CLI + MCP_* env vars
        ├─ _configure_logging()
        ├─ telemetry.initialize_error_reporting()  # no-op unless MCP_GLITCHTIP_DSN is set
-       ├─ log version + commit SHA     # build_info.py reads /app/COMMIT_SHA
+       ├─ log version + commit SHA     # build_info.py reads /opt/app-root/COMMIT_SHA
        └─ mcp.run(transport=...)       # start FastMCP server
             → server.py: _app_lifespan()
                 ├─ creates shared httpx.AsyncClient
