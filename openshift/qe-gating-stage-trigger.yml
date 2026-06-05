@@ -127,7 +127,7 @@ objects:
                       --form "variables[PLAN]=level2" \
                       --form "variables[CLA_TESTS_PACKAGE_SOURCE_PROFILE]=cdn" \
                       --form "variables[COMPOSE]=RHEL-9.8.0-Nightly" \
-                      --form "variables[CLA_THROTTLING_DELAY]=10"
+                      --form "variables[CLA_THROTTLING_DELAY]=2"
                   )
                   CURL_EXIT=$?
                   set -e
