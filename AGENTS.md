@@ -304,7 +304,14 @@ Module-level constant `STOP_WORDS` lives in `config.py` outside the class to avo
 ## Container
 
 - Use `Containerfile` (not Dockerfile), build with `podman`
-- Multi-stage build: UBI 10 builder + minimal UBI 10 Python 3.12 runtime
+- Multi-stage build on Red Hat Hardened Images (Project Hummingbird), both stages pinned to digests:
+  - Builder: `registry.access.redhat.com/hi/python:3.12-builder` (has shell + dnf); installs pinned `uv` into a tools venv, then builds the app venv straight from the lock file with `uv venv --seed` + `uv sync --locked` (no transient requirements file)
+  - Runtime: `registry.access.redhat.com/hi/python:3.12` (distroless: no shell, no package manager, runs as UID 65532)
+- The build runs entirely as the non-root user (UID 65532); there is no `USER 0` escalation. Both images set `HOME` to a user-owned directory, so the tools venv and the app venv are written under `${HOME}/.venvs`.
+- The app venv keeps the same path (`${HOME}/.venvs/okp-mcp`) in both stages. uv/pip console scripts bake an absolute-path shebang, so relocating the venv breaks the entrypoint with "No such file or directory". Keep the builder and runtime venv paths identical.
+- The distroless runtime has no shell, so `RUN` is only used in the builder stage. `ENTRYPOINT ["okp-mcp"]` is relative: the runtime resolves it via `execvp` against `PATH` (the venv `bin/` is prepended). `COMMIT_SHA` is passed as a build arg and set as an `ENV` in the runtime stage; `build_info.get_commit_sha()` reads it via `os.getenv` (no file written or copied).
+- `HEALTHCHECK` uses an exec-form TCP-connect probe (`python -c` socket check on port 8000); no shell required.
+- All runtime dependencies are pure Python (no C/C++ extensions), so the distroless image needs no extra shared libraries. Keep it that way: a new dependency with native extensions would require copying its shared libs (e.g. libstdc++) into the runtime or reverting to a non-distroless base
 - `podman-compose up -d` to run with Solr (`rhokp-rhel9` from `registry.redhat.io`)
 
 ## Complexity
