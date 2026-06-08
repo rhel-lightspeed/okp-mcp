@@ -3,23 +3,15 @@
 import os
 from importlib.metadata import version
 
-# Absolute path matching the Containerfile WORKDIR (/app).
-# Using an absolute path avoids breakage if Kubernetes overrides workingDir.
-_COMMIT_SHA_PATH = f"{os.getenv('APP_ROOT', '/opt/app-root')}/COMMIT_SHA"
-
 
 def get_commit_sha() -> str:
-    """Read the git commit SHA written during the container build.
+    """Return the git commit SHA baked into the container build.
 
-    The Containerfile writes the SHA to ``/opt/app-root/COMMIT_SHA`` via a build arg
-    supplied by the Tekton pipeline.  Falls back to ``"development"`` for
-    local runs where the file does not exist or is unreadable.
+    The Containerfile sets ``COMMIT_SHA`` in the environment via a build arg
+    supplied by the Tekton pipeline. Falls back to ``"development"`` for local
+    runs where the variable is unset or empty.
     """
-    try:
-        content = open(_COMMIT_SHA_PATH).read().strip()  # noqa: SIM115 -- one-shot read, no resource leak
-        return content or "development"
-    except OSError:
-        return "development"
+    return os.getenv("COMMIT_SHA", "").strip() or "development"
 
 
 def get_package_version() -> str:

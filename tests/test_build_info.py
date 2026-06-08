@@ -1,31 +1,25 @@
 """Tests for build_info module."""
 
-from unittest.mock import mock_open, patch
+from unittest.mock import patch
 
 from okp_mcp.build_info import get_commit_sha, get_package_version
 
 
-def test_get_commit_sha_reads_file():
-    """Return the trimmed contents of the COMMIT_SHA file."""
-    with patch("builtins.open", mock_open(read_data="abc1234\n")):
+def test_get_commit_sha_reads_env():
+    """Return the trimmed value of the COMMIT_SHA environment variable."""
+    with patch.dict("os.environ", {"COMMIT_SHA": "abc1234\n"}):
         assert get_commit_sha() == "abc1234"
 
 
-def test_get_commit_sha_fallback_when_missing():
-    """Fall back to 'development' when COMMIT_SHA file does not exist."""
-    with patch("builtins.open", side_effect=FileNotFoundError):
+def test_get_commit_sha_fallback_when_unset():
+    """Fall back to 'development' when COMMIT_SHA is not set."""
+    with patch.dict("os.environ", {}, clear=True):
         assert get_commit_sha() == "development"
 
 
-def test_get_commit_sha_fallback_on_permission_error():
-    """Fall back to 'development' on PermissionError or other OSError."""
-    with patch("builtins.open", side_effect=PermissionError):
-        assert get_commit_sha() == "development"
-
-
-def test_get_commit_sha_fallback_on_empty_file():
-    """Fall back to 'development' when the file exists but is empty."""
-    with patch("builtins.open", mock_open(read_data="  \n")):
+def test_get_commit_sha_fallback_when_empty():
+    """Fall back to 'development' when COMMIT_SHA is set but blank."""
+    with patch.dict("os.environ", {"COMMIT_SHA": "  "}):
         assert get_commit_sha() == "development"
 
 
