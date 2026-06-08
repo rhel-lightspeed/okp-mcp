@@ -278,11 +278,6 @@ def _get_highlight_snippets(data: dict, *keys: str, query: str = "") -> list[str
     return cleaned_snippets
 
 
-def _get_highlights(data: dict, *keys: str, query: str = "") -> str:
-    """Extract highlight snippets for a document, trying multiple ID keys."""
-    return " ... ".join(_get_highlight_snippets(data, *keys, query=query))
-
-
 _EXTRACTION_BOOST_KEYWORDS = frozenset(
     [
         "deprecated",
