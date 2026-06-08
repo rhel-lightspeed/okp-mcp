@@ -4,8 +4,8 @@ import re
 import time
 
 import httpx
-from rank_bm25 import BM25Plus  # pyright: ignore[reportMissingImports]
 
+from okp_mcp.bm25 import BM25Plus
 from okp_mcp.config import STOP_WORDS, logger
 from okp_mcp.metrics import SOLR_QUERIES, SOLR_QUERY_DURATION
 
@@ -417,9 +417,10 @@ def _extract_relevant_section(content: str, query: str, per_section: int = 1500,
     """Extract the most relevant sections using BM25 paragraph scoring.
 
     Splits content on blank lines (paragraphs), scores each paragraph using
-    BM25 (Okapi BM25 via rank-bm25), and returns the top non-overlapping
-    paragraphs joined with separator markers. For book-sized documents (>10KB),
-    skips the first 5% to avoid matching on the table of contents.
+    BM25+ (pure-Python BM25Plus in okp_mcp.bm25), and returns the top
+    non-overlapping paragraphs joined with separator markers. For book-sized
+    documents (>10KB), skips the first 5% to avoid matching on the table of
+    contents.
 
     Paragraphs containing deprecation/critical keywords get a 2x boost, while
     paragraphs about RHV/RHEV are demoted 20x when the query has no RHV intent.

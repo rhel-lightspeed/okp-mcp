@@ -83,6 +83,7 @@ src/okp_mcp/
     run_code.py  # placeholder run_code MCP tool
     shared.py    # shared tool constants
   solr.py        # Solr query builder, BM25 paragraph extraction, RHV filtering
+  bm25.py        # Pure-Python BM25Plus scorer (drop-in for rank_bm25, no numpy)
   content.py     # Boilerplate stripping, content truncation, text cleaning
   formatting.py  # Result annotation, deprecation/replacement detection, sort keys
 tests/
@@ -211,13 +212,14 @@ request_id.py → fastmcp.server.dependencies, fastmcp.server.middleware, starle
 intent.py   → config
 portal.py   → config, content, formatting, intent, solr
 formatting.py → content, solr
-solr.py     → config, metrics
+solr.py     → bm25, config, metrics
+bm25.py     → (standalone)
 server.py   → config
 telemetry.py → build_info, config, sentry_sdk
 content.py  → (standalone)
 ```
 
-No circular imports. `content.py` has zero internal dependencies.
+No circular imports. `content.py` and `bm25.py` have zero internal dependencies.
 
 ## Code Style
 
