@@ -1,5 +1,5 @@
 # Common base image
-FROM registry.access.redhat.com/ubi10/python-312-minimal:latest@sha256:da336bc214ac27e4c5c096f3f5f058b5292529720468f479395c108e4fd836a0 AS base
+FROM registry.access.redhat.com/ubi10/python-312-minimal:latest@sha256:d8976587dd9ac477abb8c34148f06c9f7cb66f4740c30ef1cac92f5037403e89 AS base
 
 # Stage 1: Builder
 FROM base AS builder
