@@ -1,44 +1,11 @@
 """Tests for okp_mcp.formatting module."""
 
-import pytest
-
 from okp_mcp.formatting import (
     SORT_DEPRECATION,
     SORT_EOL_PRODUCT,
     SORT_REPLACEMENT,
     _annotate_result,
-    _format_result,
 )
-
-
-@pytest.mark.parametrize(
-    "main_content,max_content,expect_truncated",
-    [
-        ("x" * 10_000, 200, True),
-        ("Brief content about kernels.", 5000, False),
-    ],
-    ids=["large-content-truncated", "short-content-preserved"],
-)
-async def test_format_result_content_cap(main_content: str, max_content: int, expect_truncated: bool):
-    """_format_result caps content at max_content, appending [...] when truncated."""
-    doc = {
-        "id": "doc-1",
-        "allTitle": "Test Doc",
-        "documentKind": "solution",
-        "view_uri": "/test-doc",
-        "main_content": main_content,
-    }
-    data: dict = {"highlighting": {}}
-    result, _ = await _format_result(doc, data, include_content=True, query="test", max_content=max_content)
-
-    if expect_truncated:
-        assert "[...]" in result
-        content_start = result.index("Content: ") + len("Content: ")
-        assert len(result[content_start:]) < max_content + 100
-    else:
-        assert "[...]" not in result
-        assert main_content in result
-
 
 # ---------------------------------------------------------------------------
 # EOL false-positive demotion regression tests
@@ -127,35 +94,3 @@ class TestEolProductFieldGuard:
         )
         assert sort_key == SORT_REPLACEMENT
         assert any("replacement" in a.lower() for a in annotations)
-
-
-class TestFormatResultProductPassthrough:
-    """Verify that _format_result passes the doc product field through to _annotate_result."""
-
-    async def test_format_result_non_eol_product_not_demoted(self):
-        """_format_result does not demote docs with a non-EOL product that mention EOL products."""
-        doc = {
-            "id": "doc-odf",
-            "allTitle": "Troubleshooting OpenShift Data Foundation",
-            "documentKind": "documentation",
-            "view_uri": "/docs/odf",
-            "product": "Red Hat OpenShift Data Foundation",
-            "main_content": "Deploy on Red Hat Virtualization or VMware for storage.",
-        }
-        data: dict = {"highlighting": {}}
-        _, sort_key = await _format_result(doc, data, include_content=True, query="odf troubleshoot")
-        assert sort_key != SORT_EOL_PRODUCT
-
-    async def test_format_result_eol_product_still_demoted(self):
-        """_format_result still demotes docs whose product IS an EOL product."""
-        doc = {
-            "id": "doc-rhv",
-            "allTitle": "Red Hat Virtualization Installation Guide",
-            "documentKind": "documentation",
-            "view_uri": "/docs/rhv",
-            "product": "Red Hat Virtualization",
-            "main_content": "Red Hat Virtualization Manager installation steps.",
-        }
-        data: dict = {"highlighting": {}}
-        _, sort_key = await _format_result(doc, data, include_content=True, query="install rhv")
-        assert sort_key == SORT_EOL_PRODUCT

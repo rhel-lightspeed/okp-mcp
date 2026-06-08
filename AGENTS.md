@@ -211,7 +211,7 @@ metrics.py  → server (imports mcp for custom_route)
 request_id.py → fastmcp.server.dependencies, fastmcp.server.middleware, starlette
 intent.py   → config
 portal.py   → config, content, formatting, intent, solr
-formatting.py → content, solr
+formatting.py → (standalone)
 solr.py     → bm25, config, metrics
 bm25.py     → (standalone)
 server.py   → config
@@ -219,7 +219,7 @@ telemetry.py → build_info, config, sentry_sdk
 content.py  → (standalone)
 ```
 
-No circular imports. `content.py` and `bm25.py` have zero internal dependencies.
+No circular imports. `content.py`, `bm25.py`, and `formatting.py` have zero internal dependencies.
 
 ## Code Style
 
