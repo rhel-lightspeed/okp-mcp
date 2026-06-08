@@ -1,32 +1,46 @@
 """Tests for build_info module."""
 
-from unittest.mock import mock_open, patch
+from unittest.mock import patch
 
-from okp_mcp.build_info import get_commit_sha, get_package_version
+import pytest
 
-
-def test_get_commit_sha_reads_file():
-    """Return the trimmed contents of the COMMIT_SHA file."""
-    with patch("builtins.open", mock_open(read_data="abc1234\n")):
-        assert get_commit_sha() == "abc1234"
+from okp_mcp.build_info import _commit_sha_from_git, get_commit_sha, get_package_version
 
 
-def test_get_commit_sha_fallback_when_missing():
-    """Fall back to 'development' when COMMIT_SHA file does not exist."""
-    with patch("builtins.open", side_effect=FileNotFoundError):
-        assert get_commit_sha() == "development"
+def test_get_commit_sha_reads_file(tmp_path):
+    """Return the trimmed value from the baked COMMIT_SHA file."""
+    (tmp_path / "COMMIT_SHA").write_text("def5678\n", encoding="utf-8")
+
+    with patch("okp_mcp.build_info.DEFAULT_APP_ROOT", str(tmp_path)):
+        assert get_commit_sha() == "def5678"
 
 
-def test_get_commit_sha_fallback_on_permission_error():
-    """Fall back to 'development' on PermissionError or other OSError."""
-    with patch("builtins.open", side_effect=PermissionError):
-        assert get_commit_sha() == "development"
+def test_get_commit_sha_uses_git_when_file_missing(tmp_path):
+    """Fall back to local git when the baked file is absent."""
+    with (
+        patch("okp_mcp.build_info.DEFAULT_APP_ROOT", str(tmp_path)),
+        patch("okp_mcp.build_info._commit_sha_from_git", return_value="9abcdef"),
+    ):
+        assert get_commit_sha() == "9abcdef"
 
 
-def test_get_commit_sha_fallback_on_empty_file():
-    """Fall back to 'development' when the file exists but is empty."""
-    with patch("builtins.open", mock_open(read_data="  \n")):
-        assert get_commit_sha() == "development"
+def test_get_commit_sha_propagates_git_failure(tmp_path):
+    """Raise when the file is absent and git is unavailable."""
+    with (
+        patch("okp_mcp.build_info.DEFAULT_APP_ROOT", str(tmp_path)),
+        patch("okp_mcp.build_info._commit_sha_from_git", side_effect=ValueError),
+        pytest.raises(ValueError),
+    ):
+        get_commit_sha()
+
+
+def test_commit_sha_from_git_raises_when_git_missing():
+    """Raise ValueError when the git executable is unavailable."""
+    with (
+        patch("okp_mcp.build_info.subprocess.run", side_effect=FileNotFoundError),
+        pytest.raises(ValueError),
+    ):
+        _commit_sha_from_git()
 
 
 def test_get_package_version():

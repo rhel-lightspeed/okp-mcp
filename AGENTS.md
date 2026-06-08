@@ -189,7 +189,7 @@ uv run okp-mcp [--transport ...] [--port ...]
        ├─ CliApp.run(ServerConfig)     # parse CLI + MCP_* env vars
        ├─ _configure_logging()
        ├─ telemetry.initialize_error_reporting()  # no-op unless MCP_GLITCHTIP_DSN is set
-       ├─ log version + commit SHA     # build_info.py reads /opt/app-root/COMMIT_SHA
+       ├─ log version + commit SHA     # build_info.py: COMMIT_SHA env var, then APP_ROOT/COMMIT_SHA file, then local `git rev-parse`
        └─ mcp.run(transport=...)       # start FastMCP server
             → server.py: _app_lifespan()
                 ├─ creates shared httpx.AsyncClient
@@ -202,7 +202,7 @@ uv run okp-mcp [--transport ...] [--port ...]
 
 ```text
 __init__.py → build_info, config, metrics (side-effect import), request_id, server, telemetry, tools (side-effect import)
-build_info.py → (standalone, reads ./COMMIT_SHA file)
+build_info.py → (standalone; reads COMMIT_SHA env var, APP_ROOT/COMMIT_SHA file, or local `git rev-parse`)
 tools/__init__.py → tools/search.py, tools/document.py, tools/run_code.py
 tools/search.py → config, metrics, portal, server
 tools/document.py → content, metrics, server, solr, tools/shared.py
