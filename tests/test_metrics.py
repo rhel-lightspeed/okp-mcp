@@ -27,8 +27,8 @@ from okp_mcp.metrics import (
     TOOL_CALLS,
     TOOL_DURATION,
     PrometheusMiddleware,
-    metrics_endpoint,
 )
+from okp_mcp.server import metrics_endpoint
 from okp_mcp.solr import _solr_query
 
 _SOLR_ENDPOINT = ServerConfig().solr_endpoint

@@ -9,7 +9,6 @@ from uuid import uuid4
 from fastmcp.server.dependencies import get_http_request
 from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
 from starlette.datastructures import Headers, MutableHeaders
-from starlette.middleware import Middleware as StarletteMiddleware
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 REQUEST_ID_HEADER = "X-Request-ID"
@@ -122,8 +121,3 @@ class RequestIDHeaderMiddleware:
             await self.app(scope, receive, send_with_request_id)
         finally:
             reset_request_id(token)
-
-
-def build_http_request_id_middleware() -> list[StarletteMiddleware]:
-    """Return the Starlette middleware objects used for HTTP transports."""
-    return [StarletteMiddleware(RequestIDHeaderMiddleware)]
