@@ -35,6 +35,9 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
+      - name: Hermetic manifests in sync with uv.lock
+        run: make check-konflux-requirements
+
       - name: Lint
         run: make lint
 
