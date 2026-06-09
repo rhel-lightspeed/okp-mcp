@@ -61,6 +61,7 @@ def main() -> None:
             host=config.host,
             port=config.port,
             middleware=http_middleware,
+            show_banner=False,
         )
     else:
-        mcp.run(transport="stdio")
+        mcp.run(transport="stdio", show_banner=False)

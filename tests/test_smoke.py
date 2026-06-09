@@ -91,7 +91,7 @@ def test_main_stdio_transport(_mock_mcp_run):
     with patch("sys.argv", ["okp-mcp", "--transport", "stdio"]):
         main()
 
-    _mock_mcp_run.run.assert_called_once_with(transport="stdio")
+    _mock_mcp_run.run.assert_called_once_with(transport="stdio", show_banner=False)
 
 
 @pytest.mark.parametrize("transport", ["sse", "streamable-http"])
