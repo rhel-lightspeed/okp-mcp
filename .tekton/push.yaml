@@ -44,7 +44,7 @@ spec:
 
     - name: prefetch-input
       value: |
-        [{"type": "pip", "path": ".", "requirements_files": [".konflux/requirements.txt"], "requirements_build_files": [".konflux/requirements-build.txt"]}]
+        [{"type": "pip", "path": ".", "requirements_files": [".konflux/requirements.txt"], "requirements_build_files": [".konflux/requirements-build.txt"], "binary": {"packages": ":all:", "arch": "x86_64,aarch64", "os": "linux", "py_version": 312}}]
 
     - name: additional-tags
       value:
