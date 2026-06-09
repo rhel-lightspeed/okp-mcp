@@ -1,30 +1,62 @@
-# Common base image
-FROM registry.access.redhat.com/ubi10/python-312-minimal:latest@sha256:d8976587dd9ac477abb8c34148f06c9f7cb66f4740c30ef1cac92f5037403e89 AS base
+# Stage 1: Builder - Red Hat Hardened Image (Project Hummingbird) with shell + dnf.
+# Pinned to a digest for reproducibility; resolves to Python 3.12.13.
+FROM registry.access.redhat.com/hi/python:3.12-builder@sha256:3d37bf07a9b663ac561e94dab30d771d0cb4a1dffbcd6aa4785af1d9b6bc5848 AS builder
 
-# Stage 1: Builder
-FROM base AS builder
-
-WORKDIR /build
-
-# Install uv for fast, reproducible dependency resolution
-RUN python3 -m venv tools && tools/bin/pip install uv
-
-# Copy dependency files first for layer caching
-COPY pyproject.toml uv.lock README.md ./
-
-# Specify uv project, virtual environment, and Python executable
-ENV UV_PROJECT=/build
-ENV UV_PROJECT_ENVIRONMENT="${APP_ROOT}"
+# Build entirely as the image's non-root user (UID 65532). HOME is owned by that
+# user, so no root escalation is needed. The whole app venv is copied into the
+# distroless runtime stage.
+ENV VENVS=${HOME}/.venvs
+ENV PATH=${VENVS}/tools/bin:${PATH}
+ENV UV_PROJECT=${HOME}/build
+ENV UV_PROJECT_ENVIRONMENT=${VENVS}/okp-mcp
 ENV UV_PYTHON=/usr/bin/python3
 
-# Copy source and install the package
-COPY src/ ./src/
-RUN tools/bin/uv sync --no-cache --locked --no-dev --no-editable
+# Copy dependency files first for layer caching. .konflux holds the
+# hash-pinned manifests Cachi2 prefetches for hermetic builds; they are
+# generated from uv.lock by scripts/konflux_requirements.sh.
+COPY pyproject.toml uv.lock README.md ${UV_PROJECT}/
+COPY .konflux/ ${UV_PROJECT}/.konflux/
+COPY src/ ${UV_PROJECT}/src/
 
-# Stage 2: Runtime - minimal UBI 10 Python 3.12 image
-FROM base
+WORKDIR ${UV_PROJECT}
 
-WORKDIR "${APP_ROOT}"
+# Install into a venv at a fixed path so the distroless runtime can copy it
+# whole. Two install paths, one venv location:
+#
+#   * Hermetic Konflux build (Cachi2 present): the network is disabled, so uv
+#     cannot be fetched from PyPI. Cachi2 has prefetched every wheel into an
+#     offline mirror and written /cachi2/cachi2.env (PIP_FIND_LINKS +
+#     PIP_NO_INDEX). Build a stdlib venv (pip via ensurepip, no network),
+#     install the hash-pinned runtime deps from the mirror, then build and
+#     install the okp_mcp wheel with the prefetched build backend. The build
+#     backend is uninstalled afterwards so it never reaches the runtime.
+#   * Local / non-hermetic build: install pinned uv, then `uv sync --locked`
+#     straight from uv.lock (fails if the lock is stale, preserving the
+#     locked-build guarantee). `uv venv --seed` seeds pip into the app venv
+#     (just pip on 3.12+); uv sync does not need it, but it keeps the local
+#     venv at parity with the hermetic path's `python -m venv` (which also
+#     ships pip).
+#
+# uv.lock stays the single source of truth in both paths: .konflux/requirements*.txt
+# are generated from it, never hand-edited.
+RUN if [ -f /cachi2/cachi2.env ]; then \
+        . /cachi2/cachi2.env \
+        && python3 -m venv "${UV_PROJECT_ENVIRONMENT}" \
+        && "${UV_PROJECT_ENVIRONMENT}/bin/pip" install --no-cache-dir --only-binary=:all: --require-hashes \
+            -r .konflux/requirements-build.txt -r .konflux/requirements.txt \
+        && PATH="${UV_PROJECT_ENVIRONMENT}/bin:${PATH}" "${UV_PROJECT_ENVIRONMENT}/bin/pip" \
+            install --no-cache-dir --no-deps --no-build-isolation . \
+        && "${UV_PROJECT_ENVIRONMENT}/bin/pip" uninstall -y uv-build \
+        && "${UV_PROJECT_ENVIRONMENT}/bin/python" -c "import okp_mcp"; \
+    else \
+        python3 -m venv "${VENVS}/tools" \
+        && "${VENVS}/tools/bin/python" -m pip install --no-cache-dir uv==0.11.14 \
+        && uv venv --seed "${UV_PROJECT_ENVIRONMENT}" \
+        && uv sync --locked --no-cache --no-dev --no-editable; \
+    fi
+
+# Stage 2: Runtime - distroless Red Hat Hardened Image (no shell, no package manager).
+FROM registry.access.redhat.com/hi/python:3.12@sha256:227cd08bc68a2fb2d79ed21d198c5dad0d130238feb4088881670296902c2754 AS runtime
 
 LABEL com.redhat.component=okp-mcp
 LABEL description="MCP server for the RHEL Offline Knowledge Portal"
@@ -32,19 +64,27 @@ LABEL name=okp-mcp
 LABEL summary="OKP MCP Server"
 LABEL vendor="Red Hat, Inc."
 
-# Copy the virtual environment from builder
-COPY --from=builder "$APP_ROOT" "$APP_ROOT"
+# Copy the dependency venv from the builder stage. It keeps the SAME path it was
+# created at in the builder, so console-script shebangs (which bake an absolute
+# interpreter path) stay valid without rewriting. All runtime dependencies are
+# pure Python (no C/C++ extensions), so the distroless image needs no extra
+# shared libraries.
+COPY --from=builder ${HOME}/.venvs/okp-mcp ${HOME}/.venvs/okp-mcp
 
-# License required by Red Hat preflight certification
+# License required by Red Hat preflight certification.
 COPY LICENSE /licenses/LICENSE
 
+# Put the venv on PATH so its console scripts and interpreter resolve first.
+ENV PATH=${HOME}/.venvs/okp-mcp/bin:${PATH}
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 
-# Bake the git commit SHA into the image at build time.
-# Tekton passes this via --build-arg; defaults to "development" for local builds.
+# Bake the git commit SHA into the environment for build_info.py to read at
+# runtime. Tekton passes this via --build-arg; defaults to "development" for
+# local builds. Using an env var avoids writing/copying a file and the
+# associated disk-read failure modes.
 ARG COMMIT_SHA=development
-RUN printf '%s\n' "${COMMIT_SHA}" > "${APP_ROOT}/COMMIT_SHA"
+ENV COMMIT_SHA=${COMMIT_SHA}
 
 # Default to streamable-http for networked container deployments.
 # Override with MCP_TRANSPORT=sse or MCP_TRANSPORT=stdio as needed.
@@ -54,4 +94,13 @@ ENV MCP_PORT=8000
 
 EXPOSE 8000
 
+# Distroless-safe liveness probe (no shell required): exec-form TCP connect to
+# the listening port using the venv interpreter.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD ["python", "-c", "import os,socket,sys; p=int(os.getenv('MCP_PORT','8000')); s=socket.socket(); s.settimeout(3); sys.exit(0 if s.connect_ex(('127.0.0.1', p)) == 0 else 1)"]
+
+# Run as the image's non-root user (UID 65532).
+USER 65532
+
+# Relative path: the runtime resolves this against PATH via execvp.
 ENTRYPOINT ["okp-mcp"]
