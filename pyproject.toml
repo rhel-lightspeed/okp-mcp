@@ -34,6 +34,23 @@ dev = [
     "ty>=0.0.39",
 ]
 
+[tool.coverage.run]
+branch = true
+data_file = "coverage/.data"
+source = [
+    "src",
+    "tests",
+]
+
+[tool.coverage.html]
+directory = "coverage/htmlcov"
+
+[tool.coverage.json]
+output = "coverage/coverage.json"
+
+[tool.coverage.xml]
+output = "coverage/coverage.xml"
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
