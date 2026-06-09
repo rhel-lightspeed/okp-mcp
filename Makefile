@@ -15,7 +15,7 @@ radon:
 		|| echo "PASS: All functions rated A or B"
 
 test:
-	uv run pytest -v --cov=okp_mcp --cov-report=term-missing
+	uv run pytest
 
 ci: lint typecheck radon check-konflux-requirements test
 
