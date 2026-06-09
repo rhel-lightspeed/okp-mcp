@@ -1,23 +1,29 @@
-.PHONY: lint format typecheck radon test ci setup konflux-requirements check-konflux-requirements
+.PHONY: fix lint format typecheck radon test ci setup konflux-requirements check-konflux-requirements
+
+fix:
+	uv run --locked ruff check --fix
+	uv run --locked ruff format
 
 lint:
-	uv run ruff check src/ tests/
+	uv run --locked ruff check src/ tests/
 
 format:
-	uv run ruff format src/ tests/
+	uv run --locked ruff format src/ tests/
 
 typecheck:
-	uv run ty check src/
+	uv run --locked ty check src/
 
 radon:
-	@uv run radon cc src/ -s --min C | grep -q . \
+	@uv run --locked radon cc src/ -s --min C | grep -q . \
 		&& { echo "FAIL: Cyclomatic complexity C or higher detected"; exit 1; } \
 		|| echo "PASS: All functions rated A or B"
 
 test:
-	uv run pytest
+	uv run --locked pytest
 
 ci: lint typecheck radon check-konflux-requirements test
+	@echo ""
+	@echo "✅ All CI checks passed!"
 
 # Regenerate the hermetic build manifests from uv.lock.
 konflux-requirements:
@@ -31,5 +37,5 @@ check-konflux-requirements:
 		|| { echo "FAIL: .konflux manifests are stale. Run 'make konflux-requirements' and commit."; git status --porcelain -- .konflux/; exit 1; }
 
 setup:
-	uv sync --group dev
+	uv sync --locked --group dev
 	pre-commit install
