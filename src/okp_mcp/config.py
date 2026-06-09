@@ -1,10 +1,14 @@
 """Server configuration via MCP_* environment variables and CLI arguments."""
 
 import logging
-from typing import Literal
+from enum import StrEnum
 
 from pydantic import Field, SecretStr, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from starlette.middleware import Middleware as StarletteMiddleware
+
+from okp_mcp.metrics import PrometheusMiddleware
+from okp_mcp.request_id import RequestIDHeaderMiddleware
 
 # Configure logging
 logging.basicConfig(
@@ -84,6 +88,13 @@ STOP_WORDS: frozenset[str] = frozenset(
 )
 
 
+class Transport(StrEnum):
+    http = "http"
+    sse = "sse"
+    stdio = "stdio"
+    streamable_http = "streamable-http"
+
+
 class ServerConfig(BaseSettings):
     """MCP server settings from CLI arguments and MCP_* environment variables.
 
@@ -96,8 +107,8 @@ class ServerConfig(BaseSettings):
         cli_hide_none_type=True,
     )
 
-    transport: Literal["stdio", "sse", "streamable-http"] = Field(
-        default="streamable-http",
+    transport: Transport = Field(
+        default=Transport.streamable_http,
         description="Transport protocol",
     )
     host: str = Field(
@@ -131,3 +142,16 @@ class ServerConfig(BaseSettings):
     def solr_endpoint(self) -> str:
         """Solr select endpoint derived from solr_url."""
         return f"{self.solr_url}/solr/portal/select"
+
+    @property
+    def transport_kwargs(self) -> dict[str, str | int | list[StarletteMiddleware]]:
+        result = {}
+        if self.transport in {Transport.streamable_http, Transport.sse}:
+            result["host"] = self.host
+            result["port"] = self.port
+            result["middleware"] = [
+                StarletteMiddleware(PrometheusMiddleware),
+                StarletteMiddleware(RequestIDHeaderMiddleware),
+            ]
+
+        return result

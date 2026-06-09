@@ -2,13 +2,8 @@
 
 import time
 
-from prometheus_client import CONTENT_TYPE_LATEST as _CONTENT_TYPE  # noqa: N812 -- upstream naming
-from prometheus_client import Counter, Histogram, generate_latest
-from starlette.requests import Request
-from starlette.responses import Response
+from prometheus_client import Counter, Histogram
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
-
-from okp_mcp.server import mcp
 
 # Allowlist of known paths to prevent unbounded label cardinality.
 # Unknown paths are bucketed as "OTHER" so rogue or scan traffic
@@ -207,10 +202,3 @@ class PrometheusMiddleware:
             # Fallback for cases where headers never sent (e.g. app crash before response).
             if not recorded:
                 _emit_metrics(status_code)
-
-
-@mcp.custom_route("/metrics", methods=["GET"])
-async def metrics_endpoint(request: Request) -> Response:
-    """Expose Prometheus metrics for scraping."""
-    del request
-    return Response(content=generate_latest(), media_type=_CONTENT_TYPE)

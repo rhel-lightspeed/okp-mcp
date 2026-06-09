@@ -1,17 +1,14 @@
 """OKP MCP server — SOLR bridge for Red Hat knowledge base search."""
 
 import logging
+import sys
 
 from pydantic_settings import CliApp
-from starlette.middleware import Middleware as StarletteMiddleware
 
-from okp_mcp import metrics as _metrics  # noqa: F401 -- import registers @mcp.custom_route("/metrics")
 from okp_mcp import server as _server
-from okp_mcp import tools as _tools  # noqa: F401 -- import triggers @mcp.tool registration
 from okp_mcp.build_info import get_commit_sha, get_package_version
 from okp_mcp.config import ServerConfig
-from okp_mcp.metrics import PrometheusMiddleware
-from okp_mcp.request_id import RequestIDLogFilter, build_http_request_id_middleware
+from okp_mcp.request_id import RequestIDLogFilter
 from okp_mcp.server import mcp
 from okp_mcp.telemetry import initialize_error_reporting
 
@@ -53,15 +50,11 @@ def main() -> None:
     logger.info("okp-mcp %s (%s)", get_package_version(), get_commit_sha())
     logger.info("Starting MCP server with transport=%s", config.transport)
 
-    if config.transport in ("sse", "streamable-http"):
-        http_middleware = build_http_request_id_middleware()
-        http_middleware.insert(0, StarletteMiddleware(PrometheusMiddleware))
-        mcp.run(
-            transport=config.transport,
-            host=config.host,
-            port=config.port,
-            middleware=http_middleware,
-            show_banner=False,
-        )
-    else:
-        mcp.run(transport="stdio", show_banner=False)
+    try:
+        mcp.run(transport=config.transport.value, show_banner=False, **config.transport_kwargs)
+    except KeyboardInterrupt:
+        logger.info("Shutting down okp-mcp")
+        sys.exit()
+    except Exception as exc:
+        logger.critical(f"Fatal error in okp-mcp: {exc}", exc_info=True)
+        sys.exit(1)

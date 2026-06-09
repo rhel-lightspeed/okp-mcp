@@ -9,6 +9,9 @@ from dataclasses import dataclass
 
 import httpx
 from fastmcp import Context, FastMCP
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+from starlette.requests import Request
+from starlette.responses import Response
 
 from okp_mcp.config import ServerConfig
 from okp_mcp.request_id import RequestIDContextMiddleware
@@ -59,3 +62,10 @@ mcp = FastMCP(
     lifespan=_app_lifespan,
     middleware=[RequestIDContextMiddleware()],
 )
+
+
+@mcp.custom_route("/metrics", methods=["GET"])
+async def metrics_endpoint(request: Request) -> Response:
+    """Expose Prometheus metrics for scraping."""
+    del request
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
