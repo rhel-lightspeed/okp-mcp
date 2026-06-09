@@ -4,7 +4,9 @@ from unittest.mock import patch
 
 import pytest
 
-from okp_mcp.build_info import _commit_sha_from_git, get_commit_sha, get_package_version
+from okp_mcp.build_info import _commit_sha_from_git
+from okp_mcp.build_info import get_commit_sha
+from okp_mcp.build_info import get_package_version
 
 
 def test_get_commit_sha_reads_file(tmp_path):

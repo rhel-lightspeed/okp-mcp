@@ -1,22 +1,24 @@
 """Tests for document retrieval tool formatting functions."""
 
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock
+from unittest.mock import Mock
+from unittest.mock import patch
 
 import httpx
 import pytest
+
 from prometheus_client import REGISTRY
 
 from okp_mcp import tools
 from okp_mcp.config import ServerConfig
-from okp_mcp.tools.document import (
-    _DOCUMENTATION_MAX_CHARS,
-    _DOCUMENTATION_MAX_SECTIONS,
-    _DOCUMENTATION_PER_SECTION,
-    _format_document_content,
-    _format_document_passages,
-    _format_metadata,
-    _uses_document_passages,
-)
+from okp_mcp.tools.document import _DOCUMENTATION_MAX_CHARS
+from okp_mcp.tools.document import _DOCUMENTATION_MAX_SECTIONS
+from okp_mcp.tools.document import _DOCUMENTATION_PER_SECTION
+from okp_mcp.tools.document import _format_document_content
+from okp_mcp.tools.document import _format_document_passages
+from okp_mcp.tools.document import _format_metadata
+from okp_mcp.tools.document import _uses_document_passages
+
 
 _SOLR_ENDPOINT = ServerConfig().solr_endpoint
 
@@ -318,20 +320,44 @@ class TestDocumentRetrievalMetrics:
         "kind, view_uri, content, snippets, query, counter_name, expected_delta",
         [
             pytest.param(
-                "documentation", "/documentation/en-US/test", "Content", ["Snippet about kernel configuration"],
-                "kernel", "okp_document_highlight_used", 1, id="doc-with-highlights",
+                "documentation",
+                "/documentation/en-US/test",
+                "Content",
+                ["Snippet about kernel configuration"],
+                "kernel",
+                "okp_document_highlight_used",
+                1,
+                id="doc-with-highlights",
             ),
             pytest.param(
-                "solution", "/solutions/12345", "Full body.", ["Fix for the network issue"],
-                "network", "okp_document_highlight_used", 1, id="non-doc-with-highlights",
+                "solution",
+                "/solutions/12345",
+                "Full body.",
+                ["Fix for the network issue"],
+                "network",
+                "okp_document_highlight_used",
+                1,
+                id="non-doc-with-highlights",
             ),
             pytest.param(
-                "documentation", "/documentation/en-US/test", "Content about systemd units " + "w" * 300, None,
-                "systemd", "okp_document_highlight_fallback", 1, id="doc-no-highlights",
+                "documentation",
+                "/documentation/en-US/test",
+                "Content about systemd units " + "w" * 300,
+                None,
+                "systemd",
+                "okp_document_highlight_fallback",
+                1,
+                id="doc-no-highlights",
             ),
             pytest.param(
-                "solution", "/solutions/12345", "Solution about networking " + "z" * 300, None,
-                "networking", "okp_document_highlight_fallback", 1, id="non-doc-no-highlights",
+                "solution",
+                "/solutions/12345",
+                "Solution about networking " + "z" * 300,
+                None,
+                "networking",
+                "okp_document_highlight_fallback",
+                1,
+                id="non-doc-no-highlights",
             ),
         ],
     )

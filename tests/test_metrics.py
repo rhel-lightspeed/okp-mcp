@@ -5,31 +5,31 @@ from unittest.mock import MagicMock
 import httpx
 import pytest
 import respx
+
 from prometheus_client import REGISTRY
 
 from okp_mcp.config import ServerConfig
-from okp_mcp.metrics import (
-    DOCUMENT_HIGHLIGHT_FALLBACK,
-    DOCUMENT_HIGHLIGHT_USED,
-    DOCUMENT_NOT_FOUND,
-    DOCUMENT_NUDGE,
-    HTTP_REQUEST_DURATION,
-    HTTP_REQUESTS,
-    INTENT_DEPRECATION_SKIPPED,
-    INTENT_MATCHED,
-    INTENT_NO_MATCH,
-    SEARCH_DEPRECATION_DETECTED,
-    SEARCH_RESULT_COUNT,
-    SEARCH_SCORE_FILTER_DROPPED,
-    SEARCH_ZERO_RESULTS,
-    SOLR_QUERIES,
-    SOLR_QUERY_DURATION,
-    TOOL_CALLS,
-    TOOL_DURATION,
-    PrometheusMiddleware,
-)
+from okp_mcp.metrics import DOCUMENT_HIGHLIGHT_FALLBACK
+from okp_mcp.metrics import DOCUMENT_HIGHLIGHT_USED
+from okp_mcp.metrics import DOCUMENT_NOT_FOUND
+from okp_mcp.metrics import DOCUMENT_NUDGE
+from okp_mcp.metrics import HTTP_REQUEST_DURATION
+from okp_mcp.metrics import HTTP_REQUESTS
+from okp_mcp.metrics import INTENT_DEPRECATION_SKIPPED
+from okp_mcp.metrics import INTENT_MATCHED
+from okp_mcp.metrics import INTENT_NO_MATCH
+from okp_mcp.metrics import PrometheusMiddleware
+from okp_mcp.metrics import SEARCH_DEPRECATION_DETECTED
+from okp_mcp.metrics import SEARCH_RESULT_COUNT
+from okp_mcp.metrics import SEARCH_SCORE_FILTER_DROPPED
+from okp_mcp.metrics import SEARCH_ZERO_RESULTS
+from okp_mcp.metrics import SOLR_QUERIES
+from okp_mcp.metrics import SOLR_QUERY_DURATION
+from okp_mcp.metrics import TOOL_CALLS
+from okp_mcp.metrics import TOOL_DURATION
 from okp_mcp.server import metrics_endpoint
 from okp_mcp.solr import _solr_query
+
 
 _SOLR_ENDPOINT = ServerConfig().solr_endpoint
 

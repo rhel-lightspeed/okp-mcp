@@ -4,11 +4,18 @@ import logging
 import time
 
 import httpx
+
 from fastmcp import Context
 
-from okp_mcp.metrics import TOOL_CALLS, TOOL_DURATION
-from okp_mcp.portal import _MAX_QUERIES, _format_portal_results, _run_multi_query_search, _run_portal_search
-from okp_mcp.server import get_app_context, mcp
+from okp_mcp.metrics import TOOL_CALLS
+from okp_mcp.metrics import TOOL_DURATION
+from okp_mcp.portal import _format_portal_results
+from okp_mcp.portal import _MAX_QUERIES
+from okp_mcp.portal import _run_multi_query_search
+from okp_mcp.portal import _run_portal_search
+from okp_mcp.server import get_app_context
+from okp_mcp.server import mcp
+
 
 logger = logging.getLogger("okp_mcp.tools.search_portal")
 

@@ -1,13 +1,18 @@
 """Error reporting setup for GlitchTip-compatible Sentry DSNs."""
 
 import logging
-from typing import TYPE_CHECKING, Any
+
+from typing import Any
+from typing import TYPE_CHECKING
 
 import sentry_sdk
+
 from sentry_sdk.utils import BadDsn
 
-from okp_mcp.build_info import get_commit_sha, get_package_version
+from okp_mcp.build_info import get_commit_sha
+from okp_mcp.build_info import get_package_version
 from okp_mcp.config import ServerConfig
+
 
 if TYPE_CHECKING:
     from sentry_sdk._types import Event

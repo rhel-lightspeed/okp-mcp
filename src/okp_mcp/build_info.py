@@ -2,9 +2,11 @@
 
 import logging
 import os
-import subprocess  # noqa: S404 -- used only for a fixed, no-input `git rev-parse` in local dev
+import subprocess
+
 from importlib.metadata import version
 from pathlib import Path
+
 
 # In-container WORKDIR set by the Containerfile. This is the path *inside the
 # built image*, not a directory on a developer's machine. The Tekton pipeline
@@ -26,7 +28,7 @@ def _commit_sha_from_git() -> str:
     working directory is not a repo (e.g. an unpacked sdist).
     """
     try:
-        result = subprocess.run(  # noqa: S603 -- fixed argv, no shell, no user input
+        result = subprocess.run(
             ["git", "rev-parse", "--short", "HEAD"],  # noqa: S607 -- git resolved from PATH is fine for dev-only use
             capture_output=True,
             text=True,

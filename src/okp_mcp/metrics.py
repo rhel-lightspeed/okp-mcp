@@ -2,8 +2,14 @@
 
 import time
 
-from prometheus_client import Counter, Histogram
-from starlette.types import ASGIApp, Message, Receive, Scope, Send
+from prometheus_client import Counter
+from prometheus_client import Histogram
+from starlette.types import ASGIApp
+from starlette.types import Message
+from starlette.types import Receive
+from starlette.types import Scope
+from starlette.types import Send
+
 
 # Allowlist of known paths to prevent unbounded label cardinality.
 # Unknown paths are bucketed as "OTHER" so rogue or scan traffic

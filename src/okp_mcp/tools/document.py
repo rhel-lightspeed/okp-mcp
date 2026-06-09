@@ -2,23 +2,31 @@
 
 import logging
 import time
+
 from urllib.parse import urlsplit
 
 import httpx
+
 from fastmcp import Context
 
-from okp_mcp.content import _select_within_budget, doc_uri, strip_boilerplate, truncate_content
-from okp_mcp.metrics import (
-    DOCUMENT_HIGHLIGHT_FALLBACK,
-    DOCUMENT_HIGHLIGHT_USED,
-    DOCUMENT_NOT_FOUND,
-    DOCUMENT_NUDGE,
-    TOOL_CALLS,
-    TOOL_DURATION,
-)
-from okp_mcp.server import get_app_context, mcp
-from okp_mcp.solr import _clean_query, _extract_relevant_section, _get_highlight_snippets, _solr_query
+from okp_mcp.content import _select_within_budget
+from okp_mcp.content import doc_uri
+from okp_mcp.content import strip_boilerplate
+from okp_mcp.content import truncate_content
+from okp_mcp.metrics import DOCUMENT_HIGHLIGHT_FALLBACK
+from okp_mcp.metrics import DOCUMENT_HIGHLIGHT_USED
+from okp_mcp.metrics import DOCUMENT_NOT_FOUND
+from okp_mcp.metrics import DOCUMENT_NUDGE
+from okp_mcp.metrics import TOOL_CALLS
+from okp_mcp.metrics import TOOL_DURATION
+from okp_mcp.server import get_app_context
+from okp_mcp.server import mcp
+from okp_mcp.solr import _clean_query
+from okp_mcp.solr import _extract_relevant_section
+from okp_mcp.solr import _get_highlight_snippets
+from okp_mcp.solr import _solr_query
 from okp_mcp.tools.shared import DOCUMENT_FL
+
 
 logger = logging.getLogger("okp_mcp.tools.get_document")
 

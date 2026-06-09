@@ -6,11 +6,13 @@ import sys
 from pydantic_settings import CliApp
 
 from okp_mcp import server as _server
-from okp_mcp.build_info import get_commit_sha, get_package_version
+from okp_mcp.build_info import get_commit_sha
+from okp_mcp.build_info import get_package_version
 from okp_mcp.config import ServerConfig
 from okp_mcp.request_id import RequestIDLogFilter
 from okp_mcp.server import mcp
 from okp_mcp.telemetry import initialize_error_reporting
+
 
 __all__ = ["mcp", "main"]
 

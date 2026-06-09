@@ -2,7 +2,8 @@
 
 from prometheus_client import REGISTRY
 
-from okp_mcp.intent import apply_deprecation_boosts, apply_main_boosts
+from okp_mcp.intent import apply_deprecation_boosts
+from okp_mcp.intent import apply_main_boosts
 
 
 def _get_counter(name: str, labels: dict) -> float:

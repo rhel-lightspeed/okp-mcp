@@ -1,14 +1,19 @@
 """Server configuration via MCP_* environment variables and CLI arguments."""
 
 import logging
+
 from enum import StrEnum
 
-from pydantic import Field, SecretStr, computed_field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import computed_field
+from pydantic import Field
+from pydantic import SecretStr
+from pydantic_settings import BaseSettings
+from pydantic_settings import SettingsConfigDict
 from starlette.middleware import Middleware as StarletteMiddleware
 
 from okp_mcp.metrics import PrometheusMiddleware
 from okp_mcp.request_id import RequestIDHeaderMiddleware
+
 
 # Configure logging
 logging.basicConfig(

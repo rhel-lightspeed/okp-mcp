@@ -2,14 +2,19 @@
 
 # pyright: reportMissingImports=false
 
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock
+from unittest.mock import Mock
+from unittest.mock import patch
 
 import httpx
 import pytest
 import respx
 
 from okp_mcp.config import ServerConfig
-from okp_mcp.solr import _clean_query, _get_highlight_snippets, _solr_query
+from okp_mcp.solr import _clean_query
+from okp_mcp.solr import _get_highlight_snippets
+from okp_mcp.solr import _solr_query
+
 
 _SOLR_ENDPOINT = ServerConfig().solr_endpoint
 

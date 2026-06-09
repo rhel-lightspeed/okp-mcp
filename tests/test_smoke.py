@@ -1,8 +1,10 @@
 """Tests for the MCP server entry point and transport dispatch."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
 import pytest
+
 from pydantic import ValidationError
 
 from okp_mcp.metrics import PrometheusMiddleware

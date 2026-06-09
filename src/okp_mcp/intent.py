@@ -12,10 +12,14 @@
 from __future__ import annotations
 
 import re
+
 from dataclasses import dataclass
 
 from okp_mcp.config import logger
-from okp_mcp.metrics import INTENT_DEPRECATION_SKIPPED, INTENT_MATCHED, INTENT_NO_MATCH
+from okp_mcp.metrics import INTENT_DEPRECATION_SKIPPED
+from okp_mcp.metrics import INTENT_MATCHED
+from okp_mcp.metrics import INTENT_NO_MATCH
+
 
 # ---------------------------------------------------------------------------
 # Intent rule dataclass

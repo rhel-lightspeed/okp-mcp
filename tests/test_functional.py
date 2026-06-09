@@ -13,10 +13,14 @@ Requires: OKP Solr container running (``podman-compose up -d``)
 
 import httpx
 import pytest
-from functional_cases import FUNCTIONAL_TEST_CASES, FunctionalCase
+
+from functional_cases import FUNCTIONAL_TEST_CASES
+from functional_cases import FunctionalCase
 
 from okp_mcp.config import ServerConfig
-from okp_mcp.portal import PortalChunk, _run_portal_search
+from okp_mcp.portal import _run_portal_search
+from okp_mcp.portal import PortalChunk
+
 
 # ---------------------------------------------------------------------------
 # Helpers

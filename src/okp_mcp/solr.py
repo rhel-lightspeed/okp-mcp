@@ -6,8 +6,10 @@ import time
 import httpx
 
 from okp_mcp.bm25 import BM25Plus
-from okp_mcp.config import STOP_WORDS, logger
-from okp_mcp.metrics import SOLR_QUERIES, SOLR_QUERY_DURATION
+from okp_mcp.config import logger
+from okp_mcp.config import STOP_WORDS
+from okp_mcp.metrics import SOLR_QUERIES
+from okp_mcp.metrics import SOLR_QUERY_DURATION
 
 
 def _split_quoted_and_plain(text: str) -> list[str]:

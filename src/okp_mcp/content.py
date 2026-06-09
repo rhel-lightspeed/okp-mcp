@@ -2,6 +2,7 @@
 
 import re
 
+
 # Solr content uses a Unicode right single quotation mark (U+2019, a.k.a.
 # "smart apostrophe") in "Red Hat\u2019s", not the ASCII apostrophe (U+0027).
 # The character class ['\u2019] matches either variant so the pattern works

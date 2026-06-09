@@ -1,6 +1,7 @@
 """Pure-Python BM25+ scorer (drop-in for rank_bm25.BM25Plus, no numpy)."""
 
 import math
+
 from collections import Counter
 from collections.abc import Sequence
 

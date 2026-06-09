@@ -3,17 +3,25 @@
 # pyright: reportMissingImports=false
 
 import inspect
-from unittest.mock import AsyncMock, Mock, patch
+
+from unittest.mock import AsyncMock
+from unittest.mock import Mock
+from unittest.mock import patch
 
 import httpx
 import pytest
 
 import okp_mcp  # noqa: F401 -- triggers @mcp.tool registration
+
 from okp_mcp import tools
 from okp_mcp.config import ServerConfig
 from okp_mcp.portal import _MAX_QUERIES
 from okp_mcp.server import mcp
-from okp_mcp.tools import _doc_id_filter, _escape_solr_phrase, _format_document, _normalize_doc_id
+from okp_mcp.tools import _doc_id_filter
+from okp_mcp.tools import _escape_solr_phrase
+from okp_mcp.tools import _format_document
+from okp_mcp.tools import _normalize_doc_id
+
 
 _SOLR_ENDPOINT = ServerConfig().solr_endpoint
 

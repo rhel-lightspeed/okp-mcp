@@ -3,32 +3,35 @@
 import httpx
 import pytest
 import respx
+
 from prometheus_client import REGISTRY
 
-from okp_mcp.intent import INTENT_RULES, IntentRule, apply_deprecation_boosts, apply_main_boosts
-from okp_mcp.portal import (
-    _DEPRECATION_WARNING,
-    _EOL_PRODUCTS,
-    _FALLBACK_MAX_CHARS,
-    _KIND_LABELS,
-    _MAIN_QF,
-    _MAX_QUERIES,
-    PortalChunk,
-    _build_deprecation_query,
-    _build_eol_filter,
-    _build_main_query,
-    _deduplicate_by_parent,
-    _docs_to_chunks,
-    _fallback_cve,
-    _fallback_errata,
-    _filter_by_score,
-    _format_portal_chunk,
-    _format_portal_results,
-    _reciprocal_rank_fusion,
-    _resolve_title,
-    _run_multi_query_search,
-    _run_portal_search,
-)
+from okp_mcp.intent import apply_deprecation_boosts
+from okp_mcp.intent import apply_main_boosts
+from okp_mcp.intent import INTENT_RULES
+from okp_mcp.intent import IntentRule
+from okp_mcp.portal import _build_deprecation_query
+from okp_mcp.portal import _build_eol_filter
+from okp_mcp.portal import _build_main_query
+from okp_mcp.portal import _deduplicate_by_parent
+from okp_mcp.portal import _DEPRECATION_WARNING
+from okp_mcp.portal import _docs_to_chunks
+from okp_mcp.portal import _EOL_PRODUCTS
+from okp_mcp.portal import _fallback_cve
+from okp_mcp.portal import _fallback_errata
+from okp_mcp.portal import _FALLBACK_MAX_CHARS
+from okp_mcp.portal import _filter_by_score
+from okp_mcp.portal import _format_portal_chunk
+from okp_mcp.portal import _format_portal_results
+from okp_mcp.portal import _KIND_LABELS
+from okp_mcp.portal import _MAIN_QF
+from okp_mcp.portal import _MAX_QUERIES
+from okp_mcp.portal import _reciprocal_rank_fusion
+from okp_mcp.portal import _resolve_title
+from okp_mcp.portal import _run_multi_query_search
+from okp_mcp.portal import _run_portal_search
+from okp_mcp.portal import PortalChunk
+
 
 # ---------------------------------------------------------------------------
 # EOL products
@@ -1546,9 +1549,7 @@ class TestSearchQualityMetrics:
         with respx.mock(assert_all_called=False) as router:
             router.get(_SOLR_ENDPOINT).mock(side_effect=side_effect)
             async with httpx.AsyncClient() as client:
-                _, has_dep = await _run_portal_search(
-                    "deprecated feature", client=client, solr_endpoint=_SOLR_ENDPOINT
-                )
+                _, has_dep = await _run_portal_search("deprecated feature", client=client, solr_endpoint=_SOLR_ENDPOINT)
 
         assert has_dep is True
         assert _get_counter("okp_search_deprecation_detected") == before + 1
@@ -1569,9 +1570,7 @@ class TestSearchQualityMetrics:
         with respx.mock(assert_all_called=False) as router:
             router.get(_SOLR_ENDPOINT).mock(side_effect=side_effect)
             async with httpx.AsyncClient() as client:
-                _, has_dep = await _run_portal_search(
-                    "clean query", client=client, solr_endpoint=_SOLR_ENDPOINT
-                )
+                _, has_dep = await _run_portal_search("clean query", client=client, solr_endpoint=_SOLR_ENDPOINT)
 
         assert has_dep is False
         assert _get_counter("okp_search_deprecation_detected") == before

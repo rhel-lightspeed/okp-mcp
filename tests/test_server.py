@@ -3,12 +3,16 @@
 # pyright: reportMissingImports=false
 
 import logging
+
 from types import SimpleNamespace
-from typing import Any, cast
-from unittest.mock import AsyncMock, patch
+from typing import Any
+from typing import cast
+from unittest.mock import AsyncMock
+from unittest.mock import patch
 
 import httpx
 import pytest
+
 from fastmcp import Context
 from fastmcp.server.middleware import MiddlewareContext
 from starlette.applications import Starlette
@@ -16,16 +20,17 @@ from starlette.middleware import Middleware as StarletteMiddleware
 from starlette.responses import PlainTextResponse
 from starlette.routing import Route
 
-from okp_mcp.request_id import (
-    REQUEST_ID_HEADER,
-    RequestIDContextMiddleware,
-    RequestIDHeaderMiddleware,
-    RequestIDLogFilter,
-    get_request_id,
-    reset_request_id,
-    set_request_id,
-)
-from okp_mcp.server import AppContext, _app_lifespan, get_app_context, mcp
+from okp_mcp.request_id import get_request_id
+from okp_mcp.request_id import REQUEST_ID_HEADER
+from okp_mcp.request_id import RequestIDContextMiddleware
+from okp_mcp.request_id import RequestIDHeaderMiddleware
+from okp_mcp.request_id import RequestIDLogFilter
+from okp_mcp.request_id import reset_request_id
+from okp_mcp.request_id import set_request_id
+from okp_mcp.server import _app_lifespan
+from okp_mcp.server import AppContext
+from okp_mcp.server import get_app_context
+from okp_mcp.server import mcp
 
 
 @pytest.mark.parametrize(

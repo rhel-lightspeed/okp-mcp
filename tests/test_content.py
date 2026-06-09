@@ -2,7 +2,11 @@
 
 import pytest
 
-from okp_mcp.content import _select_within_budget, clean_content, doc_uri, strip_boilerplate, truncate_content
+from okp_mcp.content import _select_within_budget
+from okp_mcp.content import clean_content
+from okp_mcp.content import doc_uri
+from okp_mcp.content import strip_boilerplate
+from okp_mcp.content import truncate_content
 
 
 @pytest.mark.parametrize(

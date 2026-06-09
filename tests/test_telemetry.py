@@ -4,10 +4,12 @@ from unittest.mock import patch
 
 import pytest
 import sentry_sdk
+
 from pydantic import SecretStr
 
 from okp_mcp.config import ServerConfig
-from okp_mcp.telemetry import _before_send, initialize_error_reporting
+from okp_mcp.telemetry import _before_send
+from okp_mcp.telemetry import initialize_error_reporting
 
 
 @pytest.mark.parametrize(

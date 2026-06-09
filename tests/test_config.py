@@ -3,6 +3,7 @@
 from unittest.mock import patch
 
 import pytest
+
 from pydantic import ValidationError
 from pydantic_settings import CliApp
 

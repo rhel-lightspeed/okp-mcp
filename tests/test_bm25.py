@@ -6,6 +6,7 @@ import pytest
 
 from okp_mcp.bm25 import BM25Plus
 
+
 # (corpus, query, expected_scores) triples captured from rank_bm25.BM25Plus.
 GOLDEN_CASES = [
     pytest.param(

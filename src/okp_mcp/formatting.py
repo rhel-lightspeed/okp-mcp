@@ -2,6 +2,7 @@
 
 import re
 
+
 EOL_PRODUCT_MENTIONS = [
     ("Red Hat Virtualization", "RHV"),
     ("RHEV", "RHV"),

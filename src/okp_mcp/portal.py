@@ -5,21 +5,27 @@ from __future__ import annotations
 import asyncio
 import html as html_mod
 import re
-from dataclasses import dataclass, field, replace
+
+from dataclasses import dataclass
+from dataclasses import field
+from dataclasses import replace
 
 import httpx
 
 from okp_mcp.config import logger
-from okp_mcp.content import _select_within_budget, doc_uri, strip_boilerplate
+from okp_mcp.content import _select_within_budget
+from okp_mcp.content import doc_uri
+from okp_mcp.content import strip_boilerplate
 from okp_mcp.formatting import _annotate_result
-from okp_mcp.intent import apply_deprecation_boosts, apply_main_boosts
-from okp_mcp.metrics import (
-    SEARCH_DEPRECATION_DETECTED,
-    SEARCH_RESULT_COUNT,
-    SEARCH_SCORE_FILTER_DROPPED,
-    SEARCH_ZERO_RESULTS,
-)
-from okp_mcp.solr import _clean_query, _filter_rhv_sentences, _solr_query
+from okp_mcp.intent import apply_deprecation_boosts
+from okp_mcp.intent import apply_main_boosts
+from okp_mcp.metrics import SEARCH_DEPRECATION_DETECTED
+from okp_mcp.metrics import SEARCH_RESULT_COUNT
+from okp_mcp.metrics import SEARCH_SCORE_FILTER_DROPPED
+from okp_mcp.metrics import SEARCH_ZERO_RESULTS
+from okp_mcp.solr import _clean_query
+from okp_mcp.solr import _filter_rhv_sentences
+from okp_mcp.solr import _solr_query
 
 
 @dataclass

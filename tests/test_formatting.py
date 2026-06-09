@@ -1,11 +1,10 @@
 """Tests for okp_mcp.formatting module."""
 
-from okp_mcp.formatting import (
-    SORT_DEPRECATION,
-    SORT_EOL_PRODUCT,
-    SORT_REPLACEMENT,
-    _annotate_result,
-)
+from okp_mcp.formatting import _annotate_result
+from okp_mcp.formatting import SORT_DEPRECATION
+from okp_mcp.formatting import SORT_EOL_PRODUCT
+from okp_mcp.formatting import SORT_REPLACEMENT
+
 
 # ---------------------------------------------------------------------------
 # EOL false-positive demotion regression tests

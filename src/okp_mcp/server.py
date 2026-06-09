@@ -3,18 +3,23 @@
 # pyright: reportAttributeAccessIssue=false
 
 import logging
+
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
 import httpx
-from fastmcp import Context, FastMCP
-from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+
+from fastmcp import Context
+from fastmcp import FastMCP
+from prometheus_client import CONTENT_TYPE_LATEST
+from prometheus_client import generate_latest
 from starlette.requests import Request
 from starlette.responses import Response
 
 from okp_mcp.config import ServerConfig
 from okp_mcp.request_id import RequestIDContextMiddleware
+
 
 logger = logging.getLogger(__name__)
 
