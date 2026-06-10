@@ -2,8 +2,6 @@
 
 from unittest.mock import patch
 
-import pytest
-
 from okp_mcp.build_info import _commit_sha_from_git
 from okp_mcp.build_info import get_commit_sha
 from okp_mcp.build_info import get_package_version
@@ -26,23 +24,20 @@ def test_get_commit_sha_uses_git_when_file_missing(tmp_path):
         assert get_commit_sha() == "9abcdef"
 
 
-def test_get_commit_sha_propagates_git_failure(tmp_path):
-    """Raise when the file is absent and git is unavailable."""
+def test_get_commit_sha_falls_back_to_default_when_git_unavailable(tmp_path):
+    """Return the default sentinel when the file is absent and git is unavailable."""
     with (
         patch("okp_mcp.build_info.DEFAULT_APP_ROOT", str(tmp_path)),
-        patch("okp_mcp.build_info._commit_sha_from_git", side_effect=ValueError),
-        pytest.raises(ValueError),
+        patch("okp_mcp.build_info._commit_sha_from_git", return_value=None),
+        patch("okp_mcp.build_info.DEFAULT_COMMIT_SHA", "development"),
     ):
-        get_commit_sha()
+        assert get_commit_sha() == "development"
 
 
-def test_commit_sha_from_git_raises_when_git_missing():
-    """Raise ValueError when the git executable is unavailable."""
-    with (
-        patch("okp_mcp.build_info.subprocess.run", side_effect=FileNotFoundError),
-        pytest.raises(ValueError),
-    ):
-        _commit_sha_from_git()
+def test_commit_sha_from_git_returns_none_when_git_missing():
+    """Return None when the git executable is unavailable."""
+    with patch("okp_mcp.build_info.subprocess.run", side_effect=FileNotFoundError):
+        assert _commit_sha_from_git() is None
 
 
 def test_get_package_version():

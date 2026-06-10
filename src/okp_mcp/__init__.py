@@ -47,7 +47,10 @@ def main() -> None:
     config = CliApp.run(ServerConfig)
     _server._server_config = config
     _configure_logging(config.log_level)
-    initialize_error_reporting(config)
+    try:
+        initialize_error_reporting(config)
+    except Exception:
+        logger.warning("Failed to initialize error reporting; continuing without it", exc_info=True)
 
     logger.info("okp-mcp %s (%s)", get_package_version(), get_commit_sha())
     logger.info("Starting MCP server with transport=%s", config.transport)
