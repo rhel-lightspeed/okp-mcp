@@ -42,9 +42,12 @@ spec:
     - name: hermetic
       value: "false"
 
+    # Empty prefetch-input disables Cachi2/hermeto prefetch entirely. The
+    # prefetch-dependencies task keys off this input, not the hermetic flag, so
+    # leaving it populated would still stamp hermeto:pip:package:binary=true
+    # into the SBOM and trip Conforma's disallowed_package_attributes rule.
     - name: prefetch-input
-      value: |
-        [{"type": "pip", "path": ".", "requirements_files": [".konflux/requirements.txt"], "requirements_build_files": [".konflux/requirements-build.txt"], "allow_binary": "true"}]
+      value: ""
 
     - name: additional-tags
       value:
