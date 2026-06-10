@@ -284,6 +284,38 @@ def _fallback_generic(doc: dict) -> str:
     return ""
 
 
+def _make_chunk(doc: dict, suffix: str, chunk_text: str, chunk_index: int) -> PortalChunk:
+    """Build a PortalChunk from a Solr doc and a single passage.
+
+    Centralizes the shared field extraction (title, URL, kind, score) so the
+    three construction sites in ``_docs_to_chunks`` (CVE/errata fallback,
+    highlight snippets, generic fallback) only supply the parts that vary:
+    the ``doc_id`` suffix, the chunk text, and the chunk index.
+
+    Args:
+        doc: A single Solr document dict (from ``response.docs``).
+        suffix: Appended to the parent ``id`` to form the unique ``doc_id``
+            (e.g. ``"hl_0"``, ``"fb_0"``).
+        chunk_text: The extracted passage text for this chunk.
+        chunk_index: Zero-based position of this chunk within its parent.
+
+    Returns:
+        A populated PortalChunk.
+    """
+    doc_id = doc.get("id", "")
+    return PortalChunk(
+        doc_id=f"{doc_id}_{suffix}",
+        parent_id=doc_id,
+        title=_resolve_title(doc),
+        chunk=chunk_text,
+        chunk_index=chunk_index,
+        num_tokens=len(chunk_text.split()),
+        online_source_url=_build_doc_url(doc),
+        documentKind=doc.get("documentKind", ""),
+        score=doc.get("score"),
+    )
+
+
 def _docs_to_chunks(
     solr_response: dict,
     query: str,
@@ -313,26 +345,12 @@ def _docs_to_chunks(
 
     for doc in docs:
         doc_id = doc.get("id", "")
-        title = _resolve_title(doc)
-        url = _build_doc_url(doc)
         kind = doc.get("documentKind", "")
 
         if kind in ("Cve", "Erratum"):
             chunk_text = _fallback_cve(doc) if kind == "Cve" else _fallback_errata(doc)
             if chunk_text:
-                chunks.append(
-                    PortalChunk(
-                        doc_id=f"{doc_id}_fb_0",
-                        parent_id=doc_id,
-                        title=title,
-                        chunk=chunk_text,
-                        chunk_index=0,
-                        num_tokens=len(chunk_text.split()),
-                        online_source_url=url,
-                        documentKind=kind,
-                        score=doc.get("score"),
-                    )
-                )
+                chunks.append(_make_chunk(doc, "fb_0", chunk_text, 0))
             continue
 
         hl_snippets = highlighting.get(doc_id, {}).get("main_content", [])
@@ -357,36 +375,11 @@ def _docs_to_chunks(
                     chunk_text = _filter_rhv_sentences(chunk_text, query)
                 if not chunk_text:
                     continue
-                chunks.append(
-                    PortalChunk(
-                        doc_id=f"{doc_id}_hl_{i}",
-                        parent_id=doc_id,
-                        title=title,
-                        chunk=chunk_text,
-                        chunk_index=i,
-                        num_tokens=len(chunk_text.split()),
-                        online_source_url=url,
-                        documentKind=kind,
-                        score=doc.get("score"),
-                    )
-                )
+                chunks.append(_make_chunk(doc, f"hl_{i}", chunk_text, i))
         else:
             chunk_text = _fallback_generic(doc)
-
             if chunk_text:
-                chunks.append(
-                    PortalChunk(
-                        doc_id=f"{doc_id}_fb_0",
-                        parent_id=doc_id,
-                        title=title,
-                        chunk=chunk_text,
-                        chunk_index=0,
-                        num_tokens=len(chunk_text.split()),
-                        online_source_url=url,
-                        documentKind=kind,
-                        score=doc.get("score"),
-                    )
-                )
+                chunks.append(_make_chunk(doc, "fb_0", chunk_text, 0))
 
     return chunks
 
