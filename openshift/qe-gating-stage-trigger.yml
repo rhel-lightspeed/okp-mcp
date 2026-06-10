@@ -126,7 +126,8 @@ objects:
                       --form "variables[TRIGGER_SOURCE]=promotion-channel" \
                       --form "variables[PLAN]=level2" \
                       --form "variables[CLA_TESTS_PACKAGE_SOURCE_PROFILE]=cdn" \
-                      --form "variables[COMPOSE]=RHEL-9.8.0-Nightly"
+                      --form "variables[COMPOSE]=RHEL-9.8.0-Nightly" \
+                      --form "variables[CLA_THROTTLING_DELAY]=10"
                   )
                   CURL_EXIT=$?
                   set -e
