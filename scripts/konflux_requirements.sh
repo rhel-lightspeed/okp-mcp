@@ -4,7 +4,7 @@
 # uv.lock stays the single source of truth. These manifests are generated
 # artifacts derived from it:
 #   .konflux/requirements.txt        runtime deps (hash-pinned, from uv.lock)
-#   .konflux/requirements-build.txt  build backend (uv_build, hash-pinned)
+#   .konflux/requirements-build.txt  build backend (hatchling, hash-pinned)
 #
 # The hermetic build (Cachi2 type:pip) prefetches these; the Containerfile
 # installs from the offline mirror. Local/dev builds still use `uv sync`.
@@ -29,9 +29,12 @@ if [ -z "${PYTHON_VERSION}" ]; then
 fi
 
 # Build-system requirement, parsed from pyproject.toml so it never drifts.
-# The platform uv_build wheel bundles its backend binary, so the hermetic build
-# installs it wheel-only (--only-binary) and needs nothing else to build the
-# okp_mcp wheel.
+# hatchling is a pure-Python backend; uv pip compile resolves it plus its build
+# deps (packaging, pathspec, pluggy, trove-classifiers) to hash-pinned wheels.
+# The hermetic build installs them wheel-only (--only-binary) into a throwaway
+# tools venv and builds the okp_mcp wheel with --no-build-isolation; none of
+# these reach the distroless runtime. hatchling's deps carry no win32-only
+# markers, so the Cachi2 prefetch enumerates the build manifest cleanly.
 BUILD_REQUIRE="$(python3 -c '
 import sys, tomllib
 with open("pyproject.toml", "rb") as fh:

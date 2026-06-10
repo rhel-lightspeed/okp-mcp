@@ -97,7 +97,7 @@ tests/
 .pre-commit-config.yaml  # pre-commit hook definitions (ruff, gitleaks, whitespace, YAML/TOML checks)
 .konflux/
   requirements.txt        # hash-pinned runtime deps, generated from uv.lock (Cachi2 prefetch)
-  requirements-build.txt  # hash-pinned build backend (uv_build), generated from pyproject build-system
+  requirements-build.txt  # hash-pinned build backend (hatchling + build deps), generated from pyproject build-system
 scripts/
   konflux_requirements.sh # regenerates the .konflux manifests from uv.lock / pyproject.toml
 .github/
@@ -325,12 +325,12 @@ Module-level constant `STOP_WORDS` lives in `config.py` outside the class to avo
 
 ### Hermetic Builds (Konflux + Cachi2)
 
-The Containerfile install step has two paths, both targeting the same venv at `${HOME}/.venvs/okp-mcp`:
+The Containerfile install step has two paths. The hermetic path uses two stdlib venvs to keep the build backend out of the runtime; both paths land the app at `${HOME}/.venvs/okp-mcp`:
 
-- **Hermetic** (Konflux): `/cachi2/cachi2.env` exists, network is off. A stdlib `python -m venv` plus `pip install --only-binary=:all: --require-hashes` from the Cachi2 offline mirror installs the pinned deps, then `pip install --no-build-isolation .` builds the okp_mcp wheel using the prefetched `uv_build` backend (its `uv-build` binary must be on `PATH` during the build). `uv_build` is uninstalled afterwards so it never reaches the distroless runtime. No `uv` here: it cannot be fetched with the network off.
-- **Local / non-hermetic**: installs pinned `uv`, then `uv sync --locked` straight from `uv.lock`.
+- **Hermetic** (Konflux): `/cachi2/cachi2.env` exists, network is off. A throwaway `${HOME}/.venvs/build` venv gets the hash-pinned `hatchling` backend (`pip install --only-binary=:all: --require-hashes -r .konflux/requirements-build.txt`) and builds the okp_mcp wheel with `pip wheel --no-build-isolation --no-deps`. The app venv then installs only the hash-pinned runtime deps plus that locally built wheel (`pip install --no-deps --no-index --find-links`). hatchling and its build deps never touch the app venv, so nothing needs uninstalling and the runtime SBOM carries no build tooling. This split also avoids a version clash: `packaging` is both a runtime dep and a hatchling build dep, and mixing both manifests in one venv would conflict. No `uv` here: it cannot be fetched with the network off.
+- **Local / non-hermetic**: installs pinned `uv`, then `uv sync --locked` straight from `uv.lock` (uv invokes the same hatchling backend to build the project).
 
-`uv.lock` is the single source of truth. `.konflux/requirements.txt` (runtime) and `.konflux/requirements-build.txt` (build backend) are **generated** from it by `scripts/konflux_requirements.sh`, never hand-edited. The script derives its target Python version from the `Containerfile` builder image, so Renovate image tag updates do not require a separate script edit. `make check-konflux-requirements` (run in CI and `make ci`) re-exports and fails if they drift. Regenerate with `make konflux-requirements` after any `uv.lock` or build-system change, then commit.
+`uv.lock` is the single source of truth. `.konflux/requirements.txt` (runtime) and `.konflux/requirements-build.txt` (hatchling build backend + its deps) are **generated** from it by `scripts/konflux_requirements.sh`, never hand-edited. The script derives its target Python version from the `Containerfile` builder image, so Renovate image tag updates do not require a separate script edit. `make check-konflux-requirements` (run in CI and `make ci`) re-exports and fails if they drift. Regenerate with `make konflux-requirements` after any `uv.lock` or build-system change, then commit.
 
 **Win32-only deps are pruned.** `uv export` emits Windows-only transitive deps (`pywin32` via `mcp`, `pywin32-ctypes` via `keyring`, `colorama`) with a `sys_platform == 'win32'` marker. Cachi2/hermeto prefetch enumerates every line and ignores environment markers, so it tries to fetch `pywin32` for Linux, finds no distribution (Windows-only wheels, no sdist), and fails the `prefetch-dependencies` task. The runtime is always Linux/distroless, so these are never installed. `konflux_requirements.sh` drops them via `uv export --prune colorama --prune pywin32 --prune pywin32-ctypes`. If a new win32-only transitive dep appears, add another `--prune <pkg>` (RSPEED-3208).
 

@@ -21,15 +21,21 @@ COPY src/ ${UV_PROJECT}/src/
 WORKDIR ${UV_PROJECT}
 
 # Install into a venv at a fixed path so the distroless runtime can copy it
-# whole. Two install paths, one venv location:
+# whole. Two install paths, one app-venv location:
 #
 #   * Hermetic Konflux build (Cachi2 present): the network is disabled, so uv
 #     cannot be fetched from PyPI. Cachi2 has prefetched every wheel into an
 #     offline mirror and written /cachi2/cachi2.env (PIP_FIND_LINKS +
-#     PIP_NO_INDEX). Build a stdlib venv (pip via ensurepip, no network),
-#     install the hash-pinned runtime deps from the mirror, then build and
-#     install the okp_mcp wheel with the prefetched build backend. The build
-#     backend is uninstalled afterwards so it never reaches the runtime.
+#     PIP_NO_INDEX). Two stdlib venvs keep the build backend off the runtime:
+#       1. A throwaway tools venv gets the hash-pinned hatchling backend and
+#          builds the okp_mcp wheel with --no-build-isolation.
+#       2. The app venv gets only the hash-pinned runtime deps, then the
+#          locally built okp_mcp wheel (--no-deps --no-index). hatchling and
+#          its build deps never touch the app venv, so nothing needs
+#          uninstalling and the runtime SBOM carries no build tooling. This
+#          also dodges a version clash: packaging is both a runtime dep and a
+#          hatchling build dep, and mixing both manifests in one venv would
+#          conflict.
 #   * Local / non-hermetic build: install pinned uv, then `uv sync --locked`
 #     straight from uv.lock (fails if the lock is stale, preserving the
 #     locked-build guarantee). `uv venv --seed` seeds pip into the app venv
@@ -41,12 +47,15 @@ WORKDIR ${UV_PROJECT}
 # are generated from it, never hand-edited.
 RUN if [ -f /cachi2/cachi2.env ]; then \
         . /cachi2/cachi2.env \
+        && python3 -m venv "${VENVS}/build" \
+        && "${VENVS}/build/bin/pip" install --no-cache-dir --only-binary=:all: --require-hashes \
+            -r .konflux/requirements-build.txt \
+        && "${VENVS}/build/bin/pip" wheel --no-cache-dir --no-build-isolation --no-deps . -w "${HOME}/wheels" \
         && python3 -m venv "${UV_PROJECT_ENVIRONMENT}" \
         && "${UV_PROJECT_ENVIRONMENT}/bin/pip" install --no-cache-dir --only-binary=:all: --require-hashes \
-            -r .konflux/requirements-build.txt -r .konflux/requirements.txt \
-        && PATH="${UV_PROJECT_ENVIRONMENT}/bin:${PATH}" "${UV_PROJECT_ENVIRONMENT}/bin/pip" \
-            install --no-cache-dir --no-deps --no-build-isolation . \
-        && "${UV_PROJECT_ENVIRONMENT}/bin/pip" uninstall -y uv-build \
+            -r .konflux/requirements.txt \
+        && "${UV_PROJECT_ENVIRONMENT}/bin/pip" install --no-cache-dir --no-deps --no-index \
+            --find-links "${HOME}/wheels" okp_mcp \
         && "${UV_PROJECT_ENVIRONMENT}/bin/python" -c "import okp_mcp"; \
     else \
         python3 -m venv "${VENVS}/tools" \
