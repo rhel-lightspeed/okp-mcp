@@ -68,11 +68,11 @@ class BM25Plus:
         """Return one BM25+ score per document, indexed by corpus position."""
         scores = [0.0] * self.corpus_size
         for q in query:
-            idf = self.idf.get(q) or 0
+            idf = self.idf.get(q, 0)
             if not idf:
                 continue
             for idx in range(self.corpus_size):
-                q_freq = self.doc_freqs[idx].get(q) or 0
+                q_freq = self.doc_freqs[idx].get(q, 0)
                 denom = self.k1 * (1 - self.b + self.b * self.doc_len[idx] / self.avgdl) + q_freq
                 scores[idx] += idf * (self.delta + (q_freq * (self.k1 + 1)) / denom)
         return scores

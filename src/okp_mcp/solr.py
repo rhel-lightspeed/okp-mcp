@@ -247,15 +247,15 @@ def _filter_rhv_sentences(text: str, query: str) -> str:
     sentences = re.split(r"(?<=[.!?])\s+|\n", text)
     filtered: list[str] = []
     for sentence in sentences:
-        sentence = sentence.strip()
-        if not sentence:
+        stripped = sentence.strip()
+        if not stripped:
             continue
-        sentence_lower = sentence.lower()
+        sentence_lower = stripped.lower()
         has_rhv = any(rhv in sentence_lower for rhv in _EXTRACTION_DEMOTE_RHV)
         has_contamination = any(phrase in sentence_lower for phrase in _CONTAMINATION_PHRASES)
         if has_rhv and has_contamination:
             continue
-        filtered.append(sentence)
+        filtered.append(stripped)
     return " ".join(filtered)
 
 
