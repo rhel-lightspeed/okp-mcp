@@ -39,10 +39,6 @@ jobs:
             step_name: Check complexity
             command: make radon
 
-          - name: Manifests
-            step_name: Check hermetic manifests
-            command: make check-konflux-requirements
-
     steps:
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3

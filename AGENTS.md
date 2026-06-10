@@ -18,15 +18,13 @@ uv run okp-mcp --transport streamable-http --port 8000  # explicit HTTP mode
 ## CI Commands (Makefile)
 
 ```bash
-make ci          # full suite: lint + typecheck + radon + drift check + test
+make ci          # full suite: lint + typecheck + radon + test
 make setup       # install deps + pre-commit hooks
 make lint        # ruff check src/ tests/
 make format      # ruff format src/ tests/
 make typecheck   # ty check src/
 make radon       # cyclomatic complexity gate (A/B only, C+ fails)
 make test        # pytest with coverage
-make konflux-requirements        # regenerate .konflux hermetic manifests from uv.lock
-make check-konflux-requirements  # fail if .konflux manifests drifted from uv.lock
 ```
 
 ## Pre-commit Hooks
@@ -95,11 +93,6 @@ tests/
   test_portal.py       # portal.py unit tests: query builders, chunk conversion, RRF, formatting, single/multi-query orchestrators
   test_*.py            # unit test modules mirror src structure
 .pre-commit-config.yaml  # pre-commit hook definitions (ruff, gitleaks, whitespace, YAML/TOML checks)
-.konflux/
-  requirements.txt        # hash-pinned runtime deps, generated from uv.lock (Cachi2 prefetch)
-  requirements-build.txt  # hash-pinned build backend (uv_build), generated from pyproject build-system
-scripts/
-  konflux_requirements.sh # regenerates the .konflux manifests from uv.lock / pyproject.toml
 .github/
   CODEOWNERS               # PR review assignment (@rhel-lightspeed/developers)
   workflows/
@@ -139,8 +132,6 @@ SECURITY.md            # Vulnerability reporting via GitHub Security Advisories
 | Trigger QE pipeline after staging deploy | `openshift/qe-gating-stage-trigger.yml` | OpenShift Job template; calls the GitLab CI trigger API for the auto-qe-gating project. Secret `auto-qe-trigger` supplies `gitlab-url`, `project-id`, `trigger-token`. |
 | Run locally with systemd | `quadlet/` | Rootless quadlet files: `.container`, `.network`, `.volume`; see `quadlet/README.md` |
 | Modify pre-commit hooks | `.pre-commit-config.yaml` | Runs on every commit: ruff, gitleaks, whitespace, YAML/TOML checks |
-| Change hermetic build deps | `scripts/konflux_requirements.sh`, `.konflux/` | Regenerate with `make konflux-requirements` after a `uv.lock`/build-system change; CI gates drift |
-| Toggle hermetic build | `.tekton/pull_request.yaml`, `.tekton/push.yaml` | `hermetic` + `prefetch-input` params; pipeline already wires `prefetch-dependencies` |
 | Modify CI/CD workflows | `.github/workflows/` | `build.yml` (test+container), `functional.yml` (Solr integration), `scorecard.yml` (OpenSSF) |
 | Solr schema reference | `docs/SOLR_EXPLORATION.md` | Historical: original redhat-okp container schema map |
 
@@ -313,28 +304,8 @@ Module-level constant `STOP_WORDS` lives in `config.py` outside the class to avo
 ## Container
 
 - Use `Containerfile` (not Dockerfile), build with `podman`
-- Multi-stage build on Red Hat Hardened Images (Project Hummingbird), both stages pinned to digests:
-  - Builder: `registry.access.redhat.com/hi/python:3.12-builder` (has shell + dnf). The install step branches on whether Cachi2 prefetched dependencies (see Hermetic Builds below).
-  - Runtime: `registry.access.redhat.com/hi/python:3.12` (distroless: no shell, no package manager, runs as UID 65532)
-- The build runs entirely as the non-root user (UID 65532); there is no `USER 0` escalation. Both images set `HOME` to a user-owned directory, so the tools venv and the app venv are written under `${HOME}/.venvs`.
-- The app venv keeps the same path (`${HOME}/.venvs/okp-mcp`) in both stages. uv/pip console scripts bake an absolute-path shebang, so relocating the venv breaks the entrypoint with "No such file or directory". Keep the builder and runtime venv paths identical.
-- The distroless runtime has no shell, so `RUN` is only used in the builder stage. `ENTRYPOINT ["okp-mcp"]` is relative: the runtime resolves it via `execvp` against `PATH` (the venv `bin/` is prepended). `COMMIT_SHA` is passed as a build arg and set as an `ENV` in the runtime stage; `build_info.COMMIT_SHA` reads it via `os.getenv` at import time (no file written or copied).
-- `HEALTHCHECK` uses an exec-form TCP-connect probe (`python -c` socket check on port 8000); no shell required.
-- All runtime dependencies are distributed as manylinux wheels (some carry self-contained native extensions, e.g. `pydantic-core`, `cryptography`); the distroless image needs no extra shared libraries beyond glibc. A new dependency that only ships an sdist (no wheel) would break the hermetic build, which is wheel-only.
+- Multi-stage build: UBI 10 builder + minimal UBI 10 Python 3.12 runtime
 - `podman-compose up -d` to run with Solr (`rhokp-rhel9` from `registry.redhat.io`)
-
-### Hermetic Builds (Konflux + Cachi2)
-
-The Containerfile install step has two paths, both targeting the same venv at `${HOME}/.venvs/okp-mcp`:
-
-- **Hermetic** (Konflux): `/cachi2/cachi2.env` exists, network is off. A stdlib `python -m venv` plus `pip install --only-binary=:all: --require-hashes` from the Cachi2 offline mirror installs the pinned deps, then `pip install --no-build-isolation .` builds the okp_mcp wheel using the prefetched `uv_build` backend (its `uv-build` binary must be on `PATH` during the build). `uv_build` is uninstalled afterwards so it never reaches the distroless runtime. No `uv` here: it cannot be fetched with the network off.
-- **Local / non-hermetic**: installs pinned `uv`, then `uv sync --locked` straight from `uv.lock`.
-
-`uv.lock` is the single source of truth. `.konflux/requirements.txt` (runtime) and `.konflux/requirements-build.txt` (build backend) are **generated** from it by `scripts/konflux_requirements.sh`, never hand-edited. The script derives its target Python version from the `Containerfile` builder image, so Renovate image tag updates do not require a separate script edit. `make check-konflux-requirements` (run in CI and `make ci`) re-exports and fails if they drift. Regenerate with `make konflux-requirements` after any `uv.lock` or build-system change, then commit.
-
-The PipelineRuns (`.tekton/pull_request.yaml`, `.tekton/push.yaml`) set `hermetic: "true"` and a `prefetch-input` with `allow_binary` (wheel-mode prefetch; avoids sdist build-time toolchains and the `uv` sdist Cargo.lock issue). The shared `pipeline-build-multiarch.yaml` already wires the `prefetch-dependencies` task and `CACHI2_ARTIFACT` into `build-images`; no pipeline change is needed to toggle hermetic mode.
-
-To reproduce a hermetic build locally: `hermeto fetch-deps` (via `quay.io/konflux-ci/hermeto`) with the PipelineRun's `prefetch-input`, `generate-env`/`inject-files` into `/cachi2`, then `buildah build --network=none --volume <out>:/cachi2/output --volume <out>/cachi2.env:/cachi2/cachi2.env`.
 
 ## Complexity
 

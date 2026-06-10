@@ -39,13 +39,6 @@ spec:
     - name: dockerfile
       value: /Containerfile
 
-    - name: hermetic
-      value: "true"
-
-    - name: prefetch-input
-      value: |
-        [{"type": "pip", "path": ".", "requirements_files": [".konflux/requirements.txt"], "requirements_build_files": [".konflux/requirements-build.txt"]}]
-
     - name: additional-tags
       value:
         - latest

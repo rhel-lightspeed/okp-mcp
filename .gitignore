@@ -218,6 +218,3 @@ __marimo__/
 
 # AI agent working state
 .sisyphus/
-
-# Local hermetic-build prefetch output (hermeto fetch-deps)
-.hermeto-out/
