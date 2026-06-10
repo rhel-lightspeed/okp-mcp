@@ -39,7 +39,7 @@ spec:
 
     - name: prefetch-input
       value: |
-        [{"type": "pip", "path": ".", "requirements_files": [".konflux/requirements.txt"], "requirements_build_files": [".konflux/requirements-build.txt"], "allow_binary": "true"}]
+        [{"type": "pip", "path": ".", "requirements_files": [".konflux/requirements.txt"], "requirements_build_files": [".konflux/requirements-build.txt"]}]
 
     - name: image-expires-after
       value: 5d
