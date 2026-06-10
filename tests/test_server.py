@@ -48,18 +48,39 @@ def test_mcp_properties(attr, expected):
     assert getattr(mcp, attr) == expected
 
 
-@pytest.mark.asyncio
-async def test_production_tools_registered():
-    """Production tools are registered on the MCP server."""
-    import okp_mcp  # noqa: F401 — triggers tool registration via __init__
+def test_production_tools_registered():
+    """Importing only ``okp_mcp`` registers the production tools.
 
-    tools = await mcp._list_tools()
-    tool_names = {tool.name for tool in tools}
+    Run in a clean subprocess so the assertion exercises the real
+    ``okp_mcp/__init__.py`` import chain in isolation. In-process this would
+    pass for the wrong reason: sibling tests import the tool modules directly,
+    firing the ``@mcp.tool`` decorators as a side effect, which masks a missing
+    side-effect import in ``__init__`` (see the #280 regression where tools
+    silently stopped registering in production).
+    """
+    import subprocess
+    import sys
+
+    probe = (
+        "import asyncio, okp_mcp\n"
+        "tools = asyncio.run(okp_mcp.mcp._list_tools())\n"
+        "print(','.join(sorted(t.name for t in tools)))\n"
+    )
+    result = subprocess.run(  # noqa: S603 -- fixed literal probe, no untrusted input
+        [sys.executable, "-c", probe],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    tool_names = set(result.stdout.strip().split(",")) if result.stdout.strip() else set()
     expected_tools = {
         "search_portal",
         "get_document",
     }
-    assert expected_tools.issubset(tool_names)
+    assert expected_tools.issubset(tool_names), (
+        f"Importing okp_mcp alone did not register tools {expected_tools - tool_names}. "
+        f"Got: {sorted(tool_names)}. Is the tools side-effect import missing from __init__?"
+    )
     removed_tools = {
         "search_documentation",
         "search_solutions",
