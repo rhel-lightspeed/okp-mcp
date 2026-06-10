@@ -60,7 +60,7 @@ def get_commit_sha() -> str:
         git_sha = _commit_sha_from_git()
         if git_sha:
             commit_sha = git_sha
-        logger.warning("No commit sha found in %s. Using commit value: %s", commit_sha_file, commit_sha)
+        logger.warning(f"No commit sha found in {commit_sha_file}. Using commit value: {commit_sha}")
 
     return commit_sha
 
