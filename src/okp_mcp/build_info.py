@@ -18,7 +18,7 @@ DEFAULT_COMMIT_SHA = os.getenv("COMMIT_SHA", "development")
 logger = logging.getLogger(__name__)
 
 
-def _commit_sha_from_git() -> str:
+def _commit_sha_from_git() -> str | None:
     """Return the short commit SHA from the local git checkout, if available.
 
     Local dev runs (``uv run okp-mcp``) execute outside the container, so the
@@ -34,8 +34,9 @@ def _commit_sha_from_git() -> str:
             text=True,
             check=True,
         )
-    except (OSError, subprocess.SubprocessError) as ex:
-        raise ValueError("Failed to retrieve git commit sha.") from ex
+    except (OSError, subprocess.SubprocessError):
+        logger.debug("git not available for commit SHA resolution")
+        return None
 
     return result.stdout.strip()
 
@@ -56,8 +57,10 @@ def get_commit_sha() -> str:
     try:
         commit_sha = commit_sha_file.read_text(encoding="utf-8").strip()
     except OSError:
-        commit_sha = _commit_sha_from_git()
-        logger.warning(f"No commit sha found in {commit_sha_file}. Using commit value: {commit_sha}")
+        git_sha = _commit_sha_from_git()
+        if git_sha:
+            commit_sha = git_sha
+        logger.warning("No commit sha found in %s. Using commit value: %s", commit_sha_file, commit_sha)
 
     return commit_sha
 
