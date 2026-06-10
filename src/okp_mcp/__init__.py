@@ -6,6 +6,7 @@ import sys
 from pydantic_settings import CliApp
 
 from okp_mcp import server as _server
+from okp_mcp import tools as _tools  # noqa: F401 -- import triggers @mcp.tool registration
 from okp_mcp.build_info import get_commit_sha
 from okp_mcp.build_info import get_package_version
 from okp_mcp.config import ServerConfig
