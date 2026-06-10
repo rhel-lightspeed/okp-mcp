@@ -39,6 +39,10 @@ jobs:
             step_name: Check complexity
             command: make radon
 
+          - name: Dead code
+            step_name: Check for dead code
+            command: make deadcode
+
           - name: Manifests
             step_name: Check hermetic manifests
             command: make check-konflux-requirements

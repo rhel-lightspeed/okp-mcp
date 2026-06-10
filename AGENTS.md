@@ -18,12 +18,13 @@ uv run okp-mcp --transport streamable-http --port 8000  # explicit HTTP mode
 ## CI Commands (Makefile)
 
 ```bash
-make ci          # full suite: lint + typecheck + radon + drift check + test
+make ci          # full suite: lint + typecheck + radon + deadcode + drift check + test
 make setup       # install deps + pre-commit hooks
 make lint        # ruff check src/ tests/
 make format      # ruff format src/ tests/
 make typecheck   # ty check src/
 make radon       # cyclomatic complexity gate (A/B only, C+ fails)
+make deadcode    # vulture dead-code gate (unused code fails CI)
 make test        # pytest with coverage
 make konflux-requirements        # regenerate .konflux hermetic manifests from uv.lock
 make check-konflux-requirements  # fail if .konflux manifests drifted from uv.lock
@@ -94,6 +95,7 @@ tests/
   test_functional.py   # functional test runner: calls _run_portal_search() against live Solr, asserts on PortalChunk results
   test_portal.py       # portal.py unit tests: query builders, chunk conversion, RRF, formatting, single/multi-query orchestrators
   test_*.py            # unit test modules mirror src structure
+vulture_allowlist.py     # vulture dead-code allowlist: symbols vulture can't see as used (framework dynamic refs, string-form annotations)
 .pre-commit-config.yaml  # pre-commit hook definitions (ruff, gitleaks, whitespace, YAML/TOML checks)
 .konflux/
   requirements.txt        # hash-pinned runtime deps, generated from uv.lock (Cachi2 prefetch)
@@ -103,8 +105,8 @@ scripts/
 .github/
   CODEOWNERS               # PR review assignment (@rhel-lightspeed/developers)
   workflows/
-    build.yml              # CI/CD: lint, typecheck, radon, pytest matrix, container build+push
-    functional.yml         # Functional tests against live Solr (triggered after build.yml)
+    ci.yml                 # CI/CD: lint, typecheck, radon, deadcode, pytest matrix, container build+push
+    functional.yml         # Functional tests against live Solr (triggered after ci.yml)
     scorecard.yml          # OpenSSF Scorecard: security posture, weekly + push-to-main
 docs/
   SOLR_EXPLORATION.md     # Historical: original redhat-okp container schema map
@@ -141,7 +143,8 @@ SECURITY.md            # Vulnerability reporting via GitHub Security Advisories
 | Modify pre-commit hooks | `.pre-commit-config.yaml` | Runs on every commit: ruff, gitleaks, whitespace, YAML/TOML checks |
 | Change hermetic build deps | `scripts/konflux_requirements.sh`, `.konflux/` | Regenerate with `make konflux-requirements` after a `uv.lock`/build-system change; CI gates drift |
 | Toggle hermetic build | `.tekton/pull_request.yaml`, `.tekton/push.yaml` | `hermetic` + `prefetch-input` params; pipeline already wires `prefetch-dependencies` |
-| Modify CI/CD workflows | `.github/workflows/` | `build.yml` (test+container), `functional.yml` (Solr integration), `scorecard.yml` (OpenSSF) |
+| Modify CI/CD workflows | `.github/workflows/` | `ci.yml` (sanity + test + container), `functional.yml` (Solr integration), `scorecard.yml` (OpenSSF) |
+| Suppress a vulture false positive | `vulture_allowlist.py` | Add the symbol with a note on why it's reachable; never use it to hide genuinely dead code |
 | Solr schema reference | `docs/SOLR_EXPLORATION.md` | Historical: original redhat-okp container schema map |
 
 ## Tekton Pipeline Maintenance
@@ -343,6 +346,10 @@ To reproduce a hermetic build locally: `hermeto fetch-deps` (via `quay.io/konflu
 ## Complexity
 
 All functions must be rated A or B by radon. C or higher fails the CI gate. Refactor until compliant.
+
+## Dead Code
+
+`make deadcode` runs vulture against `src/`, `tests/`, and `vulture_allowlist.py` at confidence floor 80 (configured in `[tool.vulture]` in `pyproject.toml`). Any unused code fails the CI gate. Vulture cannot see dynamically referenced symbols (decorator-registered routes/tools, string-form type annotations, framework attribute access); when it flags a genuine false positive, add the symbol to `vulture_allowlist.py` with a note explaining why it's reachable. Vulture unions usages across all scanned files, so referencing a name in the allowlist marks its real definition as used. Never add genuinely dead code to the allowlist to silence the gate; delete it instead.
 
 ## Pre-PR Code Review
 

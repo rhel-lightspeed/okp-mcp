@@ -3,7 +3,6 @@
 import pytest
 
 from okp_mcp.content import _select_within_budget
-from okp_mcp.content import clean_content
 from okp_mcp.content import doc_uri
 from okp_mcp.content import strip_boilerplate
 from okp_mcp.content import truncate_content
@@ -59,20 +58,6 @@ def test_strip_boilerplate_preserves_clean_text():
 
 
 @pytest.mark.parametrize(
-    "text,max_chars,expected",
-    [
-        (None, 100, ""),
-        ("", 100, ""),
-        ("Normal text without boilerplate.", 1000, "Normal text without boilerplate."),
-    ],
-    ids=["none-input", "empty-string", "clean-passthrough"],
-)
-def test_clean_content_edge_cases(text, max_chars, expected):
-    """Edge cases: None, empty string, and clean text pass through correctly."""
-    assert clean_content(text, max_chars=max_chars) == expected
-
-
-@pytest.mark.parametrize(
     "doc,expected",
     [
         ({"id": "/solutions/3257611/index.html"}, "/solutions/3257611"),
@@ -101,19 +86,6 @@ def test_clean_content_edge_cases(text, max_chars, expected):
 def test_doc_uri(doc, expected):
     """doc_uri returns canonical URL path, preferring view_uri and stripping /index.html."""
     assert doc_uri(doc) == expected
-
-
-def test_clean_content_strips_then_truncates():
-    """Both boilerplate patterns are stripped before truncation is applied."""
-    text = (
-        "Useful. " * 50
-        + "This content is not included. "
-        + "More useful. " * 50
-        + "This solution is part of Red Hat's fast-track publication program."
-    )
-    result = clean_content(text, max_chars=300)
-    assert "This content is not included." not in result
-    assert "fast-track publication program" not in result
 
 
 # --- _select_within_budget tests ---

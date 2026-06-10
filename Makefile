@@ -1,4 +1,4 @@
-.PHONY: fix lint format typecheck radon test ci setup konflux-requirements check-konflux-requirements
+.PHONY: fix lint format typecheck radon deadcode test ci setup konflux-requirements check-konflux-requirements
 
 fix:
 	uv run --locked ruff check --fix
@@ -18,10 +18,13 @@ radon:
 		&& { echo "FAIL: Cyclomatic complexity C or higher detected"; exit 1; } \
 		|| echo "PASS: All functions rated A or B"
 
+deadcode:
+	uv run --locked vulture
+
 test:
 	uv run --locked pytest
 
-ci: lint typecheck radon check-konflux-requirements test
+ci: lint typecheck radon deadcode check-konflux-requirements test
 	@echo ""
 	@echo "✅ All CI checks passed!"
 

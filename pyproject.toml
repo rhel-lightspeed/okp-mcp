@@ -35,6 +35,7 @@ dev = [
     "respx>=0.23.1",
     "ruff>=0.15.14",
     "ty>=0.0.39",
+    "vulture>=2.14",
 ]
 
 [tool.coverage.run]
@@ -108,3 +109,13 @@ order-by-type = false
 
 [tool.ty.environment]
 python-version = "3.12"
+
+[tool.vulture]
+# Dead-code detection. Scans src/ and tests/; the allowlist suppresses
+# framework patterns vulture cannot see (decorator-registered routes/tools,
+# pydantic enum values and computed fields, dataclass fields, string-form
+# type annotations). Confidence floor of 80 skips the low-signal 60% noise
+# (mock return_value attrs, pytest hooks) while still catching real dead code.
+paths = ["src", "tests", "vulture_allowlist.py"]
+min_confidence = 80
+sort_by_size = true

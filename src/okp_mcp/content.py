@@ -112,23 +112,3 @@ def doc_uri(doc: dict) -> str:
     """
     uri = doc.get("view_uri") or doc.get("id", "")
     return uri.removesuffix("/index.html")
-
-
-def clean_content(text: str | None, max_chars: int) -> str:
-    """Clean and truncate content for LLM consumption.
-
-    Chains strip_boilerplate then truncate_content.
-
-    Args:
-        text: The text to clean (None is handled gracefully).
-        max_chars: Maximum characters to return.
-
-    Returns:
-        Cleaned and truncated text, or empty string if input is None.
-    """
-    if text is None:
-        return ""
-
-    text = strip_boilerplate(text)
-    text = truncate_content(text, max_chars)
-    return text
