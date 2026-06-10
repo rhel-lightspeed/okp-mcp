@@ -47,21 +47,11 @@ fi
 
 # Runtime deps: exported straight from uv.lock (hashes included, project itself
 # excluded). --frozen fails if uv.lock is stale, preserving the lock guarantee.
-#
-# --prune drops win32-only transitive deps (pywin32 via mcp, pywin32-ctypes via
-# keyring, colorama). uv export emits these with a `sys_platform == 'win32'`
-# marker, but Cachi2/hermeto prefetch enumerates every line and ignores markers,
-# so it tries to fetch pywin32 for Linux, finds no distribution (Windows-only
-# wheels, no sdist), and fails the build. The runtime is always Linux/distroless,
-# so these packages are never installed anyway.
 uv export \
   --frozen \
   --no-emit-project \
   --no-dev \
   --format requirements-txt \
-  --prune colorama \
-  --prune pywin32 \
-  --prune pywin32-ctypes \
   -o "${REQ_FILE}"
 
 # Build backend: hash-pinned so the hermetic build can build the okp_mcp wheel
