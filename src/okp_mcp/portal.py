@@ -567,8 +567,7 @@ async def _run_portal_search(
 
     Args:
         query: Raw user query string.
-        client: Shared httpx.AsyncClient (typed as object to avoid httpx import
-            at module level; the actual type is enforced by ``_solr_query``).
+        client: Shared httpx.AsyncClient used for the Solr requests.
         solr_endpoint: Full Solr endpoint URL for the portal core.
         max_results: Maximum chunks to return after deduplication.
         emit_quality_metrics: Whether to record search quality Prometheus
