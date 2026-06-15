@@ -60,7 +60,7 @@ def _scan_eol_product(text_lower: str, product: str) -> str:
     return ""
 
 
-def _annotate_result(title: str, highlights: str, content: str, product: str = "") -> tuple[list[str], str, int]:
+def annotate_result(title: str, highlights: str, content: str, product: str = "") -> tuple[list[str], str, int]:
     """Scan title and content for deprecation, replacement, and EOL-product signals.
 
     Returns (annotations, applicability, sort_key) where sort_key controls

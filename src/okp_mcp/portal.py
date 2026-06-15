@@ -16,7 +16,7 @@ from okp_mcp.config import logger
 from okp_mcp.content import _select_within_budget
 from okp_mcp.content import doc_uri
 from okp_mcp.content import strip_boilerplate
-from okp_mcp.formatting import _annotate_result
+from okp_mcp.formatting import annotate_result
 from okp_mcp.intent import apply_deprecation_boosts
 from okp_mcp.intent import apply_main_boosts
 from okp_mcp.metrics import SEARCH_DEPRECATION_DETECTED
@@ -744,11 +744,11 @@ _KIND_LABELS: dict[str, str] = {
 def _format_portal_chunk(chunk: PortalChunk) -> tuple[str, int]:
     """Render a single PortalChunk as a markdown result block.
 
-    Uses ``_annotate_result()`` from ``formatting.py`` to detect deprecation,
+    Uses ``annotate_result()`` from ``formatting.py`` to detect deprecation,
     replacement, and EOL signals. Returns ``(formatted_text, sort_key)``
     where sort_key controls ordering (replacement first, EOL last).
     """
-    annotations, applicability, sort_key = _annotate_result(
+    annotations, applicability, sort_key = annotate_result(
         title=chunk.title,
         highlights=chunk.chunk,
         content=chunk.chunk,
