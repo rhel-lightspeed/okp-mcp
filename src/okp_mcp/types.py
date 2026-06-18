@@ -2,6 +2,7 @@
 
 from pydantic import BaseModel
 from pydantic import Field
+from pydantic import model_validator
 
 
 class SolrDoc(BaseModel):
@@ -44,3 +45,11 @@ class SolrResponse(BaseModel):
     error: dict | None = None
 
     model_config = {"extra": "ignore"}
+
+    @model_validator(mode="after")
+    def reject_error_response(self) -> "SolrResponse":
+        """Reject Solr responses that carry a domain-level error."""
+        if self.error is not None:
+            msg = f"Solr returned error: {self.error}"
+            raise ValueError(msg)
+        return self

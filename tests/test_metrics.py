@@ -284,7 +284,8 @@ async def test_solr_query_records_success_metrics(sample_solr_response):
 
     with respx.mock(assert_all_called=True) as router:
         router.get(_SOLR_ENDPOINT).mock(return_value=httpx.Response(200, json=sample_solr_response))
-        await _solr_query({"q": "test"}, solr_endpoint=_SOLR_ENDPOINT)
+        async with httpx.AsyncClient() as client:
+            await _solr_query({"q": "test"}, client=client, solr_endpoint=_SOLR_ENDPOINT)
 
     assert _get_counter("okp_solr_queries", {"status": "success"}) == before_success + 1
     assert _get_histogram_count("okp_solr_query_duration_seconds", {"status": "success"}) == before_duration + 1
@@ -313,8 +314,9 @@ async def test_solr_query_records_failure_metrics(status_label, mock_kwargs, exp
 
     with respx.mock(assert_all_called=True) as router:
         router.get(_SOLR_ENDPOINT).mock(**mock_kwargs)
-        with pytest.raises(expected_exc):
-            await _solr_query({"q": "test"}, solr_endpoint=_SOLR_ENDPOINT)
+        async with httpx.AsyncClient() as client:
+            with pytest.raises(expected_exc):
+                await _solr_query({"q": "test"}, client=client, solr_endpoint=_SOLR_ENDPOINT)
 
     assert _get_counter("okp_solr_queries", {"status": status_label}) == before + 1
 
@@ -326,7 +328,8 @@ async def test_solr_query_records_error_metrics_on_solr_error_response():
 
     with respx.mock(assert_all_called=True) as router:
         router.get(_SOLR_ENDPOINT).mock(return_value=httpx.Response(200, json=error_response))
-        result = await _solr_query({"q": "bad"}, solr_endpoint=_SOLR_ENDPOINT)
+        async with httpx.AsyncClient() as client:
+            result = await _solr_query({"q": "bad"}, client=client, solr_endpoint=_SOLR_ENDPOINT)
 
     assert _get_counter("okp_solr_queries", {"status": "error"}) == before + 1
     assert result.response.numFound == 0
@@ -338,7 +341,8 @@ async def test_solr_query_always_records_duration():
 
     with respx.mock:
         respx.get(_SOLR_ENDPOINT).mock(side_effect=httpx.TimeoutException("slow"))
-        with pytest.raises(httpx.TimeoutException):
-            await _solr_query({"q": "test"}, solr_endpoint=_SOLR_ENDPOINT)
+        async with httpx.AsyncClient() as client:
+            with pytest.raises(httpx.TimeoutException):
+                await _solr_query({"q": "test"}, client=client, solr_endpoint=_SOLR_ENDPOINT)
 
     assert _get_histogram_count("okp_solr_query_duration_seconds", {"status": "timeout"}) == before + 1

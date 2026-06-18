@@ -177,7 +177,7 @@ def _format_document_content(
 async def _fetch_document_with_query(
     doc_id: str,
     query: str,
-    client: httpx.AsyncClient | None = None,
+    client: httpx.AsyncClient,
     *,
     solr_endpoint: str,
 ) -> SolrResponse:
