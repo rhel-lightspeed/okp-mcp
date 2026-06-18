@@ -727,8 +727,6 @@ async def _run_multi_query_search(
 # 1500 chars is enough to include structured data like the RHEL container
 # compatibility matrix table (~800 chars for the key rows) while still
 # leaving room for ~8 other results in a typical 30K char budget.
-# See also: formatting.py _MAX_RESULT_CONTENT (used by the legacy
-# _format_result path, not this portal chunk path).
 _MAX_CHUNK_CONTENT = 1500
 
 _KIND_LABELS: dict[str, str] = {
