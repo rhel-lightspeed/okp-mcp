@@ -17,6 +17,7 @@ from okp_mcp.content import _select_within_budget
 from okp_mcp.content import doc_uri
 from okp_mcp.content import strip_boilerplate
 from okp_mcp.formatting import annotate_result
+from okp_mcp.formatting import EOL_PRODUCT_NAMES
 from okp_mcp.intent import apply_deprecation_boosts
 from okp_mcp.intent import apply_main_boosts
 from okp_mcp.metrics import SEARCH_DEPRECATION_DETECTED
@@ -49,37 +50,6 @@ class PortalChunk:
     rrf_score: float | None = field(default=None, repr=False)
 
 
-_EOL_PRODUCTS: frozenset[str] = frozenset(
-    [
-        "Red Hat Virtualization",
-        "Red Hat Hyperconverged Infrastructure for Virtualization",
-        "Red Hat JBoss Operations Network",
-        "Red Hat Fuse",
-        "Red Hat Single Sign-On",
-        "Red Hat Single Sign-On Continuous Delivery",
-        "Red Hat CodeReady Workspaces",
-        "Red Hat CodeReady Studio",
-        "Red Hat JBoss Data Virtualization",
-        "Red Hat Container Development Kit",
-        "Red Hat Gluster Storage",
-        "Red Hat JBoss Developer Studio",
-        "Red Hat JBoss Developer Studio Integration Stack",
-        "Red Hat Application Migration Toolkit",
-        "Red Hat Software Collections",
-        "JBoss Enterprise SOA Platform",
-        "JBoss Enterprise Application Platform Continuous Delivery",
-        "Red Hat Development Suite",
-        "Red Hat Developer Toolset",
-        "OpenShift Online",
-        "Red Hat JBoss Fuse Service Works",
-        "Red Hat Certificate System",
-        "Red Hat Process Automation Manager",
-        "Red Hat Decision Manager",
-        "Red Hat OpenShift Container Storage",
-    ]
-)
-
-
 # ---------------------------------------------------------------------------
 # Query builders
 # ---------------------------------------------------------------------------
@@ -110,7 +80,7 @@ _MAIN_QF = "title^5 main_content heading_h1^3 heading_h2 portal_synopsis^3 allTi
 
 def _build_eol_filter() -> str:
     """Build a Solr fq clause that excludes all EOL products."""
-    return " AND ".join(f'-product:"{p}"' for p in _EOL_PRODUCTS)
+    return " AND ".join(f'-product:"{p}"' for p in EOL_PRODUCT_NAMES)
 
 
 def _build_main_query(cleaned_query: str) -> dict:

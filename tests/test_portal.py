@@ -6,6 +6,7 @@ import respx
 
 from prometheus_client import REGISTRY
 
+from okp_mcp.formatting import EOL_PRODUCT_NAMES
 from okp_mcp.intent import apply_deprecation_boosts
 from okp_mcp.intent import apply_main_boosts
 from okp_mcp.intent import INTENT_RULES
@@ -16,7 +17,6 @@ from okp_mcp.portal import _build_main_query
 from okp_mcp.portal import _deduplicate_by_parent
 from okp_mcp.portal import _DEPRECATION_WARNING
 from okp_mcp.portal import _docs_to_chunks
-from okp_mcp.portal import _EOL_PRODUCTS
 from okp_mcp.portal import _fallback_cve
 from okp_mcp.portal import _fallback_errata
 from okp_mcp.portal import _FALLBACK_MAX_CHARS
@@ -42,31 +42,31 @@ class TestEolProducts:
     """Verify the EOL product set and filter builder."""
 
     def test_eol_products_is_frozenset(self):
-        """_EOL_PRODUCTS is an immutable frozenset."""
-        assert isinstance(_EOL_PRODUCTS, frozenset)
+        """EOL_PRODUCT_NAMES is an immutable frozenset."""
+        assert isinstance(EOL_PRODUCT_NAMES, frozenset)
 
     def test_eol_products_contains_known_entries(self):
         """Spot-check that well-known EOL products are present."""
-        assert "Red Hat Virtualization" in _EOL_PRODUCTS
-        assert "Red Hat Software Collections" in _EOL_PRODUCTS
-        assert "Red Hat Decision Manager" in _EOL_PRODUCTS
+        assert "Red Hat Virtualization" in EOL_PRODUCT_NAMES
+        assert "Red Hat Software Collections" in EOL_PRODUCT_NAMES
+        assert "Red Hat Decision Manager" in EOL_PRODUCT_NAMES
 
     def test_eol_products_excludes_active(self):
         """Active products should not appear in the EOL set."""
-        assert "Red Hat Enterprise Linux" not in _EOL_PRODUCTS
-        assert "Red Hat OpenShift Container Platform" not in _EOL_PRODUCTS
+        assert "Red Hat Enterprise Linux" not in EOL_PRODUCT_NAMES
+        assert "Red Hat OpenShift Container Platform" not in EOL_PRODUCT_NAMES
 
     def test_build_eol_filter_excludes_all_products(self):
         """_build_eol_filter produces an AND-joined fq excluding every EOL product."""
         fq = _build_eol_filter()
-        for product in _EOL_PRODUCTS:
+        for product in EOL_PRODUCT_NAMES:
             assert f'-product:"{product}"' in fq
 
     def test_build_eol_filter_uses_and_conjunction(self):
         """Filter clauses are joined with AND so Solr applies all exclusions."""
         fq = _build_eol_filter()
-        # With 25 products there should be 24 AND separators
-        assert fq.count(" AND ") == len(_EOL_PRODUCTS) - 1
+        # N products → N-1 AND separators
+        assert fq.count(" AND ") == len(EOL_PRODUCT_NAMES) - 1
 
 
 # ---------------------------------------------------------------------------

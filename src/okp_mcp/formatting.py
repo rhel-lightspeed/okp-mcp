@@ -3,13 +3,50 @@
 import re
 
 
-EOL_PRODUCT_MENTIONS = [
+# ---------------------------------------------------------------------------
+# Single-source EOL product registry
+# ---------------------------------------------------------------------------
+# (name, abbreviation) — one place to edit when a product reaches EOL.
+#
+# * Every name feeds the Solr fq exclusion filter (via EOL_PRODUCT_NAMES).
+# * Entries with a non-empty abbreviation are also scanned in document text
+#   for EOL annotations (via EOL_PRODUCT_MENTIONS).
+# * Alias entries ("RHEV", shortened names) are legitimate text-scan patterns
+#   that don't correspond to a real Solr product field value; including them
+#   in the fq is harmless (no doc matches) and keeps the data in one tuple.
+EOL_PRODUCTS: tuple[tuple[str, str], ...] = (
     ("Red Hat Virtualization", "RHV"),
     ("RHEV", "RHV"),
+    ("Red Hat Hyperconverged Infrastructure for Virtualization", "RHHI"),
     ("Red Hat Hyperconverged Infrastructure", "RHHI"),
+    ("Red Hat JBoss Operations Network", ""),
     ("Red Hat Fuse", "Fuse"),
+    ("Red Hat Single Sign-On", ""),
+    ("Red Hat Single Sign-On Continuous Delivery", ""),
+    ("Red Hat CodeReady Workspaces", ""),
+    ("Red Hat CodeReady Studio", ""),
+    ("Red Hat JBoss Data Virtualization", ""),
+    ("Red Hat Container Development Kit", ""),
     ("Red Hat Gluster Storage", "Gluster"),
-]
+    ("Red Hat JBoss Developer Studio", ""),
+    ("Red Hat JBoss Developer Studio Integration Stack", ""),
+    ("Red Hat Application Migration Toolkit", ""),
+    ("Red Hat Software Collections", ""),
+    ("JBoss Enterprise SOA Platform", ""),
+    ("JBoss Enterprise Application Platform Continuous Delivery", ""),
+    ("Red Hat Development Suite", ""),
+    ("Red Hat Developer Toolset", ""),
+    ("OpenShift Online", ""),
+    ("Red Hat JBoss Fuse Service Works", ""),
+    ("Red Hat Certificate System", ""),
+    ("Red Hat Process Automation Manager", ""),
+    ("Red Hat Decision Manager", ""),
+    ("Red Hat OpenShift Container Storage", ""),
+)
+
+# Derived views — no separate maintenance needed.
+EOL_PRODUCT_NAMES: frozenset[str] = frozenset(name for name, _ in EOL_PRODUCTS)
+EOL_PRODUCT_MENTIONS: list[tuple[str, str]] = [(name, abbr) for name, abbr in EOL_PRODUCTS if abbr]
 
 _DEPRECATION_RE = re.compile(
     r"\b(deprecated|removed|no longer available|no longer supported|end of life|"
