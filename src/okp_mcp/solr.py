@@ -10,6 +10,7 @@ from okp_mcp.config import logger
 from okp_mcp.config import STOP_WORDS
 from okp_mcp.metrics import SOLR_QUERIES
 from okp_mcp.metrics import SOLR_QUERY_DURATION
+from okp_mcp.types import SolrResponse
 
 
 def _split_quoted_and_plain(text: str) -> list[str]:
@@ -108,7 +109,7 @@ def _clean_query(query: str) -> str:
     return " ".join(parts) if parts else query
 
 
-async def _solr_query(params: dict, client: httpx.AsyncClient | None = None, *, solr_endpoint: str) -> dict:
+async def _solr_query(params: dict, client: httpx.AsyncClient | None = None, *, solr_endpoint: str) -> SolrResponse:
     """Execute a SOLR query and return the parsed JSON response."""
     _start = time.monotonic()
     close_client = client is None
@@ -207,11 +208,13 @@ async def _solr_query(params: dict, client: httpx.AsyncClient | None = None, *, 
         if close_client:
             await client.aclose()
 
-    _empty_response = {"response": {"numFound": 0, "docs": []}, "highlighting": {}}
+    _empty_response = SolrResponse()
 
-    if "error" in data:
+    parsed = SolrResponse.model_validate(data)
+
+    if parsed.error is not None:
         SOLR_QUERIES.labels(status="error").inc()
-        logger.error("SOLR returned error: %s", data["error"])
+        logger.error("SOLR returned error: %s", parsed.error)
         return _empty_response
     if "response" not in data or not isinstance(data.get("response", {}).get("docs"), list):
         SOLR_QUERIES.labels(status="error").inc()
@@ -219,10 +222,10 @@ async def _solr_query(params: dict, client: httpx.AsyncClient | None = None, *, 
         return _empty_response
 
     SOLR_QUERIES.labels(status="success").inc()
-    num_found = data["response"]["numFound"]
-    num_docs = len(data["response"]["docs"])
+    num_found = parsed.response.numFound
+    num_docs = len(parsed.response.docs)
     logger.info("SOLR query matched %d total, returning %d docs", num_found, num_docs)
-    return data
+    return parsed
 
 
 _CONTAMINATION_PHRASES = frozenset(
@@ -259,9 +262,9 @@ def _filter_rhv_sentences(text: str, query: str) -> str:
     return " ".join(filtered)
 
 
-def _get_highlight_snippets(data: dict, *keys: str, query: str = "") -> list[str]:
+def _get_highlight_snippets(data: SolrResponse, *keys: str, query: str = "") -> list[str]:
     """Extract cleaned highlight snippets for a document."""
-    hl = data.get("highlighting", {})
+    hl = data.highlighting
     seen: set[str] = set()
     cleaned_snippets: list[str] = []
 

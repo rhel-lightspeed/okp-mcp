@@ -2,6 +2,8 @@
 
 import re
 
+from okp_mcp.types import SolrDoc
+
 
 # Solr content uses a Unicode right single quotation mark (U+2019, a.k.a.
 # "smart apostrophe") in "Red Hat\u2019s", not the ASCII apostrophe (U+0027).
@@ -104,13 +106,13 @@ def strip_boilerplate(text: str) -> str:
     return text
 
 
-def doc_uri(doc: dict) -> str:
+def doc_uri(doc: SolrDoc) -> str:
     """Return the canonical URL path for a Solr document.
 
     Prefers view_uri, falls back to id. Strips trailing /index.html
     because Solr document IDs carry it but access.redhat.com 404s on those paths.
     """
-    uri = doc.get("view_uri") or doc.get("id", "")
+    uri = doc.view_uri or doc.id
     return uri.removesuffix("/index.html")
 
 

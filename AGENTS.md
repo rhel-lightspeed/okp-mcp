@@ -88,6 +88,7 @@ src/okp_mcp/
   bm25.py        # Pure-Python BM25Plus scorer (drop-in for rank_bm25, no numpy)
   content.py     # Boilerplate stripping, content truncation, text cleaning
   formatting.py  # Result annotation, deprecation/replacement detection, sort keys
+  types.py       # Shared TypedDicts: SolrDoc, SolrHighlighting, SolrResponseBody, SolrResponse
 tests/
   conftest.py          # shared fixtures (solr mocks, sample responses) + functional marker deselection
   functional_cases.py  # FunctionalCase dataclass + parametrized RSPEED test data
@@ -214,21 +215,22 @@ __init__.py → build_info, config, metrics (side-effect import), request_id, se
 build_info.py → (standalone; reads COMMIT_SHA env var, APP_ROOT/COMMIT_SHA file, or local `git rev-parse`)
 tools/__init__.py → tools/search.py, tools/document.py, tools/run_code.py
 tools/search.py → config, metrics, portal, server
-tools/document.py → content, metrics, server, solr, tools/shared.py
+tools/document.py → content, metrics, server, solr, tools/shared.py, types
 tools/run_code.py → config, server
 metrics.py  → server (imports mcp for custom_route)
 request_id.py → fastmcp.server.dependencies, fastmcp.server.middleware, starlette
 intent.py   → config
-portal.py   → config, content, formatting, intent, solr
+portal.py   → config, content, formatting, intent, solr, types
 formatting.py → (standalone)
-solr.py     → bm25, config, metrics
+solr.py     → bm25, config, metrics, types
 bm25.py     → (standalone)
 server.py   → config
 telemetry.py → build_info, config, sentry_sdk
-content.py  → (standalone)
+content.py  → types
+types.py    → (standalone)
 ```
 
-No circular imports. `content.py`, `bm25.py`, and `formatting.py` have zero internal dependencies.
+No circular imports. `types.py`, `bm25.py`, and `formatting.py` have zero internal dependencies.
 
 ## Code Style
 

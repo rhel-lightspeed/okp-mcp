@@ -27,6 +27,8 @@ from okp_mcp.metrics import SEARCH_ZERO_RESULTS
 from okp_mcp.solr import _clean_query
 from okp_mcp.solr import _filter_rhv_sentences
 from okp_mcp.solr import _solr_query
+from okp_mcp.types import SolrDoc
+from okp_mcp.types import SolrResponse
 
 
 @dataclass
@@ -179,24 +181,23 @@ _FALLBACK_MAX_CHARS = 400
 _ACCESS_BASE_URL = "https://access.redhat.com"
 
 
-def _resolve_title(doc: dict) -> str:
+def _resolve_title(doc: SolrDoc) -> str:
     """Pick the best available title for a Solr document.
 
     Prefers ``allTitle`` (populated for most doc types), then ``title``,
     then ``heading_h1`` (list field, takes first element), then falls back
     to the document ID.
     """
-    if doc.get("allTitle"):
-        return doc["allTitle"]
-    if doc.get("title"):
-        return doc["title"]
-    h1 = doc.get("heading_h1")
-    if isinstance(h1, list) and h1:
-        return h1[0]
-    return doc.get("id", "Untitled")
+    if doc.allTitle:
+        return doc.allTitle
+    if doc.title:
+        return doc.title
+    if doc.heading_h1:
+        return doc.heading_h1[0]
+    return doc.id or "Untitled"
 
 
-def _build_doc_url(doc: dict) -> str:
+def _build_doc_url(doc: SolrDoc) -> str:
     """Build a full access.redhat.com URL for a Solr document."""
     uri = doc_uri(doc)
     if not uri:
@@ -207,54 +208,48 @@ def _build_doc_url(doc: dict) -> str:
     return f"{_ACCESS_BASE_URL}{uri}"
 
 
-def _fallback_cve(doc: dict) -> str:
+def _fallback_cve(doc: SolrDoc) -> str:
     """Build fallback chunk text for a CVE without highlight snippets.
 
     Uses ``cve_details`` (the vulnerability description), prefixed with
     severity when available.
     """
     parts: list[str] = []
-    severity = doc.get("cve_threatSeverity")
-    if severity:
-        parts.append(f"Severity: {severity}")
-    details = doc.get("cve_details")
+    if doc.cve_threatSeverity:
+        parts.append(f"Severity: {doc.cve_threatSeverity}")
+    details = doc.cve_details
     if details:
         parts.append(details[:_FALLBACK_MAX_CHARS])
     return "\n".join(parts) if parts else ""
 
 
-def _fallback_errata(doc: dict) -> str:
+def _fallback_errata(doc: SolrDoc) -> str:
     """Build fallback chunk text for an erratum without highlight snippets.
 
     Uses ``portal_synopsis`` + ``portal_summary``, prefixed with advisory
     type and severity when available.
     """
     parts: list[str] = []
-    advisory_type = doc.get("portal_advisory_type")
-    severity = doc.get("portal_severity")
-    if advisory_type or severity:
-        meta = " | ".join(filter(None, [advisory_type, severity]))
+    if doc.portal_advisory_type or doc.portal_severity:
+        meta = " | ".join(filter(None, [doc.portal_advisory_type, doc.portal_severity]))
         parts.append(meta)
-    synopsis = doc.get("portal_synopsis")
-    if synopsis:
-        parts.append(synopsis)
-    summary = doc.get("portal_summary")
-    if summary:
+    if doc.portal_synopsis:
+        parts.append(doc.portal_synopsis)
+    if doc.portal_summary:
         remaining = _FALLBACK_MAX_CHARS - sum(len(p) for p in parts)
         if remaining > 0:
-            parts.append(summary[:remaining])
+            parts.append(doc.portal_summary[:remaining])
     return "\n".join(parts) if parts else ""
 
 
-def _fallback_generic(doc: dict) -> str:
+def _fallback_generic(doc: SolrDoc) -> str:
     """Build fallback chunk text for a doc/solution/article without highlights."""
-    mc = doc.get("main_content", "")
-    if mc:
-        return strip_boilerplate(mc)[:_FALLBACK_MAX_CHARS]
+    if doc.main_content:
+        return strip_boilerplate(doc.main_content)[:_FALLBACK_MAX_CHARS]
     return ""
 
 
-def _make_chunk(doc: dict, suffix: str, chunk_text: str, chunk_index: int) -> PortalChunk:
+def _make_chunk(doc: SolrDoc, suffix: str, chunk_text: str, chunk_index: int) -> PortalChunk:
     """Build a PortalChunk from a Solr doc and a single passage.
 
     Centralizes the shared field extraction (title, URL, kind, score) so the
@@ -272,22 +267,21 @@ def _make_chunk(doc: dict, suffix: str, chunk_text: str, chunk_index: int) -> Po
     Returns:
         A populated PortalChunk.
     """
-    doc_id = doc.get("id", "")
     return PortalChunk(
-        doc_id=f"{doc_id}_{suffix}",
-        parent_id=doc_id,
+        doc_id=f"{doc.id}_{suffix}",
+        parent_id=doc.id,
         title=_resolve_title(doc),
         chunk=chunk_text,
         chunk_index=chunk_index,
         num_tokens=len(chunk_text.split()),
         online_source_url=_build_doc_url(doc),
-        documentKind=doc.get("documentKind", ""),
-        score=doc.get("score"),
+        documentKind=doc.documentKind,
+        score=doc.score,
     )
 
 
 def _docs_to_chunks(
-    solr_response: dict,
+    solr_response: SolrResponse,
     query: str,
 ) -> list[PortalChunk]:
     """Convert a Solr response with highlighting into a flat list of PortalChunk chunks.
@@ -309,13 +303,13 @@ def _docs_to_chunks(
         List of PortalChunk chunks ordered by Solr rank, with multiple
         chunks per source document when highlighting produces multiple snippets.
     """
-    docs = solr_response.get("response", {}).get("docs", [])
-    highlighting = solr_response.get("highlighting", {})
+    docs = solr_response.response.docs
+    highlighting = solr_response.highlighting
     chunks: list[PortalChunk] = []
 
     for doc in docs:
-        doc_id = doc.get("id", "")
-        kind = doc.get("documentKind", "")
+        doc_id = doc.id
+        kind = doc.documentKind
 
         if kind in ("Cve", "Erratum"):
             chunk_text = _fallback_cve(doc) if kind == "Cve" else _fallback_errata(doc)
@@ -323,7 +317,7 @@ def _docs_to_chunks(
                 chunks.append(_make_chunk(doc, "fb_0", chunk_text, 0))
             continue
 
-        hl_snippets = highlighting.get(doc_id, {}).get("main_content", [])
+        hl_snippets = highlighting.get(doc_id, {}).get("main_content", [])  # highlighting is a plain dict
 
         if hl_snippets:
             for i, snippet in enumerate(hl_snippets):

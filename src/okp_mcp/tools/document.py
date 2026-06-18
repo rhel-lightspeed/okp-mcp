@@ -26,6 +26,8 @@ from okp_mcp.solr import _extract_relevant_section
 from okp_mcp.solr import _get_highlight_snippets
 from okp_mcp.solr import _solr_query
 from okp_mcp.tools.shared import DOCUMENT_FL
+from okp_mcp.types import SolrDoc
+from okp_mcp.types import SolrResponse
 
 
 logger = logging.getLogger("okp_mcp.tools.get_document")
@@ -71,29 +73,29 @@ def _doc_id_filter(doc_id: str) -> str:
     return f'id:"{safe}" OR view_uri:"{safe}"'
 
 
-def _uses_document_passages(doc: dict) -> bool:
+def _uses_document_passages(doc: SolrDoc) -> bool:
     """Return whether a document should render Solr highlights as passages."""
-    if doc.get("documentKind") == "documentation":
+    if doc.documentKind == "documentation":
         return True
     return doc_uri(doc).startswith("/documentation/")
 
 
-def _format_metadata(doc: dict) -> str:
+def _format_metadata(doc: SolrDoc) -> str:
     """Build the metadata header for a fetched document."""
-    result = f"**{doc.get('allTitle', 'Untitled')}**"
-    result += f"\nType: {doc.get('documentKind', 'Unknown')}"
-    if doc.get("product"):
-        result += f"\nProduct: {doc['product']}"
-    if doc.get("documentation_version"):
-        result += f" {doc['documentation_version']}"
+    result = f"**{doc.allTitle or 'Untitled'}**"
+    result += f"\nType: {doc.documentKind or 'Unknown'}"
+    if doc.product:
+        result += f"\nProduct: {doc.product}"
+    if doc.documentation_version:
+        result += f" {doc.documentation_version}"
     result += f"\nURL: https://access.redhat.com{doc_uri(doc)}"
 
-    if doc.get("portal_synopsis"):
-        result += f"\n\nSynopsis: {doc['portal_synopsis']}"
-    if doc.get("portal_summary"):
-        result += f"\n\nSummary: {doc['portal_summary']}"
-    if doc.get("cve_details"):
-        result += f"\n\nCVE Details: {doc['cve_details']}"
+    if doc.portal_synopsis:
+        result += f"\n\nSynopsis: {doc.portal_synopsis}"
+    if doc.portal_summary:
+        result += f"\n\nSummary: {doc.portal_summary}"
+    if doc.cve_details:
+        result += f"\n\nCVE Details: {doc.cve_details}"
     return result
 
 
@@ -109,7 +111,7 @@ def _format_document_passages(highlight_snippets: list[str], query: str, max_cha
 
 
 def _format_document_content(
-    doc: dict, data: dict, doc_id: str, query: str, max_chars: int, current_result: str
+    doc: SolrDoc, data: SolrResponse, doc_id: str, query: str, max_chars: int, current_result: str
 ) -> str:
     """Build the content section for a fetched document.
 
@@ -144,7 +146,7 @@ def _format_document_content(
             "Pass a query to get_document to extract the most relevant passages."
         )
 
-    main_content = doc.get("main_content")
+    main_content = doc.main_content
     if not main_content:
         return ""
 
@@ -152,7 +154,7 @@ def _format_document_content(
     if not query:
         return f"\n\nContent:\n{_extract_relevant_section(content, '', max_sections=8)}"
 
-    highlight_snippets = _get_highlight_snippets(data, doc.get("view_uri", ""), doc.get("id", ""), doc_id, query=query)
+    highlight_snippets = _get_highlight_snippets(data, doc.view_uri, doc.id, doc_id, query=query)
 
     if is_documentation:
         if highlight_snippets:
@@ -178,7 +180,7 @@ async def _fetch_document_with_query(
     client: httpx.AsyncClient | None = None,
     *,
     solr_endpoint: str,
-) -> dict:
+) -> SolrResponse:
     """Fetch a document by ID using edismax query mode with highlighting.
 
     Uses _solr_query so edismax and highlight parameters are applied.
@@ -198,7 +200,9 @@ async def _fetch_document_with_query(
     )
 
 
-async def _fetch_document_raw(doc_id: str, client: httpx.AsyncClient | None = None, *, solr_endpoint: str) -> dict:
+async def _fetch_document_raw(
+    doc_id: str, client: httpx.AsyncClient | None = None, *, solr_endpoint: str
+) -> SolrResponse:
     """Fetch a document by ID using a plain HTTP request, bypassing edismax defaults.
 
     Uses httpx directly rather than _solr_query to avoid injecting edismax
@@ -219,13 +223,13 @@ async def _fetch_document_raw(doc_id: str, client: httpx.AsyncClient | None = No
             },
         )
         response.raise_for_status()
-        return response.json()
+        return SolrResponse.model_validate(response.json())
     finally:
         if close_client:
             await client.aclose()
 
 
-async def _format_document(doc: dict, data: dict, doc_id: str, query: str, max_chars: int) -> str:
+async def _format_document(doc: SolrDoc, data: SolrResponse, doc_id: str, query: str, max_chars: int) -> str:
     """Format a fetched document into a readable string.
 
     Renders title, type, product/version, URL, synopsis/summary/CVE details,
@@ -258,7 +262,7 @@ async def get_document(ctx: Context, doc_id: str, query: str = "") -> str:
         else:
             data = await _fetch_document_raw(doc_id, client=app.http_client, solr_endpoint=app.solr_endpoint)
 
-        docs = data["response"]["docs"]
+        docs = data.response.docs
         if not docs:
             DOCUMENT_NOT_FOUND.inc()
             return f"Document not found: {doc_id}"

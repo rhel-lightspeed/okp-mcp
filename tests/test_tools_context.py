@@ -23,6 +23,9 @@ from okp_mcp.tools.document import _fetch_document_raw
 from okp_mcp.tools.document import _fetch_document_with_query
 from okp_mcp.tools.document import _format_document
 from okp_mcp.tools.document import _normalize_doc_id
+from okp_mcp.types import SolrDoc
+from okp_mcp.types import SolrResponse
+from okp_mcp.types import SolrResponseBody
 
 
 _SOLR_ENDPOINT = ServerConfig().solr_endpoint
@@ -58,7 +61,7 @@ async def test_fetch_document_raw_uses_provided_client_without_constructing_or_c
 
     mock_client.get.assert_awaited_once()
     mock_client.aclose.assert_not_awaited()
-    assert data["response"]["numFound"] == 1
+    assert data.response.numFound == 1
 
 
 async def test_fetch_document_raw_creates_and_closes_client_when_not_provided():
@@ -77,13 +80,15 @@ async def test_fetch_document_raw_creates_and_closes_client_when_not_provided():
     client_ctor.assert_called_once_with(timeout=30.0)
     created_client.get.assert_awaited_once()
     created_client.aclose.assert_awaited_once()
-    assert data["response"]["numFound"] == 1
+    assert data.response.numFound == 1
 
 
 async def test_fetch_document_with_query_passes_client_to_solr_query():
     """_fetch_document_with_query forwards explicit client through to _solr_query."""
     mock_client = AsyncMock(spec=httpx.AsyncClient)
-    expected = {"response": {"numFound": 1, "docs": [{"id": "123"}]}}
+    expected = SolrResponse(
+        response=SolrResponseBody(numFound=1, docs=[SolrDoc(id="123")]),
+    )
 
     with patch("okp_mcp.tools.document._solr_query", AsyncMock(return_value=expected)) as solr_query_mock:
         data = await _fetch_document_with_query(
@@ -123,13 +128,13 @@ async def test_format_document_budget_truncates_large_content():
     """_format_document truncates output to max_chars when content exceeds budget."""
     paragraph = "kernel panic error trace dump occurs during boot sequence\n\n"
     huge_content = paragraph * 2000
-    doc = {
-        "allTitle": "Test Doc",
-        "documentKind": "documentation",
-        "main_content": huge_content,
-        "view_uri": "/test-doc",
-    }
-    data = {"highlighting": {}}
+    doc = SolrDoc(
+        allTitle="Test Doc",
+        documentKind="documentation",
+        main_content=huge_content,
+        view_uri="/test-doc",
+    )
+    data = SolrResponse()
     result = await _format_document(doc, data, "/test-doc", "kernel panic", max_chars=200)
     assert len(result) <= 400  # slack for truncation message
     assert "Content truncated" in result
@@ -137,25 +142,25 @@ async def test_format_document_budget_truncates_large_content():
 
 async def test_format_document_uses_chunked_highlight_passages_for_documentation():
     """_format_document keeps highlight snippets as separate passages for large docs."""
-    doc = {
-        "id": "/documentation/en-us/rhel/9/html/configuring_networking/index.html",
-        "allTitle": "Configuring networking",
-        "documentKind": "documentation",
-        "view_uri": "/documentation/en-us/rhel/9/html/configuring_networking/index",
-        "main_content": "Long body text that should not be used when highlights are available.",
-    }
-    data = {
-        "highlighting": {
-            doc["id"]: {
+    doc = SolrDoc(
+        id="/documentation/en-us/rhel/9/html/configuring_networking/index.html",
+        allTitle="Configuring networking",
+        documentKind="documentation",
+        view_uri="/documentation/en-us/rhel/9/html/configuring_networking/index",
+        main_content="Long body text that should not be used when highlights are available.",
+    )
+    data = SolrResponse(
+        highlighting= {
+            doc.id: {
                 "main_content": [
                     "First <em>network</em> configuration snippet.",
                     "Second snippet about <em>routing</em>.",
                 ]
             }
         }
-    }
+    )
 
-    result = await _format_document(doc, data, doc["view_uri"], "network routing", max_chars=5000)
+    result = await _format_document(doc, data, doc.view_uri, "network routing", max_chars=5000)
 
     assert "Relevant passages:" in result
     assert "Passage 1:" in result
@@ -166,19 +171,19 @@ async def test_format_document_uses_chunked_highlight_passages_for_documentation
 
 async def test_format_document_falls_back_to_relevant_section_when_no_highlights():
     """_format_document falls back to extracted sections when highlighting is unavailable."""
-    doc = {
-        "id": "/documentation/en-us/rhel/9/html/using_systemd/index.html",
-        "allTitle": "Using systemd",
-        "documentKind": "documentation",
-        "view_uri": "/documentation/en-us/rhel/9/html/using_systemd/index",
-        "main_content": (
+    doc = SolrDoc(
+        id="/documentation/en-us/rhel/9/html/using_systemd/index.html",
+        allTitle="Using systemd",
+        documentKind="documentation",
+        view_uri="/documentation/en-us/rhel/9/html/using_systemd/index",
+        main_content=(
             "intro\n\n"
             "systemd units manage services and targets across the operating system.\n\n"
             "debugging boot delays with systemd-analyze can identify slow units."
         ),
-    }
+    )
 
-    result = await _format_document(doc, {"highlighting": {}}, doc["view_uri"], "systemd analyze units", max_chars=5000)
+    result = await _format_document(doc, SolrResponse(), doc.view_uri, "systemd analyze units", max_chars=5000)
 
     assert "Relevant passages:" not in result
     assert "Content:" in result
@@ -187,25 +192,25 @@ async def test_format_document_falls_back_to_relevant_section_when_no_highlights
 
 async def test_format_document_non_documentation_keeps_flat_highlights():
     """_format_document keeps non-documentation highlights in the legacy flat format."""
-    doc = {
-        "id": "/solutions/123/index.html",
-        "allTitle": "Kernel panic solution",
-        "documentKind": "solution",
-        "view_uri": "/solutions/123",
-        "main_content": "Long solution body.",
-    }
-    data = {
-        "highlighting": {
-            doc["id"]: {
+    doc = SolrDoc(
+        id="/solutions/123/index.html",
+        allTitle="Kernel panic solution",
+        documentKind="solution",
+        view_uri="/solutions/123",
+        main_content="Long solution body.",
+    )
+    data = SolrResponse(
+        highlighting= {
+            doc.id: {
                 "main_content": [
                     "First <em>kernel</em> snippet.",
                     "Second snippet about <em>panic</em>.",
                 ]
             }
         }
-    }
+    )
 
-    result = await _format_document(doc, data, doc["view_uri"], "kernel panic", max_chars=5000)
+    result = await _format_document(doc, data, doc.view_uri, "kernel panic", max_chars=5000)
 
     assert "Relevant passages:" not in result
     assert "Content:" in result
@@ -214,25 +219,25 @@ async def test_format_document_non_documentation_keeps_flat_highlights():
 
 async def test_format_document_documentation_budget_uses_remaining_space():
     """_format_document limits passage output to the true remaining response budget."""
-    doc = {
-        "id": "/documentation/en-us/rhel/9/html/networking/index.html",
-        "allTitle": "X" * 180,
-        "documentKind": "documentation",
-        "view_uri": "/documentation/en-us/rhel/9/html/networking/index",
-        "main_content": "Long body text.",
-    }
-    data = {
-        "highlighting": {
-            doc["id"]: {
+    doc = SolrDoc(
+        id="/documentation/en-us/rhel/9/html/networking/index.html",
+        allTitle="X" * 180,
+        documentKind="documentation",
+        view_uri="/documentation/en-us/rhel/9/html/networking/index",
+        main_content="Long body text.",
+    )
+    data = SolrResponse(
+        highlighting= {
+            doc.id: {
                 "main_content": [
                     "First <em>network</em> snippet with enough detail to consume budget.",
                     "Second snippet that should be excluded when the remaining budget is small.",
                 ]
             }
         }
-    }
+    )
 
-    result = await _format_document(doc, data, doc["view_uri"], "network", max_chars=320)
+    result = await _format_document(doc, data, doc.view_uri, "network", max_chars=320)
 
     assert "Relevant passages:" in result
     assert "Passage 1:" in result
@@ -241,26 +246,27 @@ async def test_format_document_documentation_budget_uses_remaining_space():
 
 async def test_format_document_falls_back_when_highlights_clean_to_empty():
     """_format_document falls back when highlight cleanup leaves no usable snippets."""
-    doc = {
-        "id": "/documentation/en-us/rhel/9/html/virtualization/index.html",
-        "allTitle": "Virtualization guide",
-        "documentKind": "documentation",
-        "view_uri": "/documentation/en-us/rhel/9/html/virtualization/index",
-        "main_content": (
-            "intro\n\nConfiguring KVM virtualization on RHEL systems.\n\nUse virsh to inspect virtual machines."
+    doc = SolrDoc(
+        id="/documentation/en-us/rhel/9/html/virtualization/index.html",
+        allTitle="Virtualization guide",
+        documentKind="documentation",
+        view_uri="/documentation/en-us/rhel/9/html/virtualization/index",
+        main_content=(
+            "intro\n\nConfiguring KVM virtualization on RHEL systems."
+            "\n\nUse virsh to inspect virtual machines."
         ),
-    }
-    data = {
-        "highlighting": {
-            doc["id"]: {
+    )
+    data = SolrResponse(
+        highlighting= {
+            doc.id: {
                 "main_content": [
                     "RHV is <em>commonly used</em> and fully supported.",
                 ]
             }
         }
-    }
+    )
 
-    result = await _format_document(doc, data, doc["view_uri"], "kvm virtualization", max_chars=5000)
+    result = await _format_document(doc, data, doc.view_uri, "kvm virtualization", max_chars=5000)
 
     assert "Relevant passages:" not in result
     assert "Content:" in result
@@ -387,7 +393,12 @@ async def test_get_document_normalizes_full_url():
         patch("okp_mcp.tools.document.get_app_context", return_value=mock_app),
         patch("okp_mcp.tools.document._fetch_document_raw", new_callable=AsyncMock) as mock_fetch,
     ):
-        mock_fetch.return_value = {"response": {"docs": [{"allTitle": "Test", "documentKind": "documentation"}]}}
+        mock_fetch.return_value = SolrResponse(
+            response=SolrResponseBody(
+                numFound=1,
+                docs=[SolrDoc(allTitle="Test", documentKind="documentation")],
+            ),
+        )
         await tools.get_document(mock_ctx, full_url)
 
         # The normalized path (not the full URL) should reach the fetch function.

@@ -7,6 +7,7 @@ from okp_mcp.content import clean_content
 from okp_mcp.content import doc_uri
 from okp_mcp.content import strip_boilerplate
 from okp_mcp.content import truncate_content
+from okp_mcp.types import SolrDoc
 
 
 @pytest.mark.parametrize(
@@ -75,17 +76,17 @@ def test_clean_content_edge_cases(text, max_chars, expected):
 @pytest.mark.parametrize(
     "doc,expected",
     [
-        ({"id": "/solutions/3257611/index.html"}, "/solutions/3257611"),
-        ({"id": "/articles/2585/index.html"}, "/articles/2585"),
+        (SolrDoc(id="/solutions/3257611/index.html"), "/solutions/3257611"),
+        (SolrDoc(id="/articles/2585/index.html"), "/articles/2585"),
         (
-            {"id": "/documentation/en-us/rhel/9/html-single/guide/index.html"},
+            SolrDoc(id="/documentation/en-us/rhel/9/html-single/guide/index.html"),
             "/documentation/en-us/rhel/9/html-single/guide",
         ),
-        ({"view_uri": "/security/cve/CVE-2024-9823/"}, "/security/cve/CVE-2024-9823/"),
-        ({"view_uri": "/errata/RHSA-2022:4915/"}, "/errata/RHSA-2022:4915/"),
-        ({}, ""),
-        ({"id": "/solutions/123"}, "/solutions/123"),
-        ({"view_uri": "/solutions/7134031", "id": "/solutions/7134031/index.html"}, "/solutions/7134031"),
+        (SolrDoc(view_uri="/security/cve/CVE-2024-9823/"), "/security/cve/CVE-2024-9823/"),
+        (SolrDoc(view_uri="/errata/RHSA-2022:4915/"), "/errata/RHSA-2022:4915/"),
+        (SolrDoc(), ""),
+        (SolrDoc(id="/solutions/123"), "/solutions/123"),
+        (SolrDoc(view_uri="/solutions/7134031", id="/solutions/7134031/index.html"), "/solutions/7134031"),
     ],
     ids=[
         "solution-id-strips-suffix",

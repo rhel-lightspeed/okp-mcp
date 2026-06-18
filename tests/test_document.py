@@ -18,6 +18,9 @@ from okp_mcp.tools.document import _format_document_content
 from okp_mcp.tools.document import _format_document_passages
 from okp_mcp.tools.document import _format_metadata
 from okp_mcp.tools.document import _uses_document_passages
+from okp_mcp.types import SolrDoc
+from okp_mcp.types import SolrResponse
+from okp_mcp.types import SolrResponseBody
 
 
 _SOLR_ENDPOINT = ServerConfig().solr_endpoint
@@ -28,23 +31,26 @@ def _make_doc(
     kind: str = "documentation",
     content: str = "Some content about RHEL",
     view_uri: str = "/documentation/en-US/test",
-) -> dict:
-    """Build a minimal Solr doc dict for testing."""
-    return {
-        "allTitle": "Test Doc",
-        "documentKind": kind,
-        "view_uri": view_uri,
-        "id": view_uri,
-        "main_content": content,
-    }
+) -> SolrDoc:
+    """Build a minimal Solr doc for testing."""
+    return SolrDoc(
+        allTitle="Test Doc",
+        documentKind=kind,
+        view_uri=view_uri,
+        id=view_uri,
+        main_content=content,
+    )
 
 
-def _make_data(*, highlight_key: str = "", snippets: list[str] | None = None) -> dict:
-    """Build a minimal Solr response dict with optional highlighting."""
+def _make_data(*, highlight_key: str = "", snippets: list[str] | None = None) -> SolrResponse:
+    """Build a minimal Solr response with optional highlighting."""
     highlighting: dict = {}
     if highlight_key and snippets:
         highlighting[highlight_key] = {"main_content": snippets}
-    return {"response": {"docs": []}, "highlighting": highlighting}
+    return SolrResponse(
+        response=SolrResponseBody(numFound=0, docs=[]),
+        highlighting=highlighting,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -55,10 +61,10 @@ def _make_data(*, highlight_key: str = "", snippets: list[str] | None = None) ->
 @pytest.mark.parametrize(
     "doc,expected",
     [
-        ({"documentKind": "documentation"}, True),
-        ({"documentKind": "solution", "view_uri": "/solutions/12345"}, False),
-        ({"documentKind": "solution", "view_uri": "/documentation/en-US/rhel/9"}, True),
-        ({"documentKind": "errata", "view_uri": "/errata/RHSA-2024:1234", "id": "/errata/RHSA-2024:1234"}, False),
+        (SolrDoc(documentKind="documentation"), True),
+        (SolrDoc(documentKind="solution", view_uri="/solutions/12345"), False),
+        (SolrDoc(documentKind="solution", view_uri="/documentation/en-US/rhel/9"), True),
+        (SolrDoc(documentKind="errata", view_uri="/errata/RHSA-2024:1234", id="/errata/RHSA-2024:1234"), False),
     ],
     ids=["kind-documentation", "kind-solution", "uri-documentation", "kind-errata"],
 )
@@ -75,7 +81,7 @@ def test_uses_document_passages(doc, expected):
 def test_format_metadata_basic():
     """Metadata includes title, type, product, and URL."""
     doc = _make_doc(kind="documentation")
-    doc["product"] = "Red Hat Enterprise Linux"
+    doc.product = "Red Hat Enterprise Linux"
     result = _format_metadata(doc)
     assert "**Test Doc**" in result
     assert "Type: documentation" in result
@@ -86,7 +92,7 @@ def test_format_metadata_basic():
 def test_format_metadata_with_synopsis():
     """Synopsis is included when present."""
     doc = _make_doc()
-    doc["portal_synopsis"] = "A brief synopsis."
+    doc.portal_synopsis = "A brief synopsis."
     result = _format_metadata(doc)
     assert "Synopsis: A brief synopsis." in result
 
@@ -100,7 +106,7 @@ def test_documentation_no_query_returns_nudge():
     """Documentation without a query returns a nudge instead of content."""
     doc = _make_doc(kind="documentation", content="x" * 100_000)
     data = _make_data()
-    result = _format_document_content(doc, data, doc["view_uri"], query="", max_chars=30_000, current_result="")
+    result = _format_document_content(doc, data, doc.view_uri, query="", max_chars=30_000, current_result="")
     assert "Pass a query" in result
     assert "large documentation page" in result
     # Must NOT contain the actual content
@@ -111,7 +117,7 @@ def test_documentation_no_query_nudge_via_uri():
     """URI-based documentation detection also triggers the nudge."""
     doc = _make_doc(kind="other", view_uri="/documentation/en-US/rhel/9/guide")
     data = _make_data()
-    result = _format_document_content(doc, data, doc["view_uri"], query="", max_chars=30_000, current_result="")
+    result = _format_document_content(doc, data, doc.view_uri, query="", max_chars=30_000, current_result="")
     assert "Pass a query" in result
 
 
@@ -164,7 +170,7 @@ def test_documentation_query_no_highlights_uses_reduced_extraction():
     data = _make_data()  # no highlights
 
     result = _format_document_content(
-        doc, data, doc["view_uri"], query="kernel configuration", max_chars=30_000, current_result=""
+        doc, data, doc.view_uri, query="kernel configuration", max_chars=30_000, current_result=""
     )
 
     assert "\n\nContent:\n" in result
@@ -184,7 +190,7 @@ def test_non_documentation_no_query_extracts_content():
     doc = _make_doc(kind="solution", view_uri="/solutions/12345", content="Solution body text here.")
     data = _make_data()
 
-    result = _format_document_content(doc, data, doc["view_uri"], query="", max_chars=30_000, current_result="")
+    result = _format_document_content(doc, data, doc.view_uri, query="", max_chars=30_000, current_result="")
 
     assert "\n\nContent:\n" in result
     assert "Pass a query" not in result
@@ -214,7 +220,7 @@ def test_non_documentation_query_no_highlights_uses_full_extraction():
     data = _make_data()  # no highlights
 
     result = _format_document_content(
-        doc, data, doc["view_uri"], query="network configuration", max_chars=30_000, current_result=""
+        doc, data, doc.view_uri, query="network configuration", max_chars=30_000, current_result=""
     )
 
     assert "\n\nContent:\n" in result
@@ -233,30 +239,30 @@ def test_non_documentation_query_no_highlights_uses_full_extraction():
 def test_no_main_content_returns_empty():
     """Missing main_content returns empty string for non-documentation."""
     doc = _make_doc(kind="solution", view_uri="/solutions/12345")
-    doc["main_content"] = None
+    doc.main_content = ""
     data = _make_data()
 
-    result = _format_document_content(doc, data, doc["view_uri"], query="test", max_chars=30_000, current_result="")
+    result = _format_document_content(doc, data, doc.view_uri, query="test", max_chars=30_000, current_result="")
     assert result == ""
 
 
 def test_documentation_no_main_content_still_nudges_without_query():
     """Documentation nudge fires even when main_content is missing (check order matters)."""
     doc = _make_doc(kind="documentation")
-    doc["main_content"] = None
+    doc.main_content = ""
     data = _make_data()
 
-    result = _format_document_content(doc, data, doc["view_uri"], query="", max_chars=30_000, current_result="")
+    result = _format_document_content(doc, data, doc.view_uri, query="", max_chars=30_000, current_result="")
     assert "Pass a query" in result
 
 
 def test_documentation_no_main_content_with_query_returns_empty():
     """Documentation with a query but no main_content returns empty (no content to extract)."""
     doc = _make_doc(kind="documentation")
-    doc["main_content"] = None
+    doc.main_content = ""
     data = _make_data()
 
-    result = _format_document_content(doc, data, doc["view_uri"], query="kernel", max_chars=30_000, current_result="")
+    result = _format_document_content(doc, data, doc.view_uri, query="kernel", max_chars=30_000, current_result="")
     assert result == ""
 
 
@@ -312,7 +318,7 @@ class TestDocumentRetrievalMetrics:
         data = _make_data()
         before = _get_counter("okp_document_nudge")
 
-        _format_document_content(doc, data, doc["view_uri"], query=query, max_chars=30_000, current_result="")
+        _format_document_content(doc, data, doc.view_uri, query=query, max_chars=30_000, current_result="")
 
         assert _get_counter("okp_document_nudge") == before + expected_delta
 
@@ -378,7 +384,7 @@ class TestDocumentRetrievalMetrics:
         before_used = _get_counter("okp_document_highlight_used")
         before_fallback = _get_counter("okp_document_highlight_fallback")
 
-        _format_document_content(doc, data, doc["view_uri"], query="", max_chars=30_000, current_result="")
+        _format_document_content(doc, data, doc.view_uri, query="", max_chars=30_000, current_result="")
 
         assert _get_counter("okp_document_highlight_used") == before_used
         assert _get_counter("okp_document_highlight_fallback") == before_fallback
@@ -386,12 +392,12 @@ class TestDocumentRetrievalMetrics:
     def test_no_highlight_metrics_without_main_content(self):
         """Missing main_content fires neither highlight counter."""
         doc = _make_doc(kind="documentation", content="x")
-        doc["main_content"] = None
+        doc.main_content = ""
         data = _make_data()
         before_used = _get_counter("okp_document_highlight_used")
         before_fallback = _get_counter("okp_document_highlight_fallback")
 
-        _format_document_content(doc, data, doc["view_uri"], query="kernel", max_chars=30_000, current_result="")
+        _format_document_content(doc, data, doc.view_uri, query="kernel", max_chars=30_000, current_result="")
 
         assert _get_counter("okp_document_highlight_used") == before_used
         assert _get_counter("okp_document_highlight_fallback") == before_fallback
@@ -416,7 +422,7 @@ async def test_not_found_counter_incremented():
         patch("okp_mcp.tools.document.get_app_context", return_value=mock_app),
         patch("okp_mcp.tools.document._fetch_document_raw", new_callable=AsyncMock) as mock_fetch,
     ):
-        mock_fetch.return_value = {"response": {"docs": []}}
+        mock_fetch.return_value = SolrResponse()
         result = await tools.get_document(mock_ctx, "/solutions/nonexistent")
 
     assert _get_counter("okp_document_not_found") == before + 1
@@ -437,20 +443,20 @@ async def test_not_found_counter_not_incremented_when_doc_exists():
         patch("okp_mcp.tools.document.get_app_context", return_value=mock_app),
         patch("okp_mcp.tools.document._fetch_document_raw", new_callable=AsyncMock) as mock_fetch,
     ):
-        mock_fetch.return_value = {
-            "response": {
-                "docs": [
-                    {
-                        "allTitle": "Test Solution",
-                        "documentKind": "solution",
-                        "view_uri": "/solutions/12345",
-                        "id": "/solutions/12345",
-                        "main_content": "Solution content here.",
-                    }
-                ]
-            },
-            "highlighting": {},
-        }
+        mock_fetch.return_value = SolrResponse(
+            response=SolrResponseBody(
+                numFound=1,
+                docs=[
+                    SolrDoc(
+                        allTitle="Test Solution",
+                        documentKind="solution",
+                        view_uri="/solutions/12345",
+                        id="/solutions/12345",
+                        main_content="Solution content here.",
+                    )
+                ],
+            ),
+        )
         await tools.get_document(mock_ctx, "/solutions/12345")
 
     assert _get_counter("okp_document_not_found") == before

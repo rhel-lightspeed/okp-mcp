@@ -31,6 +31,9 @@ from okp_mcp.portal import _resolve_title
 from okp_mcp.portal import _run_multi_query_search
 from okp_mcp.portal import _run_portal_search
 from okp_mcp.portal import PortalChunk
+from okp_mcp.types import SolrDoc
+from okp_mcp.types import SolrResponse
+from okp_mcp.types import SolrResponseBody
 
 
 # ---------------------------------------------------------------------------
@@ -583,16 +586,16 @@ class TestIntentBoostLogging:
 
 
 def _make_solr_response(docs, highlighting=None):
-    """Build a minimal Solr response dict for testing."""
-    return {
-        "response": {"numFound": len(docs), "docs": docs},
-        "highlighting": highlighting or {},
-    }
+    """Build a minimal Solr response for testing."""
+    return SolrResponse(
+        response=SolrResponseBody(numFound=len(docs), docs=docs),
+        highlighting=highlighting or {},
+    )
 
 
 def _make_doc(doc_id="doc1", kind="documentation", **overrides):
-    """Build a minimal Solr document dict."""
-    base = {
+    """Build a minimal Solr document."""
+    defaults = {
         "id": doc_id,
         "allTitle": f"Title for {doc_id}",
         "view_uri": f"/documentation/en-US/{doc_id}",
@@ -600,8 +603,8 @@ def _make_doc(doc_id="doc1", kind="documentation", **overrides):
         "product": "Red Hat Enterprise Linux",
         "score": 10.0,
     }
-    base.update(overrides)
-    return base
+    defaults.update(overrides)
+    return SolrDoc(**defaults)
 
 
 # ---------------------------------------------------------------------------
@@ -614,23 +617,23 @@ class TestResolveTitle:
 
     def test_prefers_all_title(self):
         """allTitle is used when available."""
-        assert _resolve_title({"allTitle": "Best Title", "title": "Alt"}) == "Best Title"
+        assert _resolve_title(SolrDoc(allTitle="Best Title", title="Alt")) == "Best Title"
 
     def test_falls_back_to_title(self):
         """title is used when allTitle is missing."""
-        assert _resolve_title({"title": "Fallback Title"}) == "Fallback Title"
+        assert _resolve_title(SolrDoc(title="Fallback Title")) == "Fallback Title"
 
     def test_falls_back_to_heading_h1(self):
         """First heading_h1 entry is used when allTitle and title are missing."""
-        assert _resolve_title({"heading_h1": ["H1 Title", "Other"]}) == "H1 Title"
+        assert _resolve_title(SolrDoc(heading_h1=["H1 Title", "Other"])) == "H1 Title"
 
     def test_falls_back_to_id(self):
         """Document id is used as last resort."""
-        assert _resolve_title({"id": "doc-123"}) == "doc-123"
+        assert _resolve_title(SolrDoc(id="doc-123")) == "doc-123"
 
     def test_empty_doc_returns_untitled(self):
         """Empty dict returns 'Untitled'."""
-        assert _resolve_title({}) == "Untitled"
+        assert _resolve_title(SolrDoc()) == "Untitled"
 
 
 # ---------------------------------------------------------------------------
@@ -644,7 +647,7 @@ class TestDocsToChunksHighlights:
     def test_each_snippet_becomes_a_chunk(self):
         """Each highlight snippet produces a separate PortalChunk."""
         doc = _make_doc()
-        hl = {doc["id"]: {"main_content": ["Snippet one.", "Snippet two.", "Snippet three."]}}
+        hl = {doc.id: {"main_content": ["Snippet one.", "Snippet two.", "Snippet three."]}}
         chunks = _docs_to_chunks(_make_solr_response([doc], hl), "test query")
         assert len(chunks) == 3
         assert chunks[0].chunk == "Snippet one."
@@ -654,7 +657,7 @@ class TestDocsToChunksHighlights:
     def test_chunk_ids_are_unique(self):
         """Each chunk gets a unique doc_id based on parent + snippet index."""
         doc = _make_doc()
-        hl = {doc["id"]: {"main_content": ["A.", "B."]}}
+        hl = {doc.id: {"main_content": ["A.", "B."]}}
         chunks = _docs_to_chunks(_make_solr_response([doc], hl), "test")
         assert chunks[0].doc_id == "doc1_hl_0"
         assert chunks[1].doc_id == "doc1_hl_1"
@@ -662,42 +665,42 @@ class TestDocsToChunksHighlights:
     def test_parent_id_links_to_source(self):
         """All chunks from the same doc share the parent_id."""
         doc = _make_doc()
-        hl = {doc["id"]: {"main_content": ["A.", "B."]}}
+        hl = {doc.id: {"main_content": ["A.", "B."]}}
         chunks = _docs_to_chunks(_make_solr_response([doc], hl), "test")
         assert all(c.parent_id == "doc1" for c in chunks)
 
     def test_strips_html_tags(self):
         """HTML markup from Solr highlighting is removed."""
         doc = _make_doc()
-        hl = {doc["id"]: {"main_content": ["Use <em>cockpit</em> for <b>VM</b> management."]}}
+        hl = {doc.id: {"main_content": ["Use <em>cockpit</em> for <b>VM</b> management."]}}
         chunks = _docs_to_chunks(_make_solr_response([doc], hl), "test")
         assert chunks[0].chunk == "Use cockpit for VM management."
 
     def test_num_tokens_counted(self):
         """num_tokens reflects whitespace-split word count of cleaned text."""
         doc = _make_doc()
-        hl = {doc["id"]: {"main_content": ["one two three four"]}}
+        hl = {doc.id: {"main_content": ["one two three four"]}}
         chunks = _docs_to_chunks(_make_solr_response([doc], hl), "test")
         assert chunks[0].num_tokens == 4
 
     def test_url_constructed_from_view_uri(self):
         """online_source_url uses doc_uri() to build the access.redhat.com URL."""
         doc = _make_doc(view_uri="/documentation/en-US/some/page")
-        hl = {doc["id"]: {"main_content": ["Content."]}}
+        hl = {doc.id: {"main_content": ["Content."]}}
         chunks = _docs_to_chunks(_make_solr_response([doc], hl), "test")
         assert chunks[0].online_source_url == "https://access.redhat.com/documentation/en-US/some/page"
 
     def test_document_kind_preserved(self):
         """documentKind from the Solr doc is carried to each chunk."""
         doc = _make_doc(kind="solution")
-        hl = {doc["id"]: {"main_content": ["Fix the issue."]}}
+        hl = {doc.id: {"main_content": ["Fix the issue."]}}
         chunks = _docs_to_chunks(_make_solr_response([doc], hl), "test")
         assert chunks[0].documentKind == "solution"
 
     def test_score_preserved(self):
         """Solr relevance score is carried to each chunk."""
         doc = _make_doc(score=42.5)
-        hl = {doc["id"]: {"main_content": ["Content."]}}
+        hl = {doc.id: {"main_content": ["Content."]}}
         chunks = _docs_to_chunks(_make_solr_response([doc], hl), "test")
         assert chunks[0].score == 42.5
 
@@ -706,7 +709,7 @@ class TestDocsToChunksHighlights:
         doc = _make_doc()
         # "fully supported" + "rhv" triggers RHV contamination filter
         hl = {
-            doc["id"]: {
+            doc.id: {
                 "main_content": ["SPICE is still fully supported in RHV deployments. Use cockpit for management."]
             }
         }
@@ -718,14 +721,14 @@ class TestDocsToChunksHighlights:
     def test_rhv_filtering_skipped_for_rhv_query(self):
         """RHV filtering is disabled when the query itself mentions RHV."""
         doc = _make_doc()
-        hl = {doc["id"]: {"main_content": ["SPICE is still fully supported in RHV deployments."]}}
+        hl = {doc.id: {"main_content": ["SPICE is still fully supported in RHV deployments."]}}
         chunks = _docs_to_chunks(_make_solr_response([doc], hl), "rhv spice support")
         assert "RHV" in chunks[0].chunk
 
     def test_empty_snippet_after_stripping_is_skipped(self):
         """Snippets that become empty after HTML stripping are excluded."""
         doc = _make_doc()
-        hl = {doc["id"]: {"main_content": ["<em></em>", "Real content here."]}}
+        hl = {doc.id: {"main_content": ["<em></em>", "Real content here."]}}
         chunks = _docs_to_chunks(_make_solr_response([doc], hl), "test")
         assert len(chunks) == 1
         assert chunks[0].chunk == "Real content here."
@@ -821,7 +824,7 @@ class TestDocsToChunksEdgeCases:
     def test_missing_highlighting_key(self):
         """Response without highlighting key uses fallback for all docs."""
         doc = _make_doc(main_content="Some content here.")
-        response = {"response": {"numFound": 1, "docs": [doc]}}
+        response = _make_solr_response([doc])
         chunks = _docs_to_chunks(response, "test")
         assert len(chunks) == 1
         assert chunks[0].doc_id.endswith("_fb_0")
@@ -842,7 +845,7 @@ class TestDocsToChunksEdgeCases:
     def test_empty_query_skips_rhv_filter(self):
         """Empty query string skips RHV filtering entirely."""
         doc = _make_doc()
-        hl = {doc["id"]: {"main_content": ["SPICE is fully supported in RHV deployments."]}}
+        hl = {doc.id: {"main_content": ["SPICE is fully supported in RHV deployments."]}}
         chunks = _docs_to_chunks(_make_solr_response([doc], hl), "")
         # No RHV filtering with empty query
         assert "RHV" in chunks[0].chunk
@@ -858,19 +861,19 @@ class TestFallbackCve:
 
     def test_severity_and_details(self):
         """Both severity and details are included."""
-        text = _fallback_cve({"cve_threatSeverity": "Critical", "cve_details": "RCE via buffer overflow."})
+        text = _fallback_cve(SolrDoc(cve_threatSeverity="Critical", cve_details="RCE via buffer overflow."))
         assert "Critical" in text
         assert "RCE via buffer overflow" in text
 
     def test_details_truncated_at_budget(self):
         """Long cve_details are truncated to _FALLBACK_MAX_CHARS."""
         long_details = "x" * 1000
-        text = _fallback_cve({"cve_details": long_details})
+        text = _fallback_cve(SolrDoc(cve_details=long_details))
         assert len(text) <= _FALLBACK_MAX_CHARS
 
     def test_empty_fields_returns_empty(self):
         """CVE with no severity or details returns empty string."""
-        assert _fallback_cve({}) == ""
+        assert _fallback_cve(SolrDoc()) == ""
 
 
 class TestFallbackErrata:
@@ -879,12 +882,12 @@ class TestFallbackErrata:
     def test_full_metadata(self):
         """Advisory type, severity, synopsis, and summary all appear."""
         text = _fallback_errata(
-            {
-                "portal_advisory_type": "Security Advisory",
-                "portal_severity": "Important",
-                "portal_synopsis": "kernel security update",
-                "portal_summary": "Fixes multiple CVEs.",
-            }
+            SolrDoc(
+                portal_advisory_type="Security Advisory",
+                portal_severity="Important",
+                portal_synopsis="kernel security update",
+                portal_summary="Fixes multiple CVEs.",
+            )
         )
         assert "Security Advisory" in text
         assert "Important" in text
@@ -893,12 +896,12 @@ class TestFallbackErrata:
 
     def test_synopsis_only(self):
         """Works with just portal_synopsis."""
-        text = _fallback_errata({"portal_synopsis": "Bug fix update"})
+        text = _fallback_errata(SolrDoc(portal_synopsis="Bug fix update"))
         assert "Bug fix update" in text
 
     def test_empty_returns_empty(self):
         """No errata fields returns empty string."""
-        assert _fallback_errata({}) == ""
+        assert _fallback_errata(SolrDoc()) == ""
 
 
 # ---------------------------------------------------------------------------
@@ -1181,7 +1184,7 @@ def _make_solr_json(docs, highlighting=None):
     """Build a Solr JSON response for respx mocking."""
     return {
         "responseHeader": {"status": 0, "QTime": 5},
-        "response": {"numFound": len(docs), "docs": docs},
+        "response": {"numFound": len(docs), "docs": [d.model_dump() if hasattr(d, "model_dump") else d for d in docs]},
         "highlighting": highlighting or {},
     }
 

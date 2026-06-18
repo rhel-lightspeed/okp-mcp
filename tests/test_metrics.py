@@ -329,7 +329,7 @@ async def test_solr_query_records_error_metrics_on_solr_error_response():
         result = await _solr_query({"q": "bad"}, solr_endpoint=_SOLR_ENDPOINT)
 
     assert _get_counter("okp_solr_queries", {"status": "error"}) == before + 1
-    assert result["response"]["numFound"] == 0
+    assert result.response.numFound == 0
 
 
 async def test_solr_query_always_records_duration():

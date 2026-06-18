@@ -14,6 +14,7 @@ from okp_mcp.config import ServerConfig
 from okp_mcp.solr import _clean_query
 from okp_mcp.solr import _get_highlight_snippets
 from okp_mcp.solr import _solr_query
+from okp_mcp.types import SolrResponse
 
 
 _SOLR_ENDPOINT = ServerConfig().solr_endpoint
@@ -33,7 +34,8 @@ async def test_solr_query_uses_provided_shared_client(sample_solr_response):
             await shared_client.aclose()
 
     assert route.called
-    assert data == sample_solr_response
+    assert isinstance(data, SolrResponse)
+    assert data.response.numFound == sample_solr_response["response"]["numFound"]
 
 
 async def test_solr_query_does_not_close_shared_client():
@@ -75,7 +77,8 @@ async def test_solr_query_creates_and_closes_client_when_not_provided(sample_sol
     client_ctor.assert_called_once_with(timeout=30.0)
     assert route.called
     assert closed
-    assert data == sample_solr_response
+    assert isinstance(data, SolrResponse)
+    assert data.response.numFound == sample_solr_response["response"]["numFound"]
 
 
 @pytest.mark.parametrize("use_shared_client", [True, False])
@@ -133,7 +136,7 @@ async def test_solr_query_respx_regression_guard(solr_mock, sample_solr_response
     data = await _solr_query({"q": "selinux"}, solr_endpoint=_SOLR_ENDPOINT)
 
     assert solr_mock.called
-    assert data["response"]["numFound"] == sample_solr_response["response"]["numFound"]
+    assert data.response.numFound == sample_solr_response["response"]["numFound"]
 
 
 @pytest.mark.parametrize(
@@ -174,8 +177,8 @@ def test_clean_query(input_query, expected):
 
 def test_get_highlight_snippets_preserves_individual_fragments():
     """_get_highlight_snippets returns cleaned highlight fragments without flattening them."""
-    data = {
-        "highlighting": {
+    data = SolrResponse(
+        highlighting={
             "doc-1": {
                 "main_content": [
                     "First <em>kernel</em> snippet.",
@@ -183,7 +186,7 @@ def test_get_highlight_snippets_preserves_individual_fragments():
                 ]
             }
         }
-    }
+    )
 
     snippets = _get_highlight_snippets(data, "doc-1", query="kernel panic")
 
@@ -192,12 +195,12 @@ def test_get_highlight_snippets_preserves_individual_fragments():
 
 def test_get_highlight_snippets_deduplicates_across_alias_keys():
     """_get_highlight_snippets deduplicates repeated fragments returned under multiple keys."""
-    data = {
-        "highlighting": {
+    data = SolrResponse(
+        highlighting={
             "doc-1": {"main_content": ["Repeated <em>snippet</em>."]},
             "/docs/doc-1": {"main_content": ["Repeated <em>snippet</em>.", "Unique snippet."]},
         }
-    }
+    )
 
     snippets = _get_highlight_snippets(data, "doc-1", "/docs/doc-1", query="snippet")
 
