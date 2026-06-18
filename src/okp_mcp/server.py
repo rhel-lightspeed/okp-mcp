@@ -68,6 +68,8 @@ mcp = FastMCP(
     middleware=[RequestIDContextMiddleware()],
 )
 
+from okp_mcp.tools import *  # noqa: F403, E402 -- register tools
+
 
 @mcp.custom_route("/metrics", methods=["GET"])
 async def metrics_endpoint(request: Request) -> Response:
