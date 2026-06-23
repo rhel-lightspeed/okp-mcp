@@ -457,7 +457,7 @@ spec:
           value: $(tasks.prefetch-dependencies.results.CACHI2_ARTIFACT)
 
         - name: ARGS
-          value: "--project-name=okp-mcp --report --org=12d05a23-73a7-4a1d-9162-ab12e8c051c4"
+          value: "--project-name=rhel-knowledge-base --report --org=12d05a23-73a7-4a1d-9162-ab12e8c051c4"
 
       runAfter:
         - build-image-index

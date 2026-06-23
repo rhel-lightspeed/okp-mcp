@@ -18,12 +18,12 @@ metadata:
   creationTimestamp: null
 
   labels:
-    appstudio.openshift.io/application: okp-mcp
-    appstudio.openshift.io/component: okp-mcp
+    appstudio.openshift.io/application: rhel-knowledge-base
+    appstudio.openshift.io/component: rhel-knowledge-base
     pipelines.appstudio.openshift.io/type: build
 
   namespace: rhel-lightspeed-tenant
-  name: okp-mcp-on-push
+  name: rhel-knowledge-base-on-push
 
 spec:
   params:
@@ -34,7 +34,7 @@ spec:
       value: '{{ revision }}'
 
     - name: output-image
-      value: quay.io/redhat-user-workloads/rhel-lightspeed-tenant/okp-mcp:{{ revision }}
+      value: quay.io/redhat-user-workloads/rhel-lightspeed-tenant/rhel-knowledge-base:{{ revision }}
 
     - name: dockerfile
       value: /Containerfile
@@ -57,7 +57,7 @@ spec:
     name: pipeline-build-multiarch
 
   taskRunTemplate:
-    serviceAccountName: build-pipeline-okp-mcp
+    serviceAccountName: build-pipeline-rhel-knowledge-base
 
   workspaces:
     - name: git-auth
