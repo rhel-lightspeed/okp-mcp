@@ -59,7 +59,9 @@ jobs:
           prune-cache: false
 
       - name: Install dependencies
-        run: uv sync --locked
+        run: |
+          uv sync --locked
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
 
       - name: ${{ matrix.test.step_name }}
         run: ${{ matrix.test.command }}
