@@ -34,7 +34,12 @@ fi
 # tools venv and builds the okp_mcp wheel with --no-build-isolation; none of
 # these reach the distroless runtime. hatchling's deps carry no win32-only
 # markers, so the Cachi2 prefetch enumerates the build manifest cleanly.
-BUILD_REQUIRE="$(grep -E '^\[build-system\]' -A 3 pyproject.toml | grep -E '^requires' | cut -d '=' -f 2 | tr -d '[:space:][:punct:]')"
+if [[ ! -x $(command -v tomcli) ]]; then
+  echo "Unable to find tomcli. Please install it."
+  exit 1
+fi
+
+BUILD_REQUIRE="$(tomcli get -F newline-list pyproject.toml build-system.requires)"
 if [[ -z $BUILD_REQUIRE ]]; then
   echo "ERROR: could not extract BUILD_REQUIRE from pyproject.toml build-system.requires" >&2
   exit 1
