@@ -21,8 +21,7 @@ repo_root="$(git rev-parse --show-toplevel)"
 cd "${repo_root}"
 mkdir -p "${KONFLUX_DIR}"
 
-BUILDER_IMAGE="$(awk '$1 == "FROM" && $NF == "builder" { print $2; exit }' Containerfile)"
-PYTHON_VERSION="$(printf '%s\n' "${BUILDER_IMAGE}" | grep -oP 'python:\K[0-9]+\.[0-9]+')"
+PYTHON_VERSION="$(grep -E '^FROM\s+.*python:[0-9]+\.[0-9]+' Containerfile | head -1 | grep -oE '[0-9]+\.[0-9]+')"
 if [ -z "${PYTHON_VERSION}" ]; then
   echo "ERROR: could not extract Python version from Containerfile builder image" >&2
   exit 1
