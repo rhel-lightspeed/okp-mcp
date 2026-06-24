@@ -813,6 +813,7 @@ dev = [
     { name = "radon" },
     { name = "respx" },
     { name = "ruff" },
+    { name = "tomcli" },
     { name = "ty" },
 ]
 
@@ -836,6 +837,7 @@ dev = [
     { name = "radon", specifier = ">=6.0.1" },
     { name = "respx", specifier = ">=0.23.1" },
     { name = "ruff", specifier = ">=0.15.14" },
+    { name = "tomcli" },
     { name = "ty", specifier = ">=0.0.39" },
 ]
 
@@ -895,7 +897,7 @@ name = "pexpect"
 version = "4.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "ptyprocess" },
+    { name = "ptyprocess", marker = "sys_platform != 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/42/92/cc564bf6381ff43ce1f4d06852fc19a2f11d180f23dc32d9588bee2f149d/pexpect-4.9.0.tar.gz", hash = "sha256:ee7d41123f3c9911050ea2c2dac107568dc43b2d3b0c7557a33212c398ead30f", size = 166450, upload-time = "2023-11-25T09:07:26.339Z" }
 wheels = [
@@ -1587,6 +1589,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/eb/e3/7c1dc7381d9f8ab7d854328ebfa884e62cb3f3d8549ddfd37c7814f42afa/starlette-1.3.1.tar.gz", hash = "sha256:05d0213193f2fbaae60e2ecb593b4add4262ad4e46536b54abe36f11a71724e0", size = 2703240, upload-time = "2026-06-12T09:23:11.602Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ec/bb/2799cc2ede3ed41131f8975621e7213dfc7ef4acbbaadfa440f32500c370/starlette-1.3.1-py3-none-any.whl", hash = "sha256:c7372aae11c3c3f26a42df7bd626cec2f47d03483d261d369516a615a53714c6", size = 73632, upload-time = "2026-06-12T09:23:10.017Z" },
+]
+
+[[package]]
+name = "tomcli"
+version = "0.10.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "click" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/27/de/d8dcb1700bc8339b93f2efd3b6ba1c0e990262ae2da51516424e2453e466/tomcli-0.10.1.tar.gz", hash = "sha256:0a27c685620b10a0f389b1d55dc66ea904054b178176d41440de55d296e1109d", size = 36096, upload-time = "2025-07-31T23:39:42.896Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/37/c6/d1316f907207ea3a5081175c37d04a7ebbe343247b73e213dc96fb2cb26f/tomcli-0.10.1-py3-none-any.whl", hash = "sha256:c6cb59a795544b291d001faa452039b10cc37f4395d168b16c79d1ec13b64bfc", size = 20998, upload-time = "2025-07-31T23:39:41.697Z" },
 ]
 
 [[package]]
