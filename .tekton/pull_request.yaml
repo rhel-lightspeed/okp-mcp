@@ -13,12 +13,12 @@ metadata:
   creationTimestamp: null
 
   labels:
-    appstudio.openshift.io/application: rhel-knowledge-base
-    appstudio.openshift.io/component: rhel-knowledge-base
+    appstudio.openshift.io/application: rhel-knowledge-bridge
+    appstudio.openshift.io/component: rhel-knowledge-bridge
     pipelines.appstudio.openshift.io/type: build
 
   namespace: rhel-lightspeed-tenant
-  name: rhel-knowledge-base-on-pull-request
+  name: rhel-knowledge-bridge-on-pull-request
 
 spec:
   params:
@@ -29,7 +29,7 @@ spec:
       value: '{{ revision }}'
 
     - name: output-image
-      value: quay.io/redhat-user-workloads/rhel-lightspeed-tenant/rhel-knowledge-base:pr-{{ pull_request_number }}-latest
+      value: quay.io/redhat-user-workloads/rhel-lightspeed-tenant/rhel-knowledge-bridge:pr-{{ pull_request_number }}-latest
 
     - name: dockerfile
       value: /Containerfile
@@ -54,7 +54,7 @@ spec:
     name: pipeline-build-multiarch
 
   taskRunTemplate:
-    serviceAccountName: build-pipeline-rhel-knowledge-base
+    serviceAccountName: build-pipeline-rhel-knowledge-bridge
 
   workspaces:
     - name: git-auth
