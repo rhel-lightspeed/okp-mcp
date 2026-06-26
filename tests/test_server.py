@@ -162,20 +162,6 @@ async def test_app_context_has_solr_endpoint():
         assert app_context.solr_endpoint == "http://localhost:8983/solr/portal/select"
 
 
-def test_server_config_assignment_propagates_to_lifespan():
-    """Direct _server_config assignment is picked up by the lifespan."""
-    from okp_mcp import server as server_module
-    from okp_mcp.config import ServerConfig
-
-    original = server_module._server_config
-    try:
-        cfg = ServerConfig()
-        server_module._server_config = cfg
-        assert server_module._server_config is cfg
-    finally:
-        server_module._server_config = original
-
-
 def test_request_id_log_filter_uses_context_var():
     """Log filter injects the active request ID into records."""
     log_filter = RequestIDLogFilter()
