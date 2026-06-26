@@ -36,7 +36,6 @@ class AppContext:
 @asynccontextmanager
 async def _app_lifespan(server: FastMCP) -> AsyncIterator[dict[str, AppContext]]:
     """Manage app lifecycle resources for tool execution."""
-    del server
     solr_endpoint = CONFIG.solr_endpoint
     max_response_chars = CONFIG.max_response_chars
     logger.info("SOLR endpoint: %s", solr_endpoint)
@@ -71,5 +70,4 @@ from okp_mcp.tools import *  # noqa: F403, E402 -- register tools
 @mcp.custom_route("/metrics", methods=["GET"])
 async def metrics_endpoint(request: Request) -> Response:
     """Expose Prometheus metrics for scraping."""
-    del request
     return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
