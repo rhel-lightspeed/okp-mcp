@@ -1,6 +1,7 @@
 """Server configuration via MCP_* environment variables and CLI arguments."""
 
 import logging
+import sys
 
 from enum import StrEnum
 
@@ -111,6 +112,9 @@ class ServerConfig(BaseSettings):
         cli_prog_name="okp-mcp",
         cli_hide_none_type=True,
         cli_kebab_case=True,
+        # Only parse CLI args when running okp-mcp from the command line,
+        # not when importing the module.
+        cli_parse_args=sys.argv[0].endswith("okp-mcp"),
     )
 
     transport: Transport = Field(
@@ -161,3 +165,6 @@ class ServerConfig(BaseSettings):
             ]
 
         return result
+
+
+CONFIG = ServerConfig()

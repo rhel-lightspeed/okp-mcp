@@ -17,13 +17,11 @@ from prometheus_client import generate_latest
 from starlette.requests import Request
 from starlette.responses import Response
 
-from okp_mcp.config import ServerConfig
+from okp_mcp.config import CONFIG
 from okp_mcp.request_id import RequestIDContextMiddleware
 
 
 logger = logging.getLogger(__name__)
-
-_server_config: ServerConfig | None = None
 
 
 @dataclass
@@ -39,9 +37,8 @@ class AppContext:
 async def _app_lifespan(server: FastMCP) -> AsyncIterator[dict[str, AppContext]]:
     """Manage app lifecycle resources for tool execution."""
     del server
-    cfg = _server_config if _server_config is not None else ServerConfig()
-    solr_endpoint = cfg.solr_endpoint
-    max_response_chars = cfg.max_response_chars
+    solr_endpoint = CONFIG.solr_endpoint
+    max_response_chars = CONFIG.max_response_chars
     logger.info("SOLR endpoint: %s", solr_endpoint)
     client = httpx.AsyncClient(timeout=30.0)
     try:
