@@ -110,6 +110,7 @@ class ServerConfig(BaseSettings):
         env_prefix="MCP_",
         cli_prog_name="okp-mcp",
         cli_hide_none_type=True,
+        cli_kebab_case=True,
     )
 
     transport: Transport = Field(

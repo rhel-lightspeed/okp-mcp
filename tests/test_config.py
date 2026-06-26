@@ -72,7 +72,7 @@ def test_cli_args_via_cli_app():
             "127.0.0.1",
             "--port",
             "3000",
-            "--glitchtip_dsn",
+            "--glitchtip-dsn",
             "https://example.com/1",
         ],
     )
