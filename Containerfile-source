@@ -20,6 +20,13 @@ COPY src/ ${UV_PROJECT}/src/
 
 WORKDIR ${UV_PROJECT}
 
+# Product Security requirement: build all wheels from source instead of manylinux.
+# Requires root to install C/Rust toolchains before dropping back to non-root.
+USER root
+RUN dnf install -y gcc gcc-c++ python3.12-devel openssl-devel rust cargo pkg-config libffi-devel \
+    && dnf clean all
+USER 65532
+
 # Install into a venv at a fixed path so the distroless runtime can copy it
 # whole. Two install paths, one app-venv location:
 #
@@ -48,11 +55,11 @@ WORKDIR ${UV_PROJECT}
 RUN if [ -f /cachi2/cachi2.env ]; then \
         . /cachi2/cachi2.env \
         && python3 -m venv "${VENVS}/build" \
-        && "${VENVS}/build/bin/pip" install --no-cache-dir --only-binary=:all: --require-hashes \
+        && "${VENVS}/build/bin/pip" install --no-cache-dir --no-binary=:all: --require-hashes \
             -r .konflux/requirements-build.txt \
         && "${VENVS}/build/bin/pip" wheel --no-cache-dir --no-build-isolation --no-deps . -w "${HOME}/wheels" \
         && python3 -m venv "${UV_PROJECT_ENVIRONMENT}" \
-        && "${UV_PROJECT_ENVIRONMENT}/bin/pip" install --no-cache-dir --only-binary=:all: --require-hashes \
+        && "${UV_PROJECT_ENVIRONMENT}/bin/pip" install --no-cache-dir --no-binary=:all: --require-hashes \
             -r .konflux/requirements.txt \
         && "${UV_PROJECT_ENVIRONMENT}/bin/pip" install --no-cache-dir --no-deps --no-index \
             --find-links "${HOME}/wheels" okp_mcp \
@@ -61,7 +68,7 @@ RUN if [ -f /cachi2/cachi2.env ]; then \
         python3 -m venv "${VENVS}/tools" \
         && "${VENVS}/tools/bin/python" -m pip install --no-cache-dir uv==0.11.14 \
         && uv venv --seed "${UV_PROJECT_ENVIRONMENT}" \
-        && uv sync --locked --no-cache --no-dev --no-editable; \
+        && uv sync --locked --no-cache --no-dev --no-editable --no-binary; \
     fi
 
 # Stage 2: Runtime - distroless Red Hat Hardened Image (no shell, no package manager).
