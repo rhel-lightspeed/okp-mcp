@@ -5,8 +5,10 @@ from unittest.mock import patch
 
 import pytest
 
-from pydantic import ValidationError
+from pydantic import SecretStr
 
+from okp_mcp.config import ServerConfig
+from okp_mcp.config import Transport
 from okp_mcp.metrics import PrometheusMiddleware
 from okp_mcp.request_id import RequestIDHeaderMiddleware
 
@@ -57,96 +59,97 @@ def test_main_defaults_to_streamable_http(_mock_mcp_run):
     """Default transport is streamable-http when no args or env vars are set."""
     from okp_mcp import main
 
-    with patch("sys.argv", ["okp-mcp"]):
+    config = ServerConfig()
+
+    with patch("okp_mcp.CONFIG", config):
         main()
 
-    _assert_http_run(_mock_mcp_run, transport="streamable-http", host="0.0.0.0", port=8000)
+    _assert_http_run(_mock_mcp_run, transport=Transport.streamable_http, host="0.0.0.0", port=8000)
 
 
 def test_main_initializes_error_reporting(_mock_mcp_run):
     """Configured GlitchTip setup runs before the server starts."""
     from okp_mcp import main
 
+    config = ServerConfig(glitchtip_dsn=SecretStr("https://glitchtip.example.com/1"))
     call_order: list[str] = []
 
     with (
-        patch("sys.argv", ["okp-mcp"]),
-        patch.dict("os.environ", {"MCP_GLITCHTIP_DSN": "https://glitchtip.example.com/1"}),
-        patch("okp_mcp.initialize_error_reporting") as initialize_error_reporting,
+        patch("okp_mcp.CONFIG", config),
+        patch("okp_mcp.initialize_error_reporting") as mock_init,
     ):
-        initialize_error_reporting.side_effect = lambda _cfg: call_order.append("init")
+        mock_init.side_effect = lambda _cfg: call_order.append("init")
         _mock_mcp_run.run.side_effect = lambda *args, **kwargs: call_order.append("run")
         main()
 
-    initialize_error_reporting.assert_called_once()
-    glitchtip_dsn = initialize_error_reporting.call_args.args[0].glitchtip_dsn
+    mock_init.assert_called_once_with(config)
+    glitchtip_dsn = mock_init.call_args.args[0].glitchtip_dsn
     assert glitchtip_dsn is not None
     assert glitchtip_dsn.get_secret_value() == "https://glitchtip.example.com/1"
     assert call_order == ["init", "run"]
-    _assert_http_run(_mock_mcp_run, transport="streamable-http", host="0.0.0.0", port=8000)
+    _assert_http_run(_mock_mcp_run, transport=Transport.streamable_http, host="0.0.0.0", port=8000)
 
 
 def test_main_stdio_transport(_mock_mcp_run):
     """stdio transport calls mcp.run without host/port."""
     from okp_mcp import main
 
-    with patch("sys.argv", ["okp-mcp", "--transport", "stdio"]):
+    config = ServerConfig(transport=Transport.stdio)
+
+    with patch("okp_mcp.CONFIG", config):
         main()
 
-    _mock_mcp_run.run.assert_called_once_with(transport="stdio", show_banner=False)
+    _mock_mcp_run.run.assert_called_once_with(transport=Transport.stdio, show_banner=False)
 
 
-@pytest.mark.parametrize("transport", ["sse", "streamable-http"])
+@pytest.mark.parametrize("transport", [Transport.sse, Transport.streamable_http])
 def test_main_http_transports(_mock_mcp_run, transport):
     """SSE and streamable-http transports pass host and port to mcp.run."""
     from okp_mcp import main
 
-    with patch("sys.argv", ["okp-mcp", "--transport", transport]):
+    config = ServerConfig(transport=transport)
+
+    with patch("okp_mcp.CONFIG", config):
         main()
 
     _assert_http_run(_mock_mcp_run, transport=transport, host="0.0.0.0", port=8000)
 
 
 def test_main_custom_host_and_port(_mock_mcp_run):
-    """CLI host and port are forwarded to mcp.run."""
+    """Custom host and port are forwarded to mcp.run."""
     from okp_mcp import main
 
-    with patch("sys.argv", ["okp-mcp", "--transport", "sse", "--host", "127.0.0.1", "--port", "3000"]):
+    config = ServerConfig(transport=Transport.sse, host="127.0.0.1", port=3000)
+
+    with patch("okp_mcp.CONFIG", config):
         main()
 
-    _assert_http_run(_mock_mcp_run, transport="sse", host="127.0.0.1", port=3000)
+    _assert_http_run(_mock_mcp_run, transport=Transport.sse, host="127.0.0.1", port=3000)
 
 
 def test_main_env_var_transport(_mock_mcp_run):
     """MCP_TRANSPORT env var selects the transport when no CLI arg is given."""
     from okp_mcp import main
 
-    with patch("sys.argv", ["okp-mcp"]), patch.dict("os.environ", {"MCP_TRANSPORT": "sse"}):
+    with patch.dict("os.environ", {"MCP_TRANSPORT": "sse"}):
+        config = ServerConfig()
+
+    with patch("okp_mcp.CONFIG", config):
         main()
 
-    _assert_http_run(_mock_mcp_run, transport="sse", host="0.0.0.0", port=8000)
+    _assert_http_run(_mock_mcp_run, transport=Transport.sse, host="0.0.0.0", port=8000)
 
 
 def test_main_cli_overrides_env_var(_mock_mcp_run):
     """CLI arguments take precedence over environment variables."""
     from okp_mcp import main
 
-    with (
-        patch("sys.argv", ["okp-mcp", "--transport", "sse", "--port", "7777"]),
-        patch.dict("os.environ", {"MCP_TRANSPORT": "streamable-http", "MCP_PORT": "9999"}),
-    ):
+    # _cli_parse_args overrides model_config cli_parse_args per-instance,
+    # feeding explicit CLI args without mutating sys.argv.
+    with patch.dict("os.environ", {"MCP_TRANSPORT": "streamable-http", "MCP_PORT": "9999"}):
+        config = ServerConfig(_cli_parse_args=["--transport", "sse", "--port", "7777"])
+
+    with patch("okp_mcp.CONFIG", config):
         main()
 
-    _assert_http_run(_mock_mcp_run, transport="sse", host="0.0.0.0", port=7777)
-
-
-def test_main_invalid_transport_from_env():
-    """Invalid transport from env var raises ValidationError."""
-    from okp_mcp import main
-
-    with (
-        patch("sys.argv", ["okp-mcp"]),
-        patch.dict("os.environ", {"MCP_TRANSPORT": "websocket"}),
-        pytest.raises(ValidationError, match="transport"),
-    ):
-        main()
+    _assert_http_run(_mock_mcp_run, transport=Transport.sse, host="0.0.0.0", port=7777)

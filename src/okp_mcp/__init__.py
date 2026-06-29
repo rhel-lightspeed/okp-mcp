@@ -3,12 +3,9 @@
 import logging
 import sys
 
-from pydantic_settings import CliApp
-
-from okp_mcp import server as _server
 from okp_mcp.build_info import get_commit_sha
 from okp_mcp.build_info import get_package_version
-from okp_mcp.config import ServerConfig
+from okp_mcp.config import CONFIG
 from okp_mcp.request_id import RequestIDLogFilter
 from okp_mcp.server import mcp
 from okp_mcp.telemetry import initialize_error_reporting
@@ -44,19 +41,17 @@ def main() -> None:
     CLI arguments take precedence over environment variables.
     Run ``okp-mcp --help`` for available options.
     """
-    config = CliApp.run(ServerConfig)
-    _server._server_config = config
-    _configure_logging(config.log_level)
+    _configure_logging(CONFIG.log_level)
     try:
-        initialize_error_reporting(config)
+        initialize_error_reporting(CONFIG)
     except Exception:
         logger.warning("Failed to initialize error reporting; continuing without it", exc_info=True)
 
     logger.info("okp-mcp %s (%s)", get_package_version(), get_commit_sha())
-    logger.info("Starting MCP server with transport=%s", config.transport)
+    logger.info("Starting MCP server with transport=%s", CONFIG.transport)
 
     try:
-        mcp.run(transport=config.transport.value, show_banner=False, **config.transport_kwargs)
+        mcp.run(transport=CONFIG.transport.value, show_banner=False, **CONFIG.transport_kwargs)
     except KeyboardInterrupt:
         logger.info("Shutting down okp-mcp")
         sys.exit()
