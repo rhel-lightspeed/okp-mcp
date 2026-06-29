@@ -20,6 +20,10 @@ set -euo pipefail
 if [ "${BUILD_FROM_SOURCE:-0}" = "1" ]; then
     PIP_BINARY_FLAG="--no-binary=:all:"
     UV_BINARY_FLAG="--no-binary"
+    export CMAKE_BUILD_PARALLEL_LEVEL="$(nproc)"
+    export MAX_JOBS="$(nproc)"
+    export CARGO_BUILD_JOBS="$(nproc)"
+    export MAKEFLAGS="-j$(nproc)"
 else
     PIP_BINARY_FLAG="--only-binary=:all:"
     UV_BINARY_FLAG=""
