@@ -22,8 +22,8 @@ spec:
       description: List of platforms to build the container images on. The available set of values is determined by the configuration of the multi-platform-controller.
       type: array
       default:
-        - linux/arm64
-        - linux/amd64
+        - linux-c4xlarge/arm64
+        - linux-c4xlarge/amd64
 
     - name: path-context
       description: Path to the source code of an application's component from where to build image.
