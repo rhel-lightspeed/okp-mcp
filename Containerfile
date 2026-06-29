@@ -1,13 +1,14 @@
-# Stage 1: Builder - Red Hat Hardened Image (Project Hummingbird) with shell + dnf.
-# Pinned to a digest for reproducibility; resolves to Python 3.12.13.
-FROM registry.access.redhat.com/hi/python:3.12-builder@sha256:3d37bf07a9b663ac561e94dab30d771d0cb4a1dffbcd6aa4785af1d9b6bc5848 AS builder
+# Stage 1: Builder - UBI 10 base image with shell + dnf.
+# Pinned to a digest for reproducibility.
+FROM registry.access.redhat.com/ubi10/ubi:latest@sha256:516ef28e78e388d12e31618326da68e21dcfc40f767f0c37c3b57059c642a4f0 AS builder
 
-# Build entirely as the image's non-root user (UID 65532). HOME is owned by that
-# user, so no root escalation is needed. The whole app venv is copied into the
-# distroless runtime stage.
-ENV VENVS=${HOME}/.venvs
-ENV PATH=${VENVS}/tools/bin:${PATH}
-ENV UV_PROJECT=${HOME}/build
+# Install Python 3.12 and pip. The UBI base image has dnf but no Python.
+RUN dnf install -y python3.12 python3.12-pip && dnf clean all
+
+# Venv path uses the runtime image's HOME (/opt/app-root/src) so console-script
+# shebangs (which bake an absolute interpreter path) stay valid across stages.
+ENV VENVS=/opt/app-root/src/.venvs
+ENV UV_PROJECT=/build
 ENV UV_PROJECT_ENVIRONMENT=${VENVS}/okp-mcp
 ENV UV_PYTHON=/usr/bin/python3
 
@@ -26,8 +27,8 @@ WORKDIR ${UV_PROJECT}
 # BUILD_FROM_SOURCE is unset here → uses prebuilt manylinux wheels (fast).
 RUN scripts/container-install.sh
 
-# Stage 2: Runtime - distroless Red Hat Hardened Image (no shell, no package manager).
-FROM registry.access.redhat.com/hi/python:3.12@sha256:227cd08bc68a2fb2d79ed21d198c5dad0d130238feb4088881670296902c2754 AS runtime
+# Stage 2: Runtime - UBI 10 Python 3.12 Minimal (has shell, microdnf, python3.12).
+FROM registry.access.redhat.com/ubi10/python-312-minimal:latest@sha256:c060604f820e6aed184f2b61aeed8faddb5c60344b2cf6e4c6e4e478196d729e AS runtime
 
 LABEL com.redhat.component=okp-mcp
 LABEL description="MCP server for the RHEL Offline Knowledge Portal"
@@ -36,17 +37,15 @@ LABEL summary="OKP MCP Server"
 LABEL vendor="Red Hat, Inc."
 
 # Copy the dependency venv from the builder stage. It keeps the SAME path it was
-# created at in the builder, so console-script shebangs (which bake an absolute
-# interpreter path) stay valid without rewriting. All runtime dependencies are
-# pure Python (no C/C++ extensions), so the distroless image needs no extra
-# shared libraries.
-COPY --from=builder ${HOME}/.venvs/okp-mcp ${HOME}/.venvs/okp-mcp
+# created at in the builder, so console-script shebangs stay valid without
+# rewriting.
+COPY --from=builder /opt/app-root/src/.venvs/okp-mcp /opt/app-root/src/.venvs/okp-mcp
 
 # License required by Red Hat preflight certification.
 COPY LICENSE /licenses/LICENSE
 
 # Put the venv on PATH so its console scripts and interpreter resolve first.
-ENV PATH=${HOME}/.venvs/okp-mcp/bin:${PATH}
+ENV PATH=/opt/app-root/src/.venvs/okp-mcp/bin:${PATH}
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 
@@ -65,13 +64,12 @@ ENV MCP_PORT=8000
 
 EXPOSE 8000
 
-# Distroless-safe liveness probe (no shell required): exec-form TCP connect to
-# the listening port using the venv interpreter.
+# Liveness probe: exec-form TCP connect to the listening port.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD ["python", "-c", "import os,socket,sys; p=int(os.getenv('MCP_PORT','8000')); s=socket.socket(); s.settimeout(3); sys.exit(0 if s.connect_ex(('127.0.0.1', p)) == 0 else 1)"]
 
-# Run as the image's non-root user (UID 65532).
-USER 65532
+# Run as the image's non-root user (UID 1001).
+USER 1001
 
 # Relative path: the runtime resolves this against PATH via execvp.
 ENTRYPOINT ["okp-mcp"]
