@@ -112,3 +112,8 @@ order-by-type = false
 
 [tool.ty.environment]
 python-version = "3.12"
+
+[tool.uv]
+override-dependencies = [
+    "pyjwt>=2.13.0",
+]
