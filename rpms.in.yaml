@@ -1,0 +1,25 @@
+# Build-toolchain RPMs prefetched by Hermeto for hermetic Konflux builds.
+# Containerfile-source compiles all Python wheels from source, which needs a
+# C/Rust toolchain that the distroless-ish hi/python:3.12-builder base image
+# does not ship. In hermetic mode every RUN is network-isolated, so these RPMs
+# must be prefetched. Regenerate rpms.lock.yaml after editing this file:
+#   make rpm-lock
+packages:
+  - gcc
+  - gcc-c++
+  - python3.12-devel
+  - openssl-devel
+  - rust
+  - cargo
+  - pkg-config
+  - libffi-devel
+contentOrigin:
+  repos:
+    # Mirrors the public-hummingbird repo configured in the builder image
+    # (/etc/yum.repos.d/hummingbird.repo). $basearch resolves per target arch.
+    - repoid: public-hummingbird-rpms
+      baseurl: https://koji-s3-cache.hummingbird-project.io/packages.redhat.com/api/pulp-content/public-hummingbird/$basearch/
+arches:
+  - x86_64
+  - aarch64
+installWeakDeps: false

@@ -12,9 +12,10 @@ ENV UV_PROJECT_ENVIRONMENT=${VENVS}/okp-mcp
 ENV UV_PYTHON=/usr/bin/python3
 
 # Copy dependency files first for layer caching. .konflux holds the
-# hash-pinned manifests Cachi2 prefetches for hermetic builds; they are
-# generated from uv.lock by scripts/konflux_requirements.sh.
-COPY pyproject.toml uv.lock README.md ${UV_PROJECT}/
+# hash-pinned Python manifests Hermeto prefetches for hermetic builds; they are
+# generated from uv.lock by scripts/konflux_requirements.sh. rpms.lock.yaml
+# pins the build-toolchain RPMs Hermeto prefetches (see rpms.in.yaml).
+COPY pyproject.toml uv.lock README.md rpms.lock.yaml ${UV_PROJECT}/
 COPY .konflux/ ${UV_PROJECT}/.konflux/
 COPY src/ ${UV_PROJECT}/src/
 COPY --chmod=0755 scripts/container-install.sh ${UV_PROJECT}/scripts/
@@ -26,7 +27,18 @@ WORKDIR ${UV_PROJECT}
 USER root
 RUN <<EORUN
 set -euo pipefail
-dnf install -y gcc gcc-c++ python3.12-devel openssl-devel rust cargo pkg-config libffi-devel
+# In hermetic Konflux builds these toolchain RPMs are prefetched by Hermeto
+# (rpms.in.yaml / rpms.lock.yaml) and Konflux injects a file:// repo
+# (repoid public-hummingbird-rpms) into /etc/yum.repos.d. The base image's
+# original repo points at a network URL that is unreachable under --network
+# none, so restrict dnf to the prefetched repo. The RPMs are signed with the
+# Red Hat release key already in the image's rpmdb, so gpgcheck still passes.
+# Local non-hermetic builds keep the image's network repos.
+dnf_args=()
+if [ -f /cachi2/cachi2.env ]; then
+    dnf_args=(--disablerepo='*' --enablerepo='public-hummingbird-rpms')
+fi
+dnf install -y "${dnf_args[@]}" gcc gcc-c++ python3.12-devel openssl-devel rust cargo pkg-config libffi-devel
 dnf clean all
 EORUN
 USER 65532

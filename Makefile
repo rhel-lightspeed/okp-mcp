@@ -1,4 +1,4 @@
-.PHONY: fix lint format typecheck radon test ci setup konflux-requirements check-konflux-requirements
+.PHONY: fix lint format typecheck radon test ci setup konflux-requirements check-konflux-requirements rpm-lock hermeto-prefetch hermeto-clean
 
 fix:
 	uv run --locked ruff check --fix
@@ -39,3 +39,31 @@ check-konflux-requirements:
 setup:
 	uv sync --locked --group dev
 	pre-commit install
+# Run Hermeto locally to validate sdist-only prefetch (no binary annotations).
+# Requires podman. Output lands in .hermeto-out/ (gitignored).
+# The extra GIT_COMMON_DIR mount handles git worktrees: .git is a file pointing
+# to the main repo, so Hermeto needs both paths visible inside the container.
+HERMETO_IMAGE ?= ghcr.io/hermetoproject/hermeto:0.56.0
+hermeto-prefetch:
+	GIT_COMMON=$$(cd "$$(git rev-parse --git-common-dir)" && pwd -P) && \
+	podman run --rm \
+	  -v "$$(pwd):$$(pwd):z" \
+	  -v "$$GIT_COMMON:$$GIT_COMMON:z" \
+	  -w "$$(pwd)" \
+	  $(HERMETO_IMAGE) fetch-deps \
+	  --source . --output ./.hermeto-out \
+	  '[{"type": "pip", "path": ".", "requirements_files": [".konflux/requirements.txt"], "requirements_build_files": [".konflux/requirements-build.txt", ".konflux/requirements-build-pypi.txt"]}, {"type": "rpm", "path": "."}]'
+
+hermeto-clean:
+	rm -rf .hermeto-out/
+
+# Regenerate rpms.lock.yaml from rpms.in.yaml against the Containerfile-source
+# builder image. Resolves the build-toolchain RPM tree for every target arch so
+# Hermeto can prefetch them for hermetic builds. Requires podman; the builder
+# digest is read straight from Containerfile-source to avoid duplication.
+# RLP_IMAGE defaults to the Konflux tool image (needs `podman login quay.io`).
+RLP_IMAGE ?= quay.io/konflux-ci/rpm-lockfile-prototype:latest
+rpm-lock:
+	BUILDER=$$(grep -oE 'registry.access.redhat.com/hi/python:3.12-builder@sha256:[a-f0-9]+' Containerfile-source | head -1) && \
+	podman run --rm -v "$$(pwd):/work:z" -w /work \
+	  $(RLP_IMAGE) --image "$$BUILDER" rpms.in.yaml

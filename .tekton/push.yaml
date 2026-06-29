@@ -50,14 +50,13 @@ spec:
       value: /Containerfile-source
 
     - name: hermetic
-      value: "false"
+      value: "true"
 
-    # Empty prefetch-input disables Cachi2/hermeto prefetch entirely. The
-    # prefetch-dependencies task keys off this input, not the hermetic flag, so
-    # leaving it populated would still stamp hermeto:pip:package:binary=true
-    # into the SBOM and trip Conforma's disallowed_package_attributes rule.
+    # Hermeto prefetch: pip sdists (no binary field = no binary SBOM annotations)
+    # plus the build-toolchain RPMs (rpms.lock.yaml). hermetic builds compile
+    # every wheel from source, so the network is fully isolated.
     - name: prefetch-input
-      value: ""
+      value: '[{"type": "pip", "path": ".", "requirements_files": [".konflux/requirements.txt"], "requirements_build_files": [".konflux/requirements-build.txt", ".konflux/requirements-build-pypi.txt"]}, {"type": "rpm", "path": "."}]'
 
     - name: additional-tags
       value:
