@@ -138,6 +138,7 @@ jobs:
           file: Containerfile
           platforms: linux/${{ matrix.platform }}
           load: true
+          provenance: false
           tags: okp-mcp:test-${{ matrix.platform }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -145,7 +146,7 @@ jobs:
       - name: Test container startup
         run: |
           docker run --rm -d -p 8000:8000 --name okp-mcp-test okp-mcp:test-${{ matrix.platform }}
-          
+
           for i in {1..30}; do
             STATUS=$(docker inspect -f '{{.State.Health.Status}}' okp-mcp-test 2>/dev/null || echo "missing")
             if [ "$STATUS" = "healthy" ]; then
@@ -158,7 +159,7 @@ jobs:
             fi
             sleep 2
           done
-          
+
           echo "Container failed to become healthy. Logs:"
           docker logs okp-mcp-test
           docker stop okp-mcp-test
