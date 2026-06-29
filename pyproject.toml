@@ -6,9 +6,9 @@ readme = "README.md"
 authors = [{ name = "Major Hayden", email = "major@redhat.com" }]
 requires-python = ">=3.12"
 dependencies = [
-    "fastmcp-slim>=3.4.2",
+    "fastmcp-slim[server]>=3.4.2",
     "httpx",
-    "mcp>=1.28.1",
+    "mcp>=1.28.1,<2",
     "prometheus_client>=0.25.0",
     "pydantic-settings>=2.14.1",
     "sentry-sdk[httpx]>=2.60.0",
