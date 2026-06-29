@@ -104,7 +104,7 @@ jobs:
 
 
   build:
-    name: Build
+    name: Build - ${{ matrix.platform }}
 
     needs:
       - sanity
@@ -113,51 +113,53 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - amd64
+          - arm64
 
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@53851d14592bedcffcf25ea515637c74fffb14ce # v3.3.0
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
 
-      - name: Log in to GHCR
-        if: github.event_name == 'push'
-        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Create dev tag
-        if: github.ref == 'refs/heads/main'
-        run: |
-          echo "DEV_TAG=dev-$(date +%Y%m%d)-$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
-
-      - name: Extract metadata
-        if: github.event_name == 'push'
-        uses: docker/metadata-action@80c7e94dd9b9319bd5eb7a0e0fe9291e23a2a2e9 # v6.1.0
-        id: meta
-        with:
-          images: ghcr.io/${{ github.repository }}
-          tags: |
-            type=ref,event=branch
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha
-            type=raw,value=${{ env.DEV_TAG }},enable=${{ github.ref == 'refs/heads/main' }}
-            type=raw,value=dev-latest,enable=${{ github.ref == 'refs/heads/main' }}
-
-      - name: Build and push
+      - name: Build and load
         uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
         with:
           context: .
           file: Containerfile
-          push: ${{ github.event_name == 'push' }}
-          # On PRs the metadata step is skipped, so tags/labels are empty
-          # (build-only, nothing to tag)
-          tags: ${{ steps.meta.outputs.tags || '' }}
-          labels: ${{ steps.meta.outputs.labels || '' }}
+          platforms: linux/${{ matrix.platform }}
+          load: true
+          tags: okp-mcp:test-${{ matrix.platform }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Test container startup
+        run: |
+          docker run --rm -d -p 8000:8000 --name okp-mcp-test okp-mcp:test-${{ matrix.platform }}
+          
+          for i in {1..30}; do
+            STATUS=$(docker inspect -f '{{.State.Health.Status}}' okp-mcp-test 2>/dev/null || echo "missing")
+            if [ "$STATUS" = "healthy" ]; then
+              echo "Container is healthy!"
+              docker stop okp-mcp-test
+              exit 0
+            elif [ "$STATUS" = "unhealthy" ]; then
+              echo "Container healthcheck failed!"
+              break
+            fi
+            sleep 2
+          done
+          
+          echo "Container failed to become healthy. Logs:"
+          docker logs okp-mcp-test
+          docker stop okp-mcp-test
+          exit 1
