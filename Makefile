@@ -39,3 +39,21 @@ check-konflux-requirements:
 setup:
 	uv sync --locked --group dev
 	pre-commit install
+
+# Run Hermeto locally to validate sdist-only prefetch (no binary annotations).
+# Requires podman. Output lands in .hermeto-out/ (gitignored).
+# The extra GIT_COMMON_DIR mount handles git worktrees: .git is a file pointing
+# to the main repo, so Hermeto needs both paths visible inside the container.
+HERMETO_IMAGE ?= ghcr.io/hermetoproject/hermeto:0.56.0
+hermeto-prefetch:
+	GIT_COMMON=$$(cd "$$(git rev-parse --git-common-dir)" && pwd -P) && \
+	podman run --rm \
+	  -v "$$(pwd):$$(pwd):z" \
+	  -v "$$GIT_COMMON:$$GIT_COMMON:z" \
+	  -w "$$(pwd)" \
+	  $(HERMETO_IMAGE) fetch-deps \
+	  --source . --output ./.hermeto-out \
+	  '{"type": "pip", "path": ".", "requirements_files": [".konflux/requirements.txt"], "requirements_build_files": [".konflux/requirements-build.txt"]}'
+
+hermeto-clean:
+	rm -rf .hermeto-out/
