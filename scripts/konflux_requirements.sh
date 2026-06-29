@@ -1,15 +1,15 @@
 #!/bin/bash
 # Regenerate the Cachi2-consumable dependency manifests for hermetic Konflux builds.
 #
-# uv.lock stays the single source of truth. These manifests are generated
+# pdm.lock stays the single source of truth. These manifests are generated
 # artifacts derived from it:
-#   .konflux/requirements.txt        runtime deps (hash-pinned, from uv.lock)
+#   .konflux/requirements.txt        runtime deps (hash-pinned, from pdm.lock)
 #   .konflux/requirements-build.txt  build backend (hatchling, hash-pinned)
 #
 # The hermetic build (Cachi2 type:pip) prefetches these; the Containerfile
-# installs from the offline mirror. Local/dev builds still use `uv sync`.
+# installs from the offline mirror. Local/dev builds use `pdm install`.
 #
-# Run this whenever uv.lock or the build-system requirement changes, then
+# Run this whenever pdm.lock or the build-system requirement changes, then
 # commit the regenerated files. CI verifies they are in sync (see Makefile).
 set -euo pipefail
 
@@ -21,19 +21,12 @@ repo_root="$(git rev-parse --show-toplevel)"
 cd "${repo_root}"
 mkdir -p "${KONFLUX_DIR}"
 
-PYTHON_VERSION="$(grep -E '^FROM\s+.*python:[0-9]+\.[0-9]+' Containerfile | head -1 | grep -oE '[0-9]+\.[0-9]+')"
-if [ -z "${PYTHON_VERSION}" ]; then
-  echo "ERROR: could not extract Python version from Containerfile builder image" >&2
-  exit 1
-fi
-
 # Build-system requirement, parsed from pyproject.toml so it never drifts.
-# hatchling is a pure-Python backend; uv pip compile resolves it plus its build
+# hatchling is a pure-Python backend; pip-compile resolves it plus its build
 # deps (packaging, pathspec, pluggy, trove-classifiers) to hash-pinned wheels.
 # The hermetic build installs them wheel-only (--only-binary) into a throwaway
 # tools venv and builds the okp_mcp wheel with --no-build-isolation; none of
-# these reach the distroless runtime. hatchling's deps carry no win32-only
-# markers, so the Cachi2 prefetch enumerates the build manifest cleanly.
+# these reach the distroless runtime.
 if [[ ! -x $(command -v tomcli) ]]; then
   echo "Unable to find tomcli. Please install it."
   exit 1
@@ -45,32 +38,36 @@ if [[ -z $BUILD_REQUIRE ]]; then
   exit 1
 fi
 
-# Runtime deps: exported straight from uv.lock (hashes included, project itself
-# excluded). --frozen fails if uv.lock is stale, preserving the lock guarantee.
+# Runtime deps: exported from pdm.lock (hashes included).
+# --prod excludes dev dependencies.
 #
-# --prune drops win32-only transitive deps (pywin32 via mcp, pywin32-ctypes via
-# keyring, colorama). uv export emits these with a `sys_platform == 'win32'`
+# Filter out win32-only transitive deps (pywin32 via mcp, pywin32-ctypes via
+# keyring, colorama). pdm export emits these with a `sys_platform == "win32"`
 # marker, but Cachi2/hermeto prefetch enumerates every line and ignores markers,
 # so it tries to fetch pywin32 for Linux, finds no distribution (Windows-only
 # wheels, no sdist), and fails the build. The runtime is always Linux/distroless,
 # so these packages are never installed anyway.
-uv export \
-  --frozen \
-  --no-emit-project \
-  --no-dev \
-  --format requirements-txt \
-  --prune colorama \
-  --prune pywin32 \
-  --prune pywin32-ctypes \
-  -o "${REQ_FILE}"
+pdm export --prod --no-extras -o "${REQ_FILE}.tmp"
+
+# Drop the entire stanza (version line + indented hash lines) for each filtered
+# package so no orphaned --hash= lines remain in the output.
+awk '
+  BEGIN { skip = 0 }
+  /^(colorama|pywin32|pywin32-ctypes)==/ { skip = 1; next }
+  skip && /^[[:space:]]+--hash=/ { next }
+  { skip = 0; print }
+' "${REQ_FILE}.tmp" > "${REQ_FILE}"
+rm -f "${REQ_FILE}.tmp"
 
 # Build backend: hash-pinned so the hermetic build can build the okp_mcp wheel
 # with --no-build-isolation against the prefetched mirror.
-echo "${BUILD_REQUIRE}" | uv pip compile - \
+# pip-compile (from pip-tools, a dev dependency) handles build-system deps
+# that pdm export doesn't cover.
+echo "${BUILD_REQUIRE}" | pdm run pip-compile - \
   --generate-hashes \
-  --python-version "${PYTHON_VERSION}" \
   --no-annotate \
   --no-header \
+  --allow-unsafe \
   -o "${BUILD_FILE}"
 
 echo "Wrote ${REQ_FILE} ($(grep -c '^[a-zA-Z]' "${REQ_FILE}") packages)"

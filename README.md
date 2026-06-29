@@ -12,19 +12,20 @@ MCP server for the Red Hat Offline Knowledge Portal (OKP). Bridges LLM tool call
 Install dependencies:
 
 ```
-uv sync
+pip install pdm
+pdm install --group dev
 ```
 
-Run locally (stdio transport, default):
+Run locally (streamable-http, default):
 
 ```
-uv run okp-mcp
+pdm run okp-mcp
 ```
 
 Run with HTTP transport:
 
 ```
-uv run okp-mcp --transport streamable-http --port 8000
+pdm run okp-mcp --transport streamable-http --port 8000
 ```
 
 ## Configuration
@@ -132,7 +133,7 @@ OKP_ACCESS_KEY=<your-access-key> podman-compose up -d
 Install dev dependencies and pre-commit hooks:
 
 ```
-uv sync --group dev
+pdm install --group dev
 pre-commit install
 ```
 
@@ -154,7 +155,7 @@ make test        # pytest with coverage
 
 ## Functional Tests
 
-Functional test scenarios are defined in `tests/functional_cases.py`. They are gated behind the `functional` pytest marker and deselected by default. Run them with `uv run pytest -m functional -v` (requires a running Solr instance).
+Functional test scenarios are defined in `tests/functional_cases.py`. They are gated behind the `functional` pytest marker and deselected by default. Run them with `pdm run pytest -m functional -v` (requires a running Solr instance).
 
 ## License
 

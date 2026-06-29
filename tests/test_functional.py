@@ -6,7 +6,7 @@ content.  No LLM is involved; assertions are fully deterministic.
 
 Run with::
 
-    uv run pytest -m functional -v
+    pdm run pytest -m functional -v
 
 Requires: OKP Solr container running (``podman-compose up -d``)
 """

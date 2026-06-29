@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 def _commit_sha_from_git() -> str | None:
     """Return the short commit SHA from the local git checkout, if available.
 
-    Local dev runs (``uv run okp-mcp``) execute outside the container, so the
+    Local dev runs (``pdm run okp-mcp``) execute outside the container, so the
     baked ``$APP_ROOT/COMMIT_SHA`` file does not exist. Rather than reporting a
     useless ``"development"`` sentinel, ask git directly so startup logs and
     Sentry get the real commit. Returns ``None`` when git is unavailable or the

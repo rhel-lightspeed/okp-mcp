@@ -6,20 +6,18 @@ FROM registry.access.redhat.com/hi/python:3.12-builder@sha256:3d37bf07a9b663ac56
 # user, so no root escalation is needed. The whole app venv is copied into the
 # distroless runtime stage.
 ENV VENVS=${HOME}/.venvs
-ENV PATH=${VENVS}/tools/bin:${PATH}
-ENV UV_PROJECT=${HOME}/build
-ENV UV_PROJECT_ENVIRONMENT=${VENVS}/okp-mcp
-ENV UV_PYTHON=/usr/bin/python3
+ENV APP_VENV=${VENVS}/okp-mcp
+ENV BUILD_DIR=${HOME}/build
 
 # Copy dependency files first for layer caching. .konflux holds the
 # hash-pinned manifests Cachi2 prefetches for hermetic builds; they are
-# generated from uv.lock by scripts/konflux_requirements.sh.
-COPY pyproject.toml uv.lock README.md ${UV_PROJECT}/
-COPY .konflux/ ${UV_PROJECT}/.konflux/
-COPY src/ ${UV_PROJECT}/src/
-COPY --chmod=0755 scripts/container-install.sh ${UV_PROJECT}/scripts/
+# generated from pdm.lock by scripts/konflux_requirements.sh.
+COPY pyproject.toml README.md ${BUILD_DIR}/
+COPY .konflux/ ${BUILD_DIR}/.konflux/
+COPY src/ ${BUILD_DIR}/src/
+COPY --chmod=0755 scripts/container-install.sh ${BUILD_DIR}/scripts/
 
-WORKDIR ${UV_PROJECT}
+WORKDIR ${BUILD_DIR}
 
 # Product Security requirement: build all wheels from source instead of manylinux.
 # Requires root to install C/Rust toolchains before dropping back to non-root.
