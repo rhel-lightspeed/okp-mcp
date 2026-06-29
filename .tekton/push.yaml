@@ -26,6 +26,16 @@ metadata:
   name: rhel-knowledge-bridge-on-push
 
 spec:
+  taskRunSpecs:
+    - pipelineTaskName: build-images
+      computeResources:
+        requests:
+          cpu: "4"
+          memory: 8Gi
+        limits:
+          cpu: "4"
+          memory: 8Gi
+
   params:
     - name: git-url
       value: '{{ source_url }}'
