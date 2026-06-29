@@ -17,6 +17,7 @@ ENV UV_PYTHON=/usr/bin/python3
 COPY pyproject.toml uv.lock README.md ${UV_PROJECT}/
 COPY .konflux/ ${UV_PROJECT}/.konflux/
 COPY src/ ${UV_PROJECT}/src/
+COPY --chmod=0755 scripts/container-install.sh ${UV_PROJECT}/scripts/
 
 WORKDIR ${UV_PROJECT}
 
@@ -30,52 +31,11 @@ dnf clean all
 EORUN
 USER 65532
 
-# Install into a venv at a fixed path so the distroless runtime can copy it
-# whole. Two install paths, one app-venv location:
-#
-#   * Hermetic Konflux build (Cachi2 present): the network is disabled, so uv
-#     cannot be fetched from PyPI. Cachi2 has prefetched every wheel into an
-#     offline mirror and written /cachi2/cachi2.env (PIP_FIND_LINKS +
-#     PIP_NO_INDEX). Two stdlib venvs keep the build backend off the runtime:
-#       1. A throwaway tools venv gets the hash-pinned hatchling backend and
-#          builds the okp_mcp wheel with --no-build-isolation.
-#       2. The app venv gets only the hash-pinned runtime deps, then the
-#          locally built okp_mcp wheel (--no-deps --no-index). hatchling and
-#          its build deps never touch the app venv, so nothing needs
-#          uninstalling and the runtime SBOM carries no build tooling. This
-#          also dodges a version clash: packaging is both a runtime dep and a
-#          hatchling build dep, and mixing both manifests in one venv would
-#          conflict.
-#   * Local / non-hermetic build: install pinned uv, then `uv sync --locked`
-#     straight from uv.lock (fails if the lock is stale, preserving the
-#     locked-build guarantee). `uv venv --seed` seeds pip into the app venv
-#     (just pip on 3.12+); uv sync does not need it, but it keeps the local
-#     venv at parity with the hermetic path's `python -m venv` (which also
-#     ships pip).
-#
-# uv.lock stays the single source of truth in both paths: .konflux/requirements*.txt
-# are generated from it, never hand-edited.
-RUN <<EORUN
-set -euo pipefail
-if [ -f /cachi2/cachi2.env ]; then
-    . /cachi2/cachi2.env
-    python3 -m venv "${VENVS}/build"
-    "${VENVS}/build/bin/pip" install --no-cache-dir --no-binary=:all: --require-hashes \
-        -r .konflux/requirements-build.txt
-    "${VENVS}/build/bin/pip" wheel --no-cache-dir --no-build-isolation --no-deps . -w "${HOME}/wheels"
-    python3 -m venv "${UV_PROJECT_ENVIRONMENT}"
-    "${UV_PROJECT_ENVIRONMENT}/bin/pip" install --no-cache-dir --no-binary=:all: --require-hashes \
-        -r .konflux/requirements.txt
-    "${UV_PROJECT_ENVIRONMENT}/bin/pip" install --no-cache-dir --no-deps --no-index \
-        --find-links "${HOME}/wheels" okp_mcp
-    "${UV_PROJECT_ENVIRONMENT}/bin/python" -c "import okp_mcp"
-else
-    python3 -m venv "${VENVS}/tools"
-    "${VENVS}/tools/bin/python" -m pip install --no-cache-dir uv==0.11.14
-    uv venv --seed "${UV_PROJECT_ENVIRONMENT}"
-    uv sync --locked --no-cache --no-dev --no-editable --no-binary
-fi
-EORUN
+# Install dependencies via the shared build script.
+# See scripts/container-install.sh for detailed comments on each step.
+# BUILD_FROM_SOURCE=1 → compiles all wheels from source (--no-binary).
+ENV BUILD_FROM_SOURCE=1
+RUN scripts/container-install.sh
 
 # Stage 2: Runtime - distroless Red Hat Hardened Image (no shell, no package manager).
 FROM registry.access.redhat.com/hi/python:3.12@sha256:227cd08bc68a2fb2d79ed21d198c5dad0d130238feb4088881670296902c2754 AS runtime
