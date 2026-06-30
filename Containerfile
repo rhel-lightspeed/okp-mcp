@@ -16,7 +16,7 @@ ARG BUILD_FROM_SOURCE=1
 
 # Copy dependency files first for layer caching. .konflux holds the hash-pinned
 # Python manifests Hermeto prefetches for hermetic builds; they are generated
-# from uv.lock by scripts/konflux_requirements.sh. rpms.lock.yaml pins the
+# from uv.lock by scripts/konflux_requirements.py. rpms.lock.yaml pins the
 # build-toolchain RPMs Hermeto prefetches (see rpms.in.yaml).
 COPY pyproject.toml uv.lock README.md rpms.lock.yaml ${UV_PROJECT}/
 COPY .konflux/ ${UV_PROJECT}/.konflux/

@@ -10,7 +10,7 @@
 # environments: in hermetic builds the prefetch task sets PIP_FIND_LINKS /
 # PIP_NO_INDEX and provides an offline mirror; local builds resolve from PyPI.
 # Either way the deps come from the hash-pinned .konflux manifests, which are
-# generated from uv.lock by scripts/konflux_requirements.sh.
+# generated from uv.lock by scripts/konflux_requirements.py.
 #
 # Required environment variables (set via Containerfile ENV):
 #   VENVS                    — base directory for virtual environments
