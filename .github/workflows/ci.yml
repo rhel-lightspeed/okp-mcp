@@ -140,6 +140,7 @@ jobs:
           load: true
           provenance: false
           tags: okp-mcp:test-${{ matrix.platform }}
+          build-args: BUILD_FROM_SOURCE=0
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

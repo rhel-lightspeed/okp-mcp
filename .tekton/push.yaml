@@ -37,7 +37,7 @@ spec:
       value: quay.io/redhat-user-workloads/rhel-lightspeed-tenant/rhel-knowledge-bridge:{{ revision }}
 
     - name: dockerfile
-      value: /Containerfile-source
+      value: /Containerfile
 
     - name: hermetic
       value: "true"

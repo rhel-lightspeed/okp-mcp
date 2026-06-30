@@ -58,13 +58,13 @@ hermeto-prefetch:
 hermeto-clean:
 	rm -rf .hermeto-out/
 
-# Regenerate rpms.lock.yaml from rpms.in.yaml against the Containerfile-source
-# builder image. Resolves the build-toolchain RPM tree for every target arch so
-# Hermeto can prefetch them for hermetic builds. Requires podman; the builder
-# digest is read straight from Containerfile-source to avoid duplication.
+# Regenerate rpms.lock.yaml from rpms.in.yaml against the builder image.
+# Resolves the build-toolchain RPM tree for every target arch so Hermeto can
+# prefetch them for hermetic builds. Requires podman; the builder image is read
+# straight from the first FROM in Containerfile.
 # RLP_IMAGE defaults to the Konflux tool image (needs `podman login quay.io`).
 RLP_IMAGE ?= quay.io/konflux-ci/rpm-lockfile-prototype:latest
 rpm-lock:
-	BUILDER=$$(grep -oE 'registry.access.redhat.com/ubi10/ubi:[^@]+@sha256:[a-f0-9]+' Containerfile-source | head -1) && \
+	BUILDER=$$(awk '/^FROM /{print $$2; exit}' Containerfile) && \
 	podman run --rm -v "$$(pwd):/work:z" -w /work \
 	  $(RLP_IMAGE) --image "$$BUILDER" rpms.in.yaml

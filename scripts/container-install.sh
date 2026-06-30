@@ -52,7 +52,7 @@ fi
 #    dependency tree (every PEP 517 backend for every sdist: maturin,
 #    setuptools-rust, uv-build, etc.). Prebuilt-wheel builds only need
 #    hatchling — runtime deps install from manylinux wheels, not sdists.
-python3 -m venv "${VENVS}/build"
+"${UV_PYTHON:-python3}" -m venv "${VENVS}/build"
 if [ "${BUILD_FROM_SOURCE:-0}" = "1" ]; then
     # Full build tree: every PEP 517 backend needed to compile every sdist
     # (maturin, setuptools-rust, etc.). Split across three files because some
@@ -73,7 +73,7 @@ fi
 "${VENVS}/build/bin/pip" wheel --no-cache-dir --no-build-isolation --no-deps . -w "${HOME}/wheels"
 
 # 3. Application venv: install only the hash-pinned runtime dependencies.
-python3 -m venv "${UV_PROJECT_ENVIRONMENT}"
+"${UV_PYTHON:-python3}" -m venv "${UV_PROJECT_ENVIRONMENT}"
 "${UV_PROJECT_ENVIRONMENT}/bin/pip" install --no-cache-dir "${PIP_BINARY_FLAG}" --require-hashes \
     -r .konflux/requirements.txt
 

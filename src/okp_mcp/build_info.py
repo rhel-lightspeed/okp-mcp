@@ -8,11 +8,10 @@ from importlib.metadata import version
 from pathlib import Path
 
 
-# In-container WORKDIR set by the Containerfile. This is the path *inside the
-# built image*, not a directory on a developer's machine. The Tekton pipeline
-# writes the build commit to ``$APP_ROOT/COMMIT_SHA`` during the image build, so
-# this default only resolves when running inside the container.
-DEFAULT_APP_ROOT = os.getenv("APP_ROOT", "/opt/app-root/src")
+# In-container path where Tekton may write build metadata. This is the path
+# *inside the built image*, not a directory on a developer's machine. The
+# default is largely vestigial — COMMIT_SHA is now injected via env var.
+DEFAULT_APP_ROOT = os.getenv("APP_ROOT", "/app")
 DEFAULT_COMMIT_SHA = os.getenv("COMMIT_SHA", "development")
 
 logger = logging.getLogger(__name__)

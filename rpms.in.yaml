@@ -1,13 +1,12 @@
 # Build-toolchain RPMs prefetched by Hermeto for hermetic Konflux builds.
 # Containerfile-source compiles all Python wheels from source, which needs a
-# C/Rust toolchain that the UBI 10 base image does not ship. In hermetic mode
-# every RUN is network-isolated, so these RPMs must be prefetched.
+# C/Rust toolchain that the Hummingbird builder image does not ship. In hermetic
+# mode every RUN is network-isolated, so these RPMs must be prefetched.
+# Python 3.12 + pip are already in the Hummingbird builder image.
 # Regenerate rpms.lock.yaml after editing this file:
 #   make rpm-lock
 packages:
-  - python3.12
-  - python3.12-pip
-  - python3-devel
+  - python3.12-devel
   - gcc
   - gcc-c++
   - openssl-devel
@@ -17,12 +16,8 @@ packages:
   - libffi-devel
 contentOrigin:
   repos:
-    - repoid: ubi-10-for-x86_64-baseos-rpms
-      baseurl: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/$basearch/baseos/os
-    - repoid: ubi-10-for-x86_64-appstream-rpms
-      baseurl: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/$basearch/appstream/os
-    - repoid: codeready-builder-for-ubi-10-x86_64-rpms
-      baseurl: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/$basearch/codeready-builder/os
+    - repoid: public-hummingbird-x86_64-rpms
+      baseurl: https://console.redhat.com/api/pulp-content/public-hummingbird/$basearch/
 arches:
   - x86_64
   - aarch64
