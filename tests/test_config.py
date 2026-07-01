@@ -130,7 +130,7 @@ def test_port_type_coercion():
 
 
 @pytest.mark.parametrize(
-    "solr_url, expected_endpoint",
+    ("solr_url", "expected_endpoint"),
     [
         ("http://localhost:8983", "http://localhost:8983/solr/portal/select"),
         ("http://rhel-okp:8983", "http://rhel-okp:8983/solr/portal/select"),
@@ -190,28 +190,23 @@ def test_stateless_http_disable_via_env_var():
 
 
 def test_stateless_http_from_cli():
-    """--stateless-http CLI flag controls stateless mode."""
+    """--stateless-http CLI argument controls stateless mode."""
     config = CliApp.run(ServerConfig, cli_args=["--stateless-http", "false"])
     assert config.stateless_http is False
 
 
 @pytest.mark.parametrize(
-    "transport,expected_in_kwargs",
+    ("transport", "stateless_http", "expected_in_kwargs"),
     [
-        ("streamable-http", True),
-        ("sse", False),
-        ("stdio", False),
+        ("streamable-http", True, True),
+        ("streamable-http", False, False),
+        ("http", True, False),
+        ("sse", True, False),
+        ("stdio", True, False),
     ],
 )
-def test_stateless_http_in_transport_kwargs(transport, expected_in_kwargs):
+def test_stateless_http_in_transport_kwargs(transport, stateless_http, expected_in_kwargs):
     """stateless_http only appears in transport_kwargs for streamable-http transport."""
-    config = ServerConfig(transport=transport, stateless_http=True)
+    config = ServerConfig(transport=transport, stateless_http=stateless_http)
     kwargs = config.transport_kwargs
     assert ("stateless_http" in kwargs) == expected_in_kwargs
-
-
-def test_stateless_http_not_in_kwargs_when_disabled():
-    """stateless_http is not included in transport_kwargs when explicitly disabled."""
-    config = ServerConfig(transport="streamable-http", stateless_http=False)
-    kwargs = config.transport_kwargs
-    assert "stateless_http" not in kwargs

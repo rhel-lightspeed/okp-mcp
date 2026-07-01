@@ -161,6 +161,7 @@ class ServerConfig(BaseSettings):
 
     @property
     def transport_kwargs(self) -> dict[str, str | int | bool | list[StarletteMiddleware]]:
+        """Keyword arguments to pass to `mcp.run()` for the configured transport."""
         result: dict[str, str | int | bool | list[StarletteMiddleware]] = {}
         if self.transport in {Transport.streamable_http, Transport.sse}:
             result["host"] = self.host
