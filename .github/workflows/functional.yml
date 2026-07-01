@@ -7,7 +7,8 @@ on:
     branches: [main]
     types: [completed]
 
-permissions: read-all
+permissions:
+  contents: read
 
 env:
   OKP_IMAGE_TAG: '1.1.9-1775158501'
@@ -49,10 +50,12 @@ jobs:
         run: docker load -i /tmp/okp-image.tar
 
       - name: Start OKP Solr
+        env:
+          ACCESS_KEY: ${{ secrets.OKP_ACCESS_KEY }}
         run: |
           docker run -d --name redhat-okp \
             -p 8983:8983 \
-            -e ACCESS_KEY="${{ secrets.OKP_ACCESS_KEY }}" \
+            -e ACCESS_KEY \
             -e SOLR_JETTY_HOST=0.0.0.0 \
             "registry.redhat.io/offline-knowledge-portal/rhokp-rhel9:${{ env.OKP_IMAGE_TAG }}"
 

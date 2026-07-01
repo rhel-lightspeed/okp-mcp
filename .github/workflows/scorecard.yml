@@ -6,12 +6,14 @@ on:
   schedule:
     - cron: "0 6 * * 1" # Weekly Monday 6am UTC (1am CT)
 
-permissions: read-all
+permissions:
+  contents: read
 
 jobs:
   scorecard:
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       security-events: write
       id-token: write
     steps:
