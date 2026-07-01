@@ -1,0 +1,54 @@
+name: Renovate - Regenerate Konflux Manifests
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions: read-all
+
+jobs:
+  regenerate:
+    permissions:
+      contents: write
+    # Only run for Renovate PRs.
+    if: github.event.pull_request.user.login == 'renovate[bot]'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: renovate-konflux-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Install Python
+        # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version-file: pyproject.toml
+
+      - name: Install uv
+        # v8.2.0
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
+        with:
+          enable-cache: true
+          prune-cache: false
+
+      - name: Regenerate Konflux manifests
+        run: make konflux-requirements
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if [ -z "$(git status --porcelain -- .konflux/)" ]; then
+            echo "No changes to Konflux manifests."
+            exit 0
+          fi
+
+          git add .konflux/
+          git commit -m "chore: auto-regenerate Konflux manifests"
+          git push
