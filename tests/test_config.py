@@ -130,7 +130,7 @@ def test_port_type_coercion():
 
 
 @pytest.mark.parametrize(
-    "solr_url, expected_endpoint",
+    ("solr_url", "expected_endpoint"),
     [
         ("http://localhost:8983", "http://localhost:8983/solr/portal/select"),
         ("http://rhel-okp:8983", "http://rhel-okp:8983/solr/portal/select"),
@@ -171,3 +171,42 @@ def test_max_response_chars_rejects_non_positive(bad_value):
     """max_response_chars rejects zero and negative values at load time."""
     with pytest.raises(ValidationError, match="max_response_chars"):
         ServerConfig(max_response_chars=bad_value)
+
+
+# --- stateless_http tests ---
+
+
+def test_stateless_http_defaults_to_true():
+    """Stateless mode is enabled by default."""
+    config = ServerConfig()
+    assert config.stateless_http is True
+
+
+def test_stateless_http_disable_via_env_var():
+    """MCP_STATELESS_HTTP=false env var disables stateless mode."""
+    with patch.dict("os.environ", {"MCP_STATELESS_HTTP": "false"}):
+        config = ServerConfig()
+    assert config.stateless_http is False
+
+
+def test_stateless_http_from_cli():
+    """--stateless-http CLI argument controls stateless mode."""
+    config = CliApp.run(ServerConfig, cli_args=["--stateless-http", "false"])
+    assert config.stateless_http is False
+
+
+@pytest.mark.parametrize(
+    ("transport", "stateless_http", "expected_in_kwargs"),
+    [
+        ("streamable-http", True, True),
+        ("streamable-http", False, False),
+        ("http", True, False),
+        ("sse", True, False),
+        ("stdio", True, False),
+    ],
+)
+def test_stateless_http_in_transport_kwargs(transport, stateless_http, expected_in_kwargs):
+    """stateless_http only appears in transport_kwargs for streamable-http transport."""
+    config = ServerConfig(transport=transport, stateless_http=stateless_http)
+    kwargs = config.transport_kwargs
+    assert ("stateless_http" in kwargs) == expected_in_kwargs

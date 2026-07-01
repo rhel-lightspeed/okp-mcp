@@ -146,6 +146,12 @@ class ServerConfig(BaseSettings):
         default=None,
         description="GlitchTip/Sentry DSN for exception reporting",
     )
+    stateless_http: bool = Field(
+        default=True,
+        description="Run in stateless mode (new transport per request, no session tracking). "
+        "Eliminates sticky session requirement when multiple clients share one endpoint. "
+        "Only applies to streamable-http transport. Set to false to restore stateful sessions.",
+    )
 
     @computed_field
     @property
@@ -154,8 +160,9 @@ class ServerConfig(BaseSettings):
         return f"{self.solr_url}/solr/portal/select"
 
     @property
-    def transport_kwargs(self) -> dict[str, str | int | list[StarletteMiddleware]]:
-        result = {}
+    def transport_kwargs(self) -> dict[str, str | int | bool | list[StarletteMiddleware]]:
+        """Keyword arguments to pass to `mcp.run()` for the configured transport."""
+        result: dict[str, str | int | bool | list[StarletteMiddleware]] = {}
         if self.transport in {Transport.streamable_http, Transport.sse}:
             result["host"] = self.host
             result["port"] = self.port
@@ -163,6 +170,8 @@ class ServerConfig(BaseSettings):
                 StarletteMiddleware(PrometheusMiddleware),
                 StarletteMiddleware(RequestIDHeaderMiddleware),
             ]
+        if self.transport == Transport.streamable_http and self.stateless_http:
+            result["stateless_http"] = True
 
         return result
 
