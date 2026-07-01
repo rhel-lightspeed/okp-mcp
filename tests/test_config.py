@@ -176,23 +176,23 @@ def test_max_response_chars_rejects_non_positive(bad_value):
 # --- stateless_http tests ---
 
 
-def test_stateless_http_defaults_to_false():
-    """Stateless mode is disabled by default for backward compatibility."""
+def test_stateless_http_defaults_to_true():
+    """Stateless mode is enabled by default."""
     config = ServerConfig()
+    assert config.stateless_http is True
+
+
+def test_stateless_http_disable_via_env_var():
+    """MCP_STATELESS_HTTP=false env var disables stateless mode."""
+    with patch.dict("os.environ", {"MCP_STATELESS_HTTP": "false"}):
+        config = ServerConfig()
     assert config.stateless_http is False
 
 
-def test_stateless_http_env_var():
-    """MCP_STATELESS_HTTP env var enables stateless mode."""
-    with patch.dict("os.environ", {"MCP_STATELESS_HTTP": "true"}):
-        config = ServerConfig()
-    assert config.stateless_http is True
-
-
 def test_stateless_http_from_cli():
-    """--stateless-http CLI flag enables stateless mode."""
-    config = CliApp.run(ServerConfig, cli_args=["--stateless-http", "true"])
-    assert config.stateless_http is True
+    """--stateless-http CLI flag controls stateless mode."""
+    config = CliApp.run(ServerConfig, cli_args=["--stateless-http", "false"])
+    assert config.stateless_http is False
 
 
 @pytest.mark.parametrize(
@@ -210,8 +210,8 @@ def test_stateless_http_in_transport_kwargs(transport, expected_in_kwargs):
     assert ("stateless_http" in kwargs) == expected_in_kwargs
 
 
-def test_stateless_http_not_in_kwargs_when_false():
-    """stateless_http is not included in transport_kwargs when disabled."""
+def test_stateless_http_not_in_kwargs_when_disabled():
+    """stateless_http is not included in transport_kwargs when explicitly disabled."""
     config = ServerConfig(transport="streamable-http", stateless_http=False)
     kwargs = config.transport_kwargs
     assert "stateless_http" not in kwargs

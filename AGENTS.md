@@ -13,7 +13,9 @@ uv sync                          # install all deps (including dev)
 uv run okp-mcp                   # run server (streamable-http, default)
 uv run okp-mcp --transport stdio                        # stdio mode
 uv run okp-mcp --transport streamable-http --port 8000  # explicit HTTP mode
-uv run okp-mcp --stateless-http                        # stateless mode (no session tracking)
+# Stateless mode is enabled by default for streamable-http.
+# Disable with: uv run okp-mcp --stateless-http false
+# or: MCP_STATELESS_HTTP=false uv run okp-mcp
 ```
 
 ## CI Commands (Makefile)
@@ -135,7 +137,7 @@ SECURITY.md            # Vulnerability reporting via GitHub Security Advisories
 | Modify result formatting | `src/okp_mcp/formatting.py` | `annotate_result()` for deprecation/EOL (used by portal.py) |
 | Change content cleaning | `src/okp_mcp/content.py` | `strip_boilerplate()` regex, `truncate_content()` |
 | Modify config/CLI args | `src/okp_mcp/config.py` | Add field to `ServerConfig`; auto-generates CLI arg and `MCP_`-prefixed env var |
-| Enable stateless mode | `src/okp_mcp/config.py` | `--stateless-http` flag or `MCP_STATELESS_HTTP=true` env var |
+| Enable stateless mode | `src/okp_mcp/config.py` | Enabled by default. `--stateless-http false` or `MCP_STATELESS_HTTP=false` to disable |
 | Add functional test case | `tests/functional_cases.py` | Add `FunctionalCase` to `FUNCTIONAL_TEST_CASES` list |
 | Mock Solr responses | `tests/conftest.py` | `solr_mock` fixture uses respx |
 | Deploy to OpenShift | `openshift/okp-mcp.yml` | Template with params: IMAGE, IMAGE_TAG, REPLICAS, etc. |

@@ -147,10 +147,10 @@ class ServerConfig(BaseSettings):
         description="GlitchTip/Sentry DSN for exception reporting",
     )
     stateless_http: bool = Field(
-        default=False,
+        default=True,
         description="Run in stateless mode (new transport per request, no session tracking). "
         "Eliminates sticky session requirement when multiple clients share one endpoint. "
-        "Only applies to streamable-http transport.",
+        "Only applies to streamable-http transport. Set to false to restore stateful sessions.",
     )
 
     @computed_field
