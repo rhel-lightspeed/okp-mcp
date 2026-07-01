@@ -25,7 +25,7 @@ set -euo pipefail
 # --- Determine pip binary-handling flags ---
 # Prebuilt-wheel builds use --only-binary=:all: (fast, uses manylinux wheels).
 # From-source builds use --no-binary=:all: (compiles every C/Rust extension).
-if [ "${BUILD_FROM_SOURCE:-0}" = "1" ]; then
+if [[ "${BUILD_FROM_SOURCE:-0}" = "1" ]]; then
     PIP_BINARY_FLAG="--no-binary=:all:"
     export CMAKE_BUILD_PARALLEL_LEVEL="$(nproc)"
     export MAX_JOBS="$(nproc)"
@@ -39,7 +39,7 @@ fi
 # environment so pip resolves from the prefetched offline mirror. Some prefetch
 # layouts also ship cachi2.env as a file; source it when present (harmless
 # otherwise). Local builds have neither and resolve from PyPI.
-if [ -f /cachi2/cachi2.env ]; then
+if [[ -f /cachi2/cachi2.env ]]; then
     # shellcheck source=/dev/null
     . /cachi2/cachi2.env
 fi
@@ -53,7 +53,7 @@ fi
 #    setuptools-rust, uv-build, etc.). Prebuilt-wheel builds only need
 #    hatchling — runtime deps install from manylinux wheels, not sdists.
 "${UV_PYTHON:-python3}" -m venv "${VENVS}/build"
-if [ "${BUILD_FROM_SOURCE:-0}" = "1" ]; then
+if [[ "${BUILD_FROM_SOURCE:-0}" = "1" ]]; then
     # Full build tree: every PEP 517 backend needed to compile every sdist
     # (maturin, setuptools-rust, etc.). Split across three files because some
     # packages are not available on the Konflux artifact proxy.

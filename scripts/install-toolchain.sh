@@ -18,17 +18,17 @@
 set -euo pipefail
 
 # Exit early for prebuilt-wheel builds that don't need a C/Rust toolchain.
-if [ "${BUILD_FROM_SOURCE:-1}" != "1" ]; then
+if [[ "${BUILD_FROM_SOURCE:-1}" != "1" ]]; then
     echo "install-toolchain.sh: BUILD_FROM_SOURCE=${BUILD_FROM_SOURCE:-1}, skipping toolchain install"
     exit 0
 fi
 
 dnf_args=(--allowerasing)
 
-if [ -f /cachi2/cachi2.env ]; then
+if [[ -f /cachi2/cachi2.env ]]; then
     # Find the Hermeto-injected repo (name varies); disable all others.
     hermeto_repo=$(grep -lm1 'file:///cachi2' /etc/yum.repos.d/*.repo 2>/dev/null | head -1)
-    if [ -n "$hermeto_repo" ]; then
+    if [[ -n "$hermeto_repo" ]]; then
         repo_id=$(sed -n 's/^\[\([^]]*\)\].*/\1/p' "$hermeto_repo" | head -1)
         dnf_args+=(--disablerepo='*' --enablerepo="$repo_id")
     fi
