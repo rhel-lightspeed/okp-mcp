@@ -32,9 +32,9 @@ FROM registry.access.redhat.com/ubi10/python-312-minimal:latest@sha256:c060604f8
 
 LABEL com.redhat.application=rhel-knowledge-bridge
 LABEL com.redhat.component=rhel-knowledge-bridge
-LABEL description="MCP server for the RHEL Offline Knowledge Portal"
+LABEL description="Red Hat Offline Knowledge Portal"
 LABEL distribution-scope=private
-LABEL io.k8s.description="MCP server for the RHEL Offline Knowledge Portal"
+LABEL io.k8s.description="Red Hat Offline Knowledge Portal"
 LABEL io.k8s.display-name="RHEL Offline Knowledge Portal MCP server"
 LABEL io.openshift.tags="rhel,knowledge-portal,mcp"
 LABEL name="rhel-knowledge-bridge/rhel-knowledge-bridge-rhel10"
@@ -43,7 +43,7 @@ LABEL release="1.0"
 LABEL version=1.0
 LABEL url="https://github.com/rhel-lightspeed/okp-mcp"
 LABEL vendor="Red Hat, Inc."
-LABEL summary="MCP server for the RHEL Offline Knowledge Portal"
+LABEL summary="Red Hat Offline Knowledge Portal"
 
 # Copy the dependency venv from the builder stage. It keeps the SAME path it was
 # created at in the builder, so console-script shebangs stay valid without
