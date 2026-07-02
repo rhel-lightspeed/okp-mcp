@@ -3,7 +3,11 @@
 import re
 import time
 
+from enum import StrEnum
+
 import httpx
+
+from pydantic import ValidationError
 
 from okp_mcp.bm25 import BM25Plus
 from okp_mcp.config import logger
@@ -109,123 +113,107 @@ def _clean_query(query: str) -> str:
     return " ".join(parts) if parts else query
 
 
-async def _solr_query(params: dict, client: httpx.AsyncClient | None = None, *, solr_endpoint: str) -> SolrResponse:
+# Static edismax configuration — built once, merged per-call.
+_SOLR_BASE_PARAMS: dict[str, str] = {
+    # Response format: return results as JSON.
+    "wt": "json",
+    # Use Extended DisMax, which supports field boosting, phrase boosting, and minimum-match.
+    "defType": "edismax",
+    # Query fields with boosts: title matches matter most (^5), headings and synopses help,
+    # and body content contributes at lower weight.
+    "qf": "title^5 main_content heading_h1^3 heading_h2 portal_synopsis allTitle^3 content^2 all_content^1",
+    # Phrase boost: reward documents where all query terms appear as an exact phrase.
+    "pf": "main_content^5 title^8",
+    # Phrase slop for pf: terms may be up to 3 positions apart and still earn the phrase boost.
+    "ps": "3",
+    # Bigram phrase boost: reward docs where adjacent pairs of query terms appear nearby.
+    "pf2": "main_content^3 title^5",
+    # Bigram slop: term pairs may be up to 2 positions apart.
+    "ps2": "2",
+    # Trigram phrase boost: reward docs where consecutive triples of query terms appear nearby.
+    "pf3": "main_content^1 title^2",
+    # Trigram slop: term triples may be up to 5 positions apart.
+    "ps3": "5",
+    # --- Highlighting (returns relevant snippets from matched documents) ---
+    # Enable highlighting.
+    "hl": "on",
+    # Generate highlights from the main_content field only.
+    "hl.fl": "main_content",
+    # Return up to 6 highlighted snippets per document.
+    "hl.snippets": "6",
+    # Target snippet size in characters (extended to sentence boundaries, see fragsizeIsMinimum).
+    "hl.fragsize": "600",
+    # Use the Unified Highlighter (fastest, most accurate, supports all options below).
+    "hl.method": "unified",
+    # Analyze up to 512K characters per document for highlighting (covers long RHEL docs).
+    "hl.maxAnalyzedChars": "512000",
+    # Break fragments on sentence boundaries rather than mid-sentence.
+    "hl.bs.type": "SENTENCE",
+    # Use English rules for sentence-boundary detection.
+    "hl.bs.language": "en",
+    # Treat fragsize as a minimum: snippets grow to the next sentence boundary instead of cutting off.
+    "hl.fragsizeIsMinimum": "true",
+    # If no query terms match in a document, return a summary from the start of the field.
+    "hl.defaultSummary": "true",
+    # Use BM25 term weighting to score highlighted passages instead of simple term frequency.
+    "hl.weightMatches": "true",
+    # Fragment alignment: position each snippet so the match starts roughly 1/3 in from the left,
+    # giving context before and after.
+    "hl.fragAlignRatio": "0.33",
+    # BM25 k1 (term saturation): higher values make repeated terms contribute more to the score.
+    "hl.score.k1": "1.0",
+    # BM25 b (length normalization): 0.65 moderately penalizes very long documents.
+    "hl.score.b": "0.65",
+    # BM25 pivot: documents around 200 characters get neutral length treatment;
+    # shorter docs score slightly higher, longer ones slightly lower.
+    "hl.score.pivot": "200",
+    # Minimum match: for 1-2 terms all must match; for 5+ terms at least
+    # 75% must match; for 10+ terms relax to 50%.  Long queries (e.g.
+    # user-pasted commands with IP addresses and interface names) carry
+    # many environment-specific tokens that won't appear in any doc.
+    # Without the 10<50% clause, mm=75% on a 15-token query requires 12
+    # matches, which no bonding/LACP solution doc can satisfy.
+    "mm": "2<-1 5<75% 10<50%",
+}
+
+
+class SolrStatus(StrEnum):
+    """Prometheus label values for Solr query outcomes."""
+
+    SUCCESS = "success"
+    ERROR = "error"
+    TIMEOUT = "timeout"
+
+
+async def _solr_query(params: dict, client: httpx.AsyncClient, *, solr_endpoint: str) -> SolrResponse:
     """Execute a SOLR query and return the parsed JSON response."""
-    _start = time.monotonic()
-    close_client = client is None
-    if client is None:
-        client = httpx.AsyncClient(timeout=30.0)
-    base_params = {
-        # Response format: return results as JSON.
-        "wt": "json",
-        # Use Extended DisMax, which supports field boosting, phrase boosting, and minimum-match.
-        "defType": "edismax",
-        # Query fields with boosts: title matches matter most (^5), headings and synopses help,
-        # and body content contributes at lower weight.
-        "qf": "title^5 main_content heading_h1^3 heading_h2 portal_synopsis allTitle^3 content^2 all_content^1",
-        # Phrase boost: reward documents where all query terms appear as an exact phrase.
-        "pf": "main_content^5 title^8",
-        # Phrase slop for pf: terms may be up to 3 positions apart and still earn the phrase boost.
-        "ps": "3",
-        # Bigram phrase boost: reward docs where adjacent pairs of query terms appear nearby.
-        "pf2": "main_content^3 title^5",
-        # Bigram slop: term pairs may be up to 2 positions apart.
-        "ps2": "2",
-        # Trigram phrase boost: reward docs where consecutive triples of query terms appear nearby.
-        "pf3": "main_content^1 title^2",
-        # Trigram slop: term triples may be up to 5 positions apart.
-        "ps3": "5",
-        # --- Highlighting (returns relevant snippets from matched documents) ---
-        # Enable highlighting.
-        "hl": "on",
-        # Generate highlights from the main_content field only.
-        "hl.fl": "main_content",
-        # Return up to 6 highlighted snippets per document.
-        "hl.snippets": "6",
-        # Target snippet size in characters (extended to sentence boundaries, see fragsizeIsMinimum).
-        "hl.fragsize": "600",
-        # Use the Unified Highlighter (fastest, most accurate, supports all options below).
-        "hl.method": "unified",
-        # Analyze up to 512K characters per document for highlighting (covers long RHEL docs).
-        "hl.maxAnalyzedChars": "512000",
-        # Break fragments on sentence boundaries rather than mid-sentence.
-        "hl.bs.type": "SENTENCE",
-        # Use English rules for sentence-boundary detection.
-        "hl.bs.language": "en",
-        # Treat fragsize as a minimum: snippets grow to the next sentence boundary instead of cutting off.
-        "hl.fragsizeIsMinimum": "true",
-        # If no query terms match in a document, return a summary from the start of the field.
-        "hl.defaultSummary": "true",
-        # Use BM25 term weighting to score highlighted passages instead of simple term frequency.
-        "hl.weightMatches": "true",
-        # Fragment alignment: position each snippet so the match starts roughly 1/3 in from the left,
-        # giving context before and after.
-        "hl.fragAlignRatio": "0.33",
-        # BM25 k1 (term saturation): higher values make repeated terms contribute more to the score.
-        "hl.score.k1": "1.0",
-        # BM25 b (length normalization): 0.65 moderately penalizes very long documents.
-        "hl.score.b": "0.65",
-        # BM25 pivot: documents around 200 characters get neutral length treatment;
-        # shorter docs score slightly higher, longer ones slightly lower.
-        "hl.score.pivot": "200",
-        # Minimum match: for 1-2 terms all must match; for 5+ terms at least
-        # 75% must match; for 10+ terms relax to 50%.  Long queries (e.g.
-        # user-pasted commands with IP addresses and interface names) carry
-        # many environment-specific tokens that won't appear in any doc.
-        # Without the 10<50% clause, mm=75% on a 15-token query requires 12
-        # matches, which no bonding/LACP solution doc can satisfy.
-        "mm": "2<-1 5<75% 10<50%",
-    }
-    base_params.update(params)
+    merged = _SOLR_BASE_PARAMS | params
     logger.info("SOLR query: q=%r, fq=%r", params.get("q"), params.get("fq"))
-    _solr_status = "success"
+    _start = time.monotonic()
+    _status = SolrStatus.SUCCESS
+    result = SolrResponse()
     try:
-        response = await client.get(solr_endpoint, params=base_params)
+        response = await client.get(solr_endpoint, params=merged)
         response.raise_for_status()
         data = response.json()
+        result = SolrResponse.model_validate(data)
+        num_found = result.response.numFound
+        logger.info("SOLR query matched %d total, returning %d docs", num_found, len(result.response.docs))
     except httpx.TimeoutException:
-        _solr_status = "timeout"
-        SOLR_QUERIES.labels(status="timeout").inc()
-        logger.warning("SOLR query timed out after 30s", exc_info=True)
+        _status = SolrStatus.TIMEOUT
+        logger.warning("SOLR query timed out", exc_info=True)
         raise
-    except httpx.HTTPStatusError as e:
-        _solr_status = "error"
-        SOLR_QUERIES.labels(status="error").inc()
-        logger.exception("SOLR returned HTTP %d: %s", e.response.status_code, e.response.text[:200])
-        raise
-    except httpx.RequestError as e:
-        _solr_status = "error"
-        SOLR_QUERIES.labels(status="error").inc()
-        logger.exception("SOLR connection error: %s", e)
-        raise
-    except ValueError as e:
-        _solr_status = "error"
-        SOLR_QUERIES.labels(status="error").inc()
-        logger.exception("SOLR returned non-JSON response: %s", e)
+    except ValidationError as e:
+        _status = SolrStatus.ERROR
+        logger.error("SOLR response validation failed: %s", e)
+    except (httpx.HTTPStatusError, httpx.RequestError, ValueError) as e:
+        _status = SolrStatus.ERROR
+        logger.exception("SOLR query failed: %s", e)
         raise
     finally:
-        SOLR_QUERY_DURATION.labels(status=_solr_status).observe(time.monotonic() - _start)
-        if close_client:
-            await client.aclose()
-
-    _empty_response = SolrResponse()
-
-    parsed = SolrResponse.model_validate(data)
-
-    if parsed.error is not None:
-        SOLR_QUERIES.labels(status="error").inc()
-        logger.error("SOLR returned error: %s", parsed.error)
-        return _empty_response
-    if "response" not in data or not isinstance(data.get("response", {}).get("docs"), list):
-        SOLR_QUERIES.labels(status="error").inc()
-        logger.error("SOLR returned unexpected structure: %s", list(data.keys()))
-        return _empty_response
-
-    SOLR_QUERIES.labels(status="success").inc()
-    num_found = parsed.response.numFound
-    num_docs = len(parsed.response.docs)
-    logger.info("SOLR query matched %d total, returning %d docs", num_found, num_docs)
-    return parsed
+        SOLR_QUERIES.labels(status=_status).inc()
+        SOLR_QUERY_DURATION.labels(status=_status).observe(time.monotonic() - _start)
+    return result
 
 
 _CONTAMINATION_PHRASES = frozenset(
