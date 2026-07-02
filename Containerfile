@@ -39,11 +39,20 @@ RUN scripts/container-install.sh
 # Stage 2: Runtime - Hummingbird Python 3.12 distroless.
 FROM registry.access.redhat.com/hi/python:3.12@sha256:f26250d20dd1bc70539b049d7b9b1a93998d6fd57ba75e6579e47b93bef76fc9 AS runtime
 
-LABEL com.redhat.component=okp-mcp
-LABEL description="MCP server for the RHEL Offline Knowledge Portal"
-LABEL name=okp-mcp
-LABEL summary="OKP MCP Server"
+LABEL com.redhat.application=rhel-knowledge-bridge
+LABEL com.redhat.component=rhel-knowledge-bridge
+LABEL description="Red Hat Offline Knowledge Portal"
+LABEL distribution-scope=private
+LABEL io.k8s.description="Red Hat Offline Knowledge Portal"
+LABEL io.k8s.display-name="RHEL Offline Knowledge Portal MCP server"
+LABEL io.openshift.tags="rhel,knowledge-portal,mcp"
+LABEL name="rhel-knowledge-bridge/rhel-knowledge-bridge-rhel10"
+LABEL cpe="cpe:/a:redhat:rhel_knowledge_bridge:1.0::el10"
+LABEL release="1.0"
+LABEL version=1.0
+LABEL url="https://github.com/rhel-lightspeed/okp-mcp"
 LABEL vendor="Red Hat, Inc."
+LABEL summary="Red Hat Offline Knowledge Portal"
 
 # Copy the dependency venv from the builder stage. It keeps the SAME path it was
 # created at in the builder, so console-script shebangs stay valid without
