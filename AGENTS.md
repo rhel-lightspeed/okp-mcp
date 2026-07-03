@@ -196,9 +196,7 @@ To check whether pinned tasks are current:
 
 **zsh gotcha**: The bash tool runs in zsh. Bash-only syntax like `declare -A` associative arrays will fail. Write the script to a temp file and run it with `bash /tmp/script.sh` instead.
 
-### Known Gaps (as of 2026-05-20)
-
-**Missing task**: `source-build-oci-ta:0.3` - builds a source container image. Present in the canonical pipeline but absent from ours. Runs after `build-image-index`, gated by a `build-source-image` param. Needs `BINARY_IMAGE`, `BINARY_IMAGE_DIGEST`, `SOURCE_ARTIFACT`, `CACHI2_ARTIFACT` params.
+### Known Gaps (as of 2026-07-03)
 
 **Matrix strategy migrations**: The canonical pipeline uses `matrix.params` for per-platform execution on these tasks, but our pipeline does not:
 - `clair-scan` (matrix on `image-platform`)

@@ -48,6 +48,9 @@ spec:
     - name: prefetch-input
       value: '[{"type": "pip", "path": ".", "requirements_files": [".konflux/requirements.txt"], "requirements_build_files": [".konflux/requirements-build-all.txt", ".konflux/requirements-build-pypi.txt"]}, {"type": "rpm", "path": "."}]'
 
+    - name: build-source-image
+      value: "true"
+
     - name: additional-tags
       value:
         - latest
