@@ -152,6 +152,12 @@ class ServerConfig(BaseSettings):
         "Eliminates sticky session requirement when multiple clients share one endpoint. "
         "Only applies to streamable-http transport. Set to false to restore stateful sessions.",
     )
+    exclude_kbase: bool = Field(
+        default=False,
+        description="Exclude kbase documents (solutions and articles) from search results. "
+        "Intended for disconnected (offline) deployments where kbase content is unavailable. "
+        "When enabled, adds fq=-documentKind:(solution OR article) to the main Solr query.",
+    )
 
     @computed_field
     @property

@@ -1,5 +1,7 @@
 """Unit tests for the portal search module: query builders, chunk conversion, RRF, orchestrator, formatting."""
 
+from unittest.mock import patch
+
 import httpx
 import pytest
 import respx
@@ -353,6 +355,54 @@ class TestBuildMainQuery:
         """3 highlight snippets requested per document (enough for BM25 to pick good passages)."""
         params = _build_main_query("test")
         assert params["hl.snippets"] == "3"
+
+
+# ---------------------------------------------------------------------------
+# Main query builder — kbase exclusion filter
+# ---------------------------------------------------------------------------
+
+
+class TestBuildMainQueryExcludeKbase:
+    """Verify the kbase exclusion filter in the main query builder."""
+
+    def test_exclude_kbase_disabled_by_default_fq_is_string(self):
+        """When exclude_kbase is False (default), fq is a plain EOL-filter string."""
+        params = _build_main_query("test query")
+        fq = params["fq"]
+        assert isinstance(fq, str)
+        assert "documentKind" not in fq
+
+    def test_exclude_kbase_enabled_fq_is_list(self):
+        """When exclude_kbase is True, fq becomes a list containing both filters."""
+        with patch("okp_mcp.portal.CONFIG") as mock_cfg:
+            mock_cfg.exclude_kbase = True
+            params = _build_main_query("test query")
+        fq = params["fq"]
+        assert isinstance(fq, list)
+
+    def test_exclude_kbase_enabled_contains_negated_document_kind_filter(self):
+        """When exclude_kbase is True, the kbase negation clause is present in fq."""
+        with patch("okp_mcp.portal.CONFIG") as mock_cfg:
+            mock_cfg.exclude_kbase = True
+            params = _build_main_query("test query")
+        assert "-documentKind:(solution OR article)" in params["fq"]
+
+    def test_exclude_kbase_enabled_preserves_eol_filter(self):
+        """When exclude_kbase is True, the EOL product exclusion filter is still present."""
+        with patch("okp_mcp.portal.CONFIG") as mock_cfg:
+            mock_cfg.exclude_kbase = True
+            params = _build_main_query("test query")
+        eol_fq = _build_eol_filter()
+        assert eol_fq in params["fq"]
+
+    def test_exclude_kbase_disabled_no_document_kind_filter(self):
+        """When exclude_kbase is False, no documentKind clause is added to fq."""
+        with patch("okp_mcp.portal.CONFIG") as mock_cfg:
+            mock_cfg.exclude_kbase = False
+            params = _build_main_query("test query")
+        fq = params["fq"]
+        assert isinstance(fq, str)
+        assert "documentKind" not in fq
 
 
 # ---------------------------------------------------------------------------
