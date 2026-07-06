@@ -12,6 +12,7 @@ from dataclasses import replace
 
 import httpx
 
+from okp_mcp.config import CONFIG
 from okp_mcp.config import logger
 from okp_mcp.content import _select_within_budget
 from okp_mcp.content import doc_uri
@@ -95,10 +96,18 @@ def _build_main_query(cleaned_query: str) -> dict:
     Intent-specific boosts are applied by ``apply_main_boosts`` (from
     ``intent.py``) after construction.  See ``INTENT_RULES`` for the full
     list of detected intents and their boost parameters.
+
+    When ``CONFIG.exclude_kbase`` is enabled, a negated ``documentKind`` filter
+    is added to exclude kbase solutions and articles.  This is intended for
+    disconnected deployments where kbase content is unavailable.
     """
+    eol_fq = _build_eol_filter()
+    fq: str | list[str] = eol_fq
+    if CONFIG.exclude_kbase:
+        fq = [eol_fq, "-documentKind:(solution OR article)"]
     return {
         "q": cleaned_query,
-        "fq": _build_eol_filter(),
+        "fq": fq,
         "qf": _MAIN_QF,
         "fl": _MAIN_FL,
         # Token budget control: _deduplicate_by_parent keeps only the best
