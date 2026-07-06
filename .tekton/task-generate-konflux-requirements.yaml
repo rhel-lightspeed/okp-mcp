@@ -91,7 +91,7 @@ spec:
         mkdir -p "${HOME}"
 
         echo "Installing uv via pip (manylinux binary wheel, ~25 MB) ..."
-        pip3 install --quiet --no-cache-dir uv
+        python3 -m pip install --quiet --no-cache-dir uv
 
         echo "Regenerating .konflux/ manifests from uv.lock ..."
         # scripts/konflux_requirements.py:
