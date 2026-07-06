@@ -90,8 +90,12 @@ spec:
         # Create a writable home directory for uv tool cache (uvx pybuild-deps).
         mkdir -p "${HOME}"
 
-        echo "Installing uv via pip (manylinux binary wheel, ~25 MB) ..."
-        python3 -m pip install --quiet --no-cache-dir uv
+        echo "Installing uv ..."
+        # s2i-base has no pip, so download uv via its official install script.
+        # UV_INSTALL_DIR must be writable; redirect to the emptyDir volume.
+        curl -LsSf https://astral.sh/uv/install.sh \
+          | UV_INSTALL_DIR=/var/workdir/uv-bin sh
+        export PATH="/var/workdir/uv-bin:${PATH}"
 
         echo "Regenerating .konflux/ manifests from uv.lock ..."
         # scripts/konflux_requirements.py:
