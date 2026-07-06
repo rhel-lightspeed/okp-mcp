@@ -1,0 +1,120 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  namespace: rhel-lightspeed-tenant
+  name: generate-konflux-requirements
+
+spec:
+  description: >-
+    Regenerate .konflux/ hermetic build manifests from uv.lock and produce an
+    enriched source Trusted Artifact for consumption by prefetch-dependencies.
+
+    Runs scripts/konflux_requirements.py (uv export + uv pip compile +
+    pybuild-deps) so that the four .konflux/ requirement files are always in
+    sync with uv.lock at build time, regardless of what is committed to git.
+
+    This task runs after clone-repository (full network access available) and
+    before prefetch-dependencies (which needs the .konflux/ files to exist in
+    the source tree it reads). It follows the standard OCI Trusted Artifact
+    pattern: use the incoming source artifact, mutate the working directory,
+    then create a new artifact that downstream tasks consume.
+
+  params:
+    - name: SOURCE_ARTIFACT
+      description: >-
+        Trusted Artifact URI from clone-repository pointing to the source tree.
+      type: string
+
+    - name: oci-storage
+      description: >-
+        OCI repository where the enriched source Trusted Artifact will be
+        stored (e.g. $(params.output-image).source).
+      type: string
+
+    - name: oci-artifact-expires-after
+      description: >-
+        Expiry for the produced Trusted Artifact (e.g. 5d). Empty string means
+        no expiry — appropriate for push/production builds.
+      type: string
+      default: ""
+
+  results:
+    - name: SOURCE_ARTIFACT
+      description: >-
+        Trusted Artifact URI pointing to the source tree with freshly generated
+        .konflux/ manifests. Consumed by the prefetch-dependencies task.
+
+  volumes:
+    - name: workdir
+      emptyDir: {}
+
+  stepTemplate:
+    volumeMounts:
+      - name: workdir
+        mountPath: /var/workdir
+
+  steps:
+    # Step 1 — extract the source tree from the OCI Trusted Artifact produced
+    # by clone-repository into /var/workdir/source.
+    - name: use-trusted-artifact
+      image: quay.io/konflux-ci/build-trusted-artifacts:latest@sha256:0d5769f1a100f6b4f330cfa5d2bd22efc50bdb184e270ca84404e25c0b8fcf80
+      args:
+        - use
+        - $(params.SOURCE_ARTIFACT)=/var/workdir/source
+
+    # Step 2 — generate the four .konflux/ manifests.
+    #
+    # Network is available at this stage (network isolation only applies inside
+    # the buildah build step). Two of the three uv sub-commands need network:
+    #   • uv export --frozen       → offline, reads uv.lock only
+    #   • uv pip compile           → resolves hatchling build deps from PyPI
+    #   • uvx pybuild-deps compile → resolves the full sdist build-backend tree
+    #
+    # uv is not available in UBI images as an RPM, so we install it via pip.
+    # The uv PyPI package ships a self-contained manylinux binary that works on
+    # any glibc ≥ 2.17 image (UBI 9/10 qualify). uvx is a symlink to uv and
+    # is available as soon as the pip install completes.
+    #
+    # HOME is redirected to a writable path on the emptyDir volume so that
+    # uv can write its tool cache when uvx downloads pybuild-deps.
+    - name: generate-manifests
+      image: registry.redhat.io/ubi10/s2i-base:latest
+      workingDir: /var/workdir/source
+      env:
+        - name: HOME
+          value: /var/workdir/home
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        # Create a writable home directory for uv tool cache (uvx pybuild-deps).
+        mkdir -p "${HOME}"
+
+        echo "Installing uv via pip (manylinux binary wheel, ~25 MB) ..."
+        pip3 install --quiet --no-cache-dir uv
+
+        echo "Regenerating .konflux/ manifests from uv.lock ..."
+        # scripts/konflux_requirements.py:
+        #   1. uv export → .konflux/requirements.txt           (runtime deps, offline)
+        #   2. uv pip compile → .konflux/requirements-build.txt (hatchling tree, needs network)
+        #   3. uvx pybuild-deps → .konflux/requirements-build-all.txt (full build tree, needs network)
+        #   4. pin uv-build to 0.11.7 (MSRV 1.92, compatible with UBI 10 rustc)
+        #   5. split proxy-missing pkgs → .konflux/requirements-build-pypi.txt
+        python3 scripts/konflux_requirements.py
+
+        echo "Generated files:"
+        ls -lh .konflux/
+
+    # Step 3 — pack the mutated source tree (now containing .konflux/) back into
+    # a new OCI Trusted Artifact and write its URI to the SOURCE_ARTIFACT result
+    # so that prefetch-dependencies can consume it.
+    - name: create-trusted-artifact
+      image: quay.io/konflux-ci/build-trusted-artifacts:latest@sha256:0d5769f1a100f6b4f330cfa5d2bd22efc50bdb184e270ca84404e25c0b8fcf80
+      args:
+        - create
+        - --store
+        - $(params.oci-storage)
+        - $(results.SOURCE_ARTIFACT.path)=/var/workdir/source
+      env:
+        - name: IMAGE_EXPIRES_AFTER
+          value: $(params.oci-artifact-expires-after)
