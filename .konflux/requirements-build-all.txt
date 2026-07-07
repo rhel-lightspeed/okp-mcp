@@ -1,7 +1,6 @@
 calver==2025.10.20 \
     --hash=sha256:c98b376c2424642224d456b2f70c51402343e008c63d204634665e1a2a2835f5 \
     --hash=sha256:d7d75224eed9d9263f4fb30008487615196d208d14752bfd93fea7af2c84f508
-    # via trove-classifiers
 cffi==2.1.0 ; platform_python_implementation != "PyPy" \
     --hash=sha256:02cb7ff33ded4f1532476731f89ede53e2e488a8e6205515a82144246ffa7dcc \
     --hash=sha256:03e9810d18c646077e501f661b682fbf5dee4676048527ca3cffe66faa9960dd \
@@ -103,14 +102,9 @@ cffi==2.1.0 ; platform_python_implementation != "PyPy" \
     --hash=sha256:f9912624a0c0b834b7520d7769b3644453aabc0a7e1c839da7359f050750e9bc \
     --hash=sha256:fb62edb5bb52cca65fab91a63afa7561607120d26090a7e8fda6fb9f064726da \
     --hash=sha256:ff067a8d8d880e7809e4ac88eb009bb848870115317b306666502ccad30b147f
-    # via cryptography
 coherent-licensed==0.5.2 \
     --hash=sha256:d8071403ce742d3ac3592ddc4fb7057a46caffb415b928b4d52802e5f208416d \
     --hash=sha256:edccc5193ca2786f8fb3f0c7374637a143985f781f7eaa21aca3af2bd634b82f
-    # via
-    #   jaraco-context
-    #   jaraco-functools
-    #   keyring
 cython==3.2.8 \
     --hash=sha256:0961ba91f59492d1bef974cc6b45993c743162776188bcb79e029b442d5d4fcc \
     --hash=sha256:0d78205f525287de94effa2f2fab6b9edafdab44ef8c58ecf52fcb1013225d68 \
@@ -151,91 +145,27 @@ cython==3.2.8 \
     --hash=sha256:f3bce1f079734753649f8a3d3a95832297207feb120d0ef4fd5db4c813cc6c04 \
     --hash=sha256:f4f23a56b25221a06f91817fe8f3114ab8b48a4fac73187dbb64bc2c4a87961f \
     --hash=sha256:f635e113677666de13a2ec2979e9b1d5b90617cdfd1a691d3559be81e2dd6cb9
-    # via pyyaml
 dunamai==1.26.1 \
     --hash=sha256:2727d939c5b4257cb01ea404372803b477f5176e5a347c43beaf89cd5072e853 \
     --hash=sha256:3b46007bd65b00b4824ead0a1aee365fd22d0ec2b9c219497d4fd48f52860c8b
-    # via uv-dynamic-versioning
 flit-core==3.12.0 \
     --hash=sha256:18f63100d6f94385c6ed57a72073443e1a71a4acb4339491615d0f16d6ff01b2 \
     --hash=sha256:e7a0304069ea895172e3c7bb703292e992c5d1555dd1233ab7b5621b5b69e62c
-    # via
-    #   click
-    #   coherent-licensed
-    #   flit-scm
-    #   idna
-    #   jeepney
-    #   jinja2
-    #   markdown-it-py
-    #   mdurl
-    #   more-itertools
-    #   packaging
-    #   pathspec
-    #   typing-extensions
-    #   wheel
 flit-scm==1.7.0 \
     --hash=sha256:961bd6fb24f31bba75333c234145fff88e6de0a90fc0f7e5e7c79deca69f6bb2 \
     --hash=sha256:9e864caa8a63f708f5bb2f1b5b53eedcd4da75ec2cc6221a64cea7aa5c9eae1a
-    # via exceptiongroup
 hatch-fancy-pypi-readme==25.1.0 \
     --hash=sha256:9c58ed3dff90d51f43414ce37009ad1d5b0f08ffc9fc216998a06380f01c0045 \
     --hash=sha256:ce0134c40d63d874ac48f48ccc678b8f3b62b8e50e9318520d2bffc752eedaf3
-    # via
-    #   attrs
-    #   httpcore
-    #   httpx
-    #   jsonschema
-    #   pydantic
 hatch-vcs==0.5.0 \
     --hash=sha256:0395fa126940340215090c344a2bf4e2a77bcbe7daab16f41b37b98c95809ff9 \
     --hash=sha256:b49677dbdc597460cc22d01b27ab3696f5e16a21ecf2700fb01bc28e1f2a04a7
-    # via
-    #   attrs
-    #   cyclopts
-    #   jsonschema
-    #   jsonschema-specifications
-    #   platformdirs
-    #   referencing
-    #   uncalled-for
-    #   urllib3
 hatchling==1.30.1 \
     --hash=sha256:161eacafb3c6f91526e92116d21426369f2c36e98c36a864f11a96345ad4ee31 \
     --hash=sha256:eee4fd45357f72ebb3d7a42e5d72cfb5e29ed426d79e8836288926c4258d5f2e
-    # via
-    #   aiofile
-    #   annotated-types
-    #   attrs
-    #   beartype
-    #   cyclopts
-    #   dnspython
-    #   docstring-parser
-    #   fastmcp
-    #   fastmcp-slim
-    #   griffelib
-    #   hatch-fancy-pypi-readme
-    #   hatch-vcs
-    #   httpcore
-    #   httpx
-    #   jsonschema
-    #   jsonschema-specifications
-    #   mcp
-    #   opentelemetry-api
-    #   platformdirs
-    #   pydantic
-    #   pydantic-settings
-    #   pygments
-    #   python-multipart
-    #   referencing
-    #   starlette
-    #   typing-inspection
-    #   uncalled-for
-    #   urllib3
-    #   uv-dynamic-versioning
-    #   uvicorn
 jinja2==3.1.6 \
     --hash=sha256:0137fb05990d35f1275a587e9aee6d56da821fc83491a0fb838183be43f66d6d \
     --hash=sha256:85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67
-    # via uv-dynamic-versioning
 markupsafe==3.0.3 \
     --hash=sha256:0303439a41979d9e74d18ff5e2dd8c43ed6c6001fd40e5bf2e43f7bd9bbc523f \
     --hash=sha256:068f375c472b3e7acbe2d5318dea141359e6900156b5b2ba06a30b169086b91a \
@@ -326,7 +256,6 @@ markupsafe==3.0.3 \
     --hash=sha256:f71a396b3bf33ecaa1626c255855702aca4d3d9fea5e051b41ac59a9c1c41edc \
     --hash=sha256:f9e130248f4462aaa8e2552d547f36ddadbeaa573879158d721bbd33dfe4743a \
     --hash=sha256:fed51ac40f757d41b7c48425901843666a6677e3e8eb0abcff09e4ba6e664f50
-    # via jinja2
 maturin==1.14.1 \
     --hash=sha256:15cea8fcb3ba47dd636f50092bb34baea8b04ac777392f23e6bf8a9a61efb894 \
     --hash=sha256:1a04de0a20188f95c721b5702eed18140bdcccb28c386797093eca3f62f4d4e0 \
@@ -342,131 +271,49 @@ maturin==1.14.1 \
     --hash=sha256:dfc54ae32e6fcb18302193ab9a30b0b25eefffba994ae13238974805533ef75e \
     --hash=sha256:f3306078070c1508fd715b9116070cbcaff5959024272a9f1e6f5cb29768b86c \
     --hash=sha256:ffe5ad71f21d1e6603c4dd75f7fee34adf5ed5ebcebb692886549888ebb329ed
-    # via
-    #   cryptography
-    #   pydantic-core
-    #   rpds-py
-    #   uv-build
-    #   watchfiles
 packaging==26.2 \
     --hash=sha256:5fc45236b9446107ff2415ce77c807cee2862cb6fac22b8a73826d0693b0980e \
     --hash=sha256:ff452ff5a3e828ce110190feff1178bb1f2ea2281fa2075aadb987c2fb221661
-    # via
-    #   hatchling
-    #   setuptools-scm
-    #   vcs-versioning
-    #   wheel
 pathspec==1.1.1 \
     --hash=sha256:17db5ecd524104a120e173814c90367a96a98d07c45b2e10c2f3919fff91bf5a \
     --hash=sha256:a00ce642f577bf7f473932318056212bc4f8bfdf53128c78bbd5af0b9b20b189
-    # via hatchling
 pdm-backend==2.4.9 \
     --hash=sha256:8d1064751dadb0c40b1026b46826a448d85c8228a564985c62fb53d4aba538a1 \
     --hash=sha256:c41a852ccbf4b567b033db9b2ae78660d7a4ea49307719959ab88a01f0aabb2e
-    # via griffelib
 pdm-pep517==1.1.4 \
     --hash=sha256:7f49121e70b42dca296fac962210dd2da07a39575fc5673137ad661633b2cf3f \
     --hash=sha256:c9fe65d06cf193f864ac2b38372a355450ff7f847aefc9b59e89fe2cf19f32b9
-    # via jsonref
 pluggy==1.6.0 \
     --hash=sha256:7dcc130b76258d33b90f61b658791dede3486c3e6bfb003ee5c9bfb396dd22f3 \
     --hash=sha256:e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746
-    # via hatchling
 poetry-core==2.4.1 \
     --hash=sha256:89dceb6c10e9c6d8650a16183400e3c9ff9ddee13b0a81023b5575334a2b3744 \
     --hash=sha256:acf06f9537cd2625bdaec926d95d90b557ba15353bc71d27a3a8a441042b5316
-    # via
-    #   dunamai
-    #   jsonschema-path
-    #   openapi-pydantic
-    #   pathable
-    #   rich
-    #   tomlkit
 pycparser==3.0 ; implementation_name != "PyPy" and platform_python_implementation != "PyPy" \
     --hash=sha256:600f49d217304a5902ac3c37e1281c9fe94e4d0489de643a9504c5cdfdfc6b29 \
     --hash=sha256:b727414169a36b7d524c1c3e31839a521725078d7b2ff038656844266160a992
-    # via cffi
 semantic-version==2.10.0 \
     --hash=sha256:bdabb6d336998cbb378d4b9db3a4b56a1e3235701dc05ea2690d9a997ed5041c \
     --hash=sha256:de78a3b8e0feda74cabc54aab2da702113e33ac9d9eb9d2389bcf1f58b7d9177
-    # via setuptools-rust
 setuptools-scm==10.2.0 \
     --hash=sha256:6cc5ac7da8e54d74e43503be2fa023eb7a1ca820d5c318e6ae20efc48110d6c7 \
     --hash=sha256:ec8ea1738b92e42146a46e29a0e9de9ad462744c63cf9778677b95dfd605adde
-    # via
-    #   anyio
-    #   cachetools
-    #   flit-scm
-    #   hatch-vcs
-    #   httpx-sse
-    #   jaraco-classes
-    #   jaraco-context
-    #   jaraco-functools
-    #   keyring
-    #   pluggy
-    #   setuptools-rust
-    #   urllib3
 tomlkit==0.15.0 \
     --hash=sha256:4dbc8f0fc024412b57ced8757ac7461305126a648ff8c2c807fcb8e133a78738 \
     --hash=sha256:7d1a9ecba3086638211b13814ea79c90dd54dd11993564376f3aa92271f5c7a3
-    # via uv-dynamic-versioning
 trove-classifiers==2026.6.1.19 \
     --hash=sha256:ab4c4ec93cc4a4e7815fa759906e05e6bb3f2fbd92ea0f897288c6a43efd15b3 \
     --hash=sha256:c5132b4b61a829d11cfbd2d72e97f20a45ed6edb95e45c5efdeb5e00836b2745
-    # via hatchling
 uv-build==0.11.7 \
     --hash=sha256:258e3a10929b5de79074078ba1ad8edbdd4db5d9c3cafba81f11b329eeaaca08
-    # via py-key-value-aio
 uv-dynamic-versioning==0.14.0 \
     --hash=sha256:574fbc07e87ace45c01d55967ad3b864871257b98ff5b8ac87c261227ac8db5b \
     --hash=sha256:e087c346a786e98d41292ac2315180fb700cedfb30565fc973d64ce11a112387
-    # via
-    #   fastmcp
-    #   fastmcp-slim
-    #   griffelib
-    #   mcp
 wheel==0.47.0 \
     --hash=sha256:212281cab4dff978f6cedd499cd893e1f620791ca6ff7107cf270781e587eced \
     --hash=sha256:cc72bd1009ba0cf63922e28f94d9d83b920aa2bb28f798a31d0691b02fa3c9b3
-    # via
-    #   authlib
-    #   httpx-sse
-    #   pycparser
 
 # The following packages are considered to be unsafe in a requirements file:
 setuptools==83.0.0 \
     --hash=sha256:025bccbbf0fa05b6192bc64ae1e7b16e001fd6d6d4d5de03c97b1c1ade523bef \
     --hash=sha256:29b23c360f22f414dc7336bb39178cc7bcbf6021ed2733cde173f09dba19abb3
-    # via
-    #   anyio
-    #   authlib
-    #   cachetools
-    #   caio
-    #   calver
-    #   certifi
-    #   cffi
-    #   cryptography
-    #   httpx-sse
-    #   jaraco-classes
-    #   jaraco-context
-    #   jaraco-functools
-    #   joserfc
-    #   keyring
-    #   markupsafe
-    #   maturin
-    #   pathspec
-    #   pluggy
-    #   prometheus-client
-    #   pycparser
-    #   pyjwt
-    #   pyperclip
-    #   python-dotenv
-    #   pyyaml
-    #   rich-rst
-    #   secretstorage
-    #   setuptools-rust
-    #   setuptools-scm
-    #   sse-starlette
-    #   trove-classifiers
-    #   vcs-versioning
-    #   websockets

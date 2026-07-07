@@ -15,16 +15,18 @@ Run this whenever uv.lock or the build-system requirement changes, then
 commit the regenerated files. CI verifies they are in sync (see Makefile).
 """
 
-# ruff: noqa: S603,S607 -- script runs hardcoded external tools found via PATH
+# ruff: noqa: S603 -- script runs hardcoded external tools found via PATH
 
-import os
 import re
+import shutil
 import subprocess
 
 from pathlib import Path
 
 
-KONFLUX_DIR = Path(".konflux")
+UV_BIN = shutil.which("uv") or "uv"
+REPO_ROOT = Path(__file__).parents[1]
+KONFLUX_DIR = REPO_ROOT / ".konflux"
 REQ_FILE = KONFLUX_DIR / "requirements.txt"
 BUILD_FILE = KONFLUX_DIR / "requirements-build.txt"
 BUILD_ALL_FILE = KONFLUX_DIR / "requirements-build-all.txt"
@@ -64,11 +66,13 @@ def export_runtime_deps() -> None:
     """
     subprocess.run(
         [
-            "uv",
+            UV_BIN,
             "export",
             "--frozen",
             "--no-emit-project",
             "--no-dev",
+            "--no-header",
+            "--no-annotate",
             "--format",
             "requirements-txt",
             "--prune",
@@ -81,22 +85,30 @@ def export_runtime_deps() -> None:
             str(REQ_FILE),
         ],
         check=True,
-        text=True,
+        stdout=subprocess.DEVNULL,
     )
 
 
 def export_build_deps() -> None:
     """Export hatchling build backend deps → requirements-build.txt."""
-    result = subprocess.run(
-        ["uv", "pip", "compile", "--generate-hashes", "-"],
+    subprocess.run(
+        [
+            UV_BIN,
+            "pip",
+            "compile",
+            "--generate-hashes",
+            "--no-header",
+            "--no-annotate",
+            "--output-file",
+            BUILD_FILE,
+            "-",
+        ],
         input="hatchling\n",
-        capture_output=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
         check=True,
         text=True,
     )
-    # Strip comment and blank lines
-    lines = [line for line in result.stdout.splitlines() if line and not line.startswith("#")]
-    BUILD_FILE.write_text("\n".join(lines) + "\n")
 
 
 def export_full_build_tree() -> None:
@@ -109,17 +121,20 @@ def export_full_build_tree() -> None:
     (Path.home() / ".cache" / "pybuild-deps").mkdir(parents=True, exist_ok=True)
     subprocess.run(
         [
-            "uvx",
+            UV_BIN,
+            "tool",
+            "run",
             "pybuild-deps",
             "compile",
             "--generate-hashes",
             "--no-header",
+            "--no-annotate",
             "-o",
             str(BUILD_ALL_FILE),
             str(REQ_FILE),
         ],
-        check=True,
-        text=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
     )
 
 
@@ -168,14 +183,7 @@ def split_proxy_missing() -> None:
 
 def main() -> None:
     """Regenerate all .konflux manifests from uv.lock."""
-    # cd to repo root
-    repo_root = subprocess.run(
-        ["git", "rev-parse", "--show-toplevel"],
-        capture_output=True,
-        check=True,
-        text=True,
-    ).stdout.strip()
-    os.chdir(repo_root)
+    print("Creating freeze files...")
     KONFLUX_DIR.mkdir(exist_ok=True)
 
     export_runtime_deps()
@@ -184,10 +192,10 @@ def main() -> None:
     pin_uv_build()
     split_proxy_missing()
 
-    print(f"Wrote {REQ_FILE} ({count_packages(REQ_FILE)} packages)")
-    print(f"Wrote {BUILD_FILE} ({count_packages(BUILD_FILE)} packages, hatchling only)")
-    print(f"Wrote {BUILD_ALL_FILE} ({count_packages(BUILD_ALL_FILE)} packages, full tree)")
-    print(f"Wrote {BUILD_PYPI_FILE} ({count_packages(BUILD_PYPI_FILE)} packages, direct PyPI)")
+    print(f"Wrote {REQ_FILE.relative_to(REPO_ROOT)} ({count_packages(REQ_FILE)} packages)")
+    print(f"Wrote {BUILD_FILE.relative_to(REPO_ROOT)} ({count_packages(BUILD_FILE)} packages, hatchling only)")
+    print(f"Wrote {BUILD_ALL_FILE.relative_to(REPO_ROOT)} ({count_packages(BUILD_ALL_FILE)} packages, full tree)")
+    print(f"Wrote {BUILD_PYPI_FILE.relative_to(REPO_ROOT)} ({count_packages(BUILD_PYPI_FILE)} packages, direct PyPI)")
     print("Remember to commit all four files.")
 
 
