@@ -88,16 +88,24 @@ def export_runtime_deps() -> None:
 
 def export_build_deps() -> None:
     """Export hatchling build backend deps → requirements-build.txt."""
-    result = subprocess.run(
-        ["uv", "pip", "compile", "--generate-hashes", "-"],
+    subprocess.run(
+        [
+            UV_BIN,
+            "pip",
+            "compile",
+            "--generate-hashes",
+            "--no-header",
+            "--no-annotate",
+            "--output-file",
+            BUILD_FILE,
+            "-",
+        ],
         input="hatchling\n",
-        capture_output=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
         check=True,
         text=True,
     )
-    # Strip comment and blank lines
-    lines = [line for line in result.stdout.splitlines() if line and not line.startswith("#")]
-    BUILD_FILE.write_text("\n".join(lines) + "\n")
 
 
 def export_full_build_tree() -> None:
