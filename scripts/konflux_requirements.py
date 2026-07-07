@@ -70,6 +70,7 @@ def export_runtime_deps() -> None:
             "--frozen",
             "--no-emit-project",
             "--no-dev",
+            "--no-header",
             "--format",
             "requirements-txt",
             "--prune",
@@ -82,7 +83,7 @@ def export_runtime_deps() -> None:
             str(REQ_FILE),
         ],
         check=True,
-        text=True,
+        stdout=subprocess.DEVNULL,
     )
 
 
@@ -129,8 +130,8 @@ def export_full_build_tree() -> None:
             str(BUILD_ALL_FILE),
             str(REQ_FILE),
         ],
-        check=True,
-        text=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
     )
 
 
@@ -179,6 +180,7 @@ def split_proxy_missing() -> None:
 
 def main() -> None:
     """Regenerate all .konflux manifests from uv.lock."""
+    print("Creating freeze files...")
     KONFLUX_DIR.mkdir(exist_ok=True)
 
     export_runtime_deps()
