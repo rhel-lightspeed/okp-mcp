@@ -25,6 +25,7 @@ from pathlib import Path
 
 
 UV_BIN = shutil.which("uv") or "uv"
+KONFLUX_DIR = Path(__file__).parents[1] / ".konflux"
 REQ_FILE = KONFLUX_DIR / "requirements.txt"
 BUILD_FILE = KONFLUX_DIR / "requirements-build.txt"
 BUILD_ALL_FILE = KONFLUX_DIR / "requirements-build-all.txt"
@@ -170,14 +171,6 @@ def split_proxy_missing() -> None:
 
 def main() -> None:
     """Regenerate all .konflux manifests from uv.lock."""
-    # cd to repo root
-    repo_root = subprocess.run(
-        ["git", "rev-parse", "--show-toplevel"],
-        capture_output=True,
-        check=True,
-        text=True,
-    ).stdout.strip()
-    os.chdir(repo_root)
     KONFLUX_DIR.mkdir(exist_ok=True)
 
     export_runtime_deps()
