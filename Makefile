@@ -27,12 +27,12 @@ ci: lint typecheck radon check-konflux-requirements test
 
 # Regenerate the hermetic build manifests from uv.lock.
 konflux-requirements:
-	scripts/konflux_requirements.py
+	@scripts/konflux_requirements.py
 
 # Fail if the committed manifests have drifted from uv.lock. Run in CI so a
 # lock change without a manifest refresh cannot slip through.
 check-konflux-requirements:
-	scripts/konflux_requirements.py
+	@scripts/konflux_requirements.py
 	@test -z "$$(git status --porcelain -- .konflux/)" \
 		|| { echo "FAIL: .konflux manifests are stale. Run 'make konflux-requirements' and commit."; git status --porcelain -- .konflux/; exit 1; }
 
