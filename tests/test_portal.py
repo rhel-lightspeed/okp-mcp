@@ -759,9 +759,7 @@ class TestDocsToChunksHighlights:
         doc = _make_doc()
         # "fully supported" + "rhv" triggers RHV contamination filter
         hl = {
-            doc.id: {
-                "main_content": ["SPICE is still fully supported in RHV deployments. Use cockpit for management."]
-            }
+            doc.id: {"main_content": ["SPICE is still fully supported in RHV deployments. Use cockpit for management."]}
         }
         chunks = _docs_to_chunks(_make_solr_response([doc], hl), "cockpit management")
         # The RHV sentence should be filtered out, keeping only the cockpit sentence

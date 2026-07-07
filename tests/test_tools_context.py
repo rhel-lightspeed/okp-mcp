@@ -150,7 +150,7 @@ async def test_format_document_uses_chunked_highlight_passages_for_documentation
         main_content="Long body text that should not be used when highlights are available.",
     )
     data = SolrResponse(
-        highlighting= {
+        highlighting={
             doc.id: {
                 "main_content": [
                     "First <em>network</em> configuration snippet.",
@@ -200,7 +200,7 @@ async def test_format_document_non_documentation_keeps_flat_highlights():
         main_content="Long solution body.",
     )
     data = SolrResponse(
-        highlighting= {
+        highlighting={
             doc.id: {
                 "main_content": [
                     "First <em>kernel</em> snippet.",
@@ -227,7 +227,7 @@ async def test_format_document_documentation_budget_uses_remaining_space():
         main_content="Long body text.",
     )
     data = SolrResponse(
-        highlighting= {
+        highlighting={
             doc.id: {
                 "main_content": [
                     "First <em>network</em> snippet with enough detail to consume budget.",
@@ -252,12 +252,11 @@ async def test_format_document_falls_back_when_highlights_clean_to_empty():
         documentKind="documentation",
         view_uri="/documentation/en-us/rhel/9/html/virtualization/index",
         main_content=(
-            "intro\n\nConfiguring KVM virtualization on RHEL systems."
-            "\n\nUse virsh to inspect virtual machines."
+            "intro\n\nConfiguring KVM virtualization on RHEL systems.\n\nUse virsh to inspect virtual machines."
         ),
     )
     data = SolrResponse(
-        highlighting= {
+        highlighting={
             doc.id: {
                 "main_content": [
                     "RHV is <em>commonly used</em> and fully supported.",
