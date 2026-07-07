@@ -32,6 +32,8 @@ make test        # pytest with coverage
 make konflux-requirements        # regenerate .konflux hermetic manifests from uv.lock
 make check-konflux-requirements  # fail if .konflux manifests drifted from uv.lock
 make rpm-lock                    # regenerate rpms.lock.yaml from rpms.in.yaml
+make lock                        # resolve deps and update uv.lock
+make freeze                      # lock + regenerate .konflux manifests (preferred workflow)
 make hermeto-prefetch             # run Hermeto prefetch locally (requires podman)
 make hermeto-clean                # remove .hermeto-out/
 ```
@@ -122,9 +124,10 @@ rpms.lock.yaml                # resolved RPM dependency tree (generated from rpm
     functional.yml         # Functional tests against live Solr (triggered after ci.yml)
     scorecard.yml          # OpenSSF Scorecard: security posture, weekly + push-to-main
 docs/
-  CONTAINER_BUILD.md     # Container build process, data flow diagrams, hermetic builds
-  RELEASE_BRANCHES.md    # Release branch workflow
-  SOLR_EXPLORATION.md    # Historical: original redhat-okp container schema map
+  CONTAINER_BUILD.md         # Container build process, data flow diagrams, hermetic builds
+  RELEASE_BRANCHES.md        # Release branch workflow
+  SOLR_EXPLORATION.md        # Historical: original redhat-okp container schema map
+  UPDATING_REQUIREMENTS.md   # Dependency update workflow: make freeze, lock, konflux-requirements
 openshift/
   okp-mcp.yml                   # OpenShift deployment template (Deployment, Service, ServiceAccount)
   qe-gating-stage-trigger.yml   # OpenShift Job template that triggers the auto-qe-gating GitLab pipeline after staging deploys
@@ -157,6 +160,7 @@ SECURITY.md            # Vulnerability reporting via GitHub Security Advisories
 | Trigger QE pipeline after staging deploy | `openshift/qe-gating-stage-trigger.yml` | OpenShift Job template; calls the GitLab CI trigger API for the auto-qe-gating project. Secret `auto-qe-trigger` supplies `gitlab-url`, `project-id`, `trigger-token`. |
 | Run locally with systemd | `quadlet/` | Rootless quadlet files: `.container`, `.network`, `.volume`; see `quadlet/README.md` |
 | Modify pre-commit hooks | `.pre-commit-config.yaml` | Runs on every commit: ruff, gitleaks, whitespace, YAML/TOML checks |
+| Update Python dependencies | `pyproject.toml`, `uv.lock`, `.konflux/` | See [docs/UPDATING_REQUIREMENTS.md](docs/UPDATING_REQUIREMENTS.md); `make freeze` is the preferred single command |
 | Change hermetic build deps | `scripts/konflux_requirements.py`, `.konflux/` | Regenerate with `make konflux-requirements` after a `uv.lock`/build-system change; CI gates drift |
 | Change RPM toolchain deps | `rpms.in.yaml`, `scripts/install-toolchain.sh` | Edit `rpms.in.yaml`, run `make rpm-lock`, update `install-toolchain.sh` if package list changed |
 | Change container install logic | `scripts/container-install.sh`, `Containerfile` | Build venv → wheel → app venv; branches on `BUILD_FROM_SOURCE` and `/cachi2/cachi2.env` |
