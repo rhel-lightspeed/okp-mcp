@@ -1,4 +1,4 @@
-.PHONY: fix lint format typecheck radon test ci setup konflux-requirements check-konflux-requirements rpm-lock hermeto-prefetch hermeto-clean
+.PHONY: check-konflux-requirements ci fix format freeze hermeto-clean hermeto-prefetch konflux-requirements lint lock radon rpm-lock setup test typecheck
 
 fix:
 	uv run --locked ruff check --fix
@@ -68,3 +68,9 @@ rpm-lock:
 	BUILDER=$$(awk '/^FROM /{print $$2; exit}' Containerfile) && \
 	podman run --rm -v "$$(pwd):/work:z" -w /work \
 	  $(RLP_IMAGE) --image "$$BUILDER" rpms.in.yaml
+
+
+lock:
+	uv lock
+
+freeze: lock konflux-requirements
