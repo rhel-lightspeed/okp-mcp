@@ -5,13 +5,13 @@ fix:
 	uv run --locked ruff format
 
 lint:
-	uv run --locked ruff check src/ tests/
+	uv run --locked ruff check src/ tests/ scripts/
 
 format:
-	uv run --locked ruff format src/ tests/
+	uv run --locked ruff format src/ tests/ scripts/
 
 typecheck:
-	uv run --locked ty check src/
+	uv run --locked ty check src/ scripts/
 
 radon:
 	@uv run --locked radon cc src/ -s --min C | grep -q . \
