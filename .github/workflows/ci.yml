@@ -36,6 +36,10 @@ jobs:
             step_name: Run lint
             command: make lint
 
+          - name: Format
+            step_name: Run format check
+            command: make format
+
           - name: Complexity
             step_name: Check complexity
             command: make radon

@@ -21,7 +21,7 @@ radon:
 test:
 	uv run --locked pytest
 
-ci: lint typecheck radon check-konflux-requirements test
+ci: lint format typecheck radon check-konflux-requirements test
 	@echo ""
 	@echo "✅ All CI checks passed!"
 
