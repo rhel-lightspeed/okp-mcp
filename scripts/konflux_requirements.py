@@ -15,16 +15,16 @@ Run this whenever uv.lock or the build-system requirement changes, then
 commit the regenerated files. CI verifies they are in sync (see Makefile).
 """
 
-# ruff: noqa: S603,S607 -- script runs hardcoded external tools found via PATH
+# ruff: noqa: S603 -- script runs hardcoded external tools found via PATH
 
-import os
 import re
+import shutil
 import subprocess
 
 from pathlib import Path
 
 
-KONFLUX_DIR = Path(".konflux")
+UV_BIN = shutil.which("uv") or "uv"
 REQ_FILE = KONFLUX_DIR / "requirements.txt"
 BUILD_FILE = KONFLUX_DIR / "requirements-build.txt"
 BUILD_ALL_FILE = KONFLUX_DIR / "requirements-build-all.txt"
@@ -64,7 +64,7 @@ def export_runtime_deps() -> None:
     """
     subprocess.run(
         [
-            "uv",
+            UV_BIN,
             "export",
             "--frozen",
             "--no-emit-project",
@@ -109,7 +109,9 @@ def export_full_build_tree() -> None:
     (Path.home() / ".cache" / "pybuild-deps").mkdir(parents=True, exist_ok=True)
     subprocess.run(
         [
-            "uvx",
+            UV_BIN,
+            "tool",
+            "run",
             "pybuild-deps",
             "compile",
             "--generate-hashes",
