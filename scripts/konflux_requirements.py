@@ -25,7 +25,8 @@ from pathlib import Path
 
 
 UV_BIN = shutil.which("uv") or "uv"
-KONFLUX_DIR = Path(__file__).parents[1] / ".konflux"
+REPO_ROOT = Path(__file__).parents[1]
+KONFLUX_DIR = REPO_ROOT / ".konflux"
 REQ_FILE = KONFLUX_DIR / "requirements.txt"
 BUILD_FILE = KONFLUX_DIR / "requirements-build.txt"
 BUILD_ALL_FILE = KONFLUX_DIR / "requirements-build-all.txt"
@@ -191,10 +192,10 @@ def main() -> None:
     pin_uv_build()
     split_proxy_missing()
 
-    print(f"Wrote {REQ_FILE} ({count_packages(REQ_FILE)} packages)")
-    print(f"Wrote {BUILD_FILE} ({count_packages(BUILD_FILE)} packages, hatchling only)")
-    print(f"Wrote {BUILD_ALL_FILE} ({count_packages(BUILD_ALL_FILE)} packages, full tree)")
-    print(f"Wrote {BUILD_PYPI_FILE} ({count_packages(BUILD_PYPI_FILE)} packages, direct PyPI)")
+    print(f"Wrote {REQ_FILE.relative_to(REPO_ROOT)} ({count_packages(REQ_FILE)} packages)")
+    print(f"Wrote {BUILD_FILE.relative_to(REPO_ROOT)} ({count_packages(BUILD_FILE)} packages, hatchling only)")
+    print(f"Wrote {BUILD_ALL_FILE.relative_to(REPO_ROOT)} ({count_packages(BUILD_ALL_FILE)} packages, full tree)")
+    print(f"Wrote {BUILD_PYPI_FILE.relative_to(REPO_ROOT)} ({count_packages(BUILD_PYPI_FILE)} packages, direct PyPI)")
     print("Remember to commit all four files.")
 
 
