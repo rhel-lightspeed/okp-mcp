@@ -157,3 +157,13 @@ jobs:
 
       - name: Test container startup
         run: scripts/test-container-startup.sh okp-mcp:test-${{ matrix.platform }}
+
+  functional:
+    name: Functional Tests
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build
+    uses: ./.github/workflows/functional.yml
+    secrets:
+      REGISTRY_REDHAT_IO_USERNAME: ${{ secrets.REGISTRY_REDHAT_IO_USERNAME }}
+      REGISTRY_REDHAT_IO_PASSWORD: ${{ secrets.REGISTRY_REDHAT_IO_PASSWORD }}
+      OKP_ACCESS_KEY: ${{ secrets.OKP_ACCESS_KEY }}

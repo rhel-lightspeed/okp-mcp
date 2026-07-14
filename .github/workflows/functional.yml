@@ -1,11 +1,14 @@
 name: Functional Tests
 
 on:
-  # Run after CI/CD passes on main (push only, not PRs)
-  workflow_run:
-    workflows: [CI/CD]
-    branches: [main]
-    types: [completed]
+  workflow_call:
+    secrets:
+      REGISTRY_REDHAT_IO_USERNAME:
+        required: true
+      REGISTRY_REDHAT_IO_PASSWORD:
+        required: true
+      OKP_ACCESS_KEY:
+        required: true
 
 permissions:
   contents: read
@@ -18,9 +21,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    if: >-
-      github.event.workflow_run.conclusion == 'success'
-      && github.event.workflow_run.event == 'push'
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
