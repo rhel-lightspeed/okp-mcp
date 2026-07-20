@@ -60,7 +60,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          uv sync --locked
+          uv sync --locked --group dev
           echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
 
       - name: ${{ matrix.test.step_name }}
@@ -96,7 +96,9 @@ jobs:
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
 
       - name: Install dependencies
-        run: uv sync --locked --group dev
+        run: |
+          uv sync --locked --group dev
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
 
       - name: Run tests
         run: make test
