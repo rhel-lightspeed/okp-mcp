@@ -11,7 +11,7 @@ dependencies = [
     # fastmcp 3.4.3 introduces breaking changes
     # and okp mcp returns 421. See issue:
     # https://github.com/PrefectHQ/fastmcp/pull/4405#issuecomment-4899319730
-    "fastmcp>=3.3.1,<3.4.3",
+    "fastmcp>=3.4.4,<3.5.0",
     "httpx",
     "prometheus_client>=0.25.0",
     "pydantic-settings>=2.14.1",
