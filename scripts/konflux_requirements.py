@@ -47,7 +47,7 @@ UV_BUILD_PIN = (
 # Packages the Konflux artifact registry proxy cannot find. These go into a
 # separate file with --index-url pointing directly at PyPI. Add new package
 # names here as failures are discovered.
-PROXY_MISSING = re.compile(r"^(setuptools-rust|vcs-versioning)==")
+PROXY_MISSING = re.compile(r"^(setuptools-rust|vcs-versioning|(flit-(scm|core)))==")
 
 
 def count_packages(path: Path) -> int:

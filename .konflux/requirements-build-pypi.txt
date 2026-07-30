@@ -1,8 +1,8 @@
 --index-url https://pypi.org/simple/
 
-setuptools-rust==1.13.0 \
-    --hash=sha256:666439c4d90e968bb625bcf87ec0aa02b4f49e599d2f5dc255c633a04e8eca99 \
-    --hash=sha256:f2afcf4baeee689910ce49cfa8aad4e08cce72f417449bcc32891b8664fdc726
-vcs-versioning==2.2.2 \
-    --hash=sha256:4ac4ded78720cdb4d0291ae58ace87e1e9201912e1023f3029c6cce5c9152cfb \
-    --hash=sha256:fe7fb216f8780a5516e7864a9333aacb1b70015b087a9be3918da76ef2760808
+flit-core==3.12.0 \
+    --hash=sha256:18f63100d6f94385c6ed57a72073443e1a71a4acb4339491615d0f16d6ff01b2 \
+    --hash=sha256:e7a0304069ea895172e3c7bb703292e992c5d1555dd1233ab7b5621b5b69e62c
+flit-scm==1.7.0 \
+    --hash=sha256:961bd6fb24f31bba75333c234145fff88e6de0a90fc0f7e5e7c79deca69f6bb2 \
+    --hash=sha256:9e864caa8a63f708f5bb2f1b5b53eedcd4da75ec2cc6221a64cea7aa5c9eae1a
