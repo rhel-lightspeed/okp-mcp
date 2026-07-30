@@ -120,7 +120,8 @@ rpms.lock.yaml                # resolved RPM dependency tree (generated from rpm
 .github/
   CODEOWNERS               # PR review assignment (@rhel-lightspeed/developers)
   workflows/
-    ci.yml                 # CI/CD: lint, typecheck, radon, pytest matrix, container build+push
+    ci.yml                 # CI: lint, typecheck, radon, pytest matrix, container build+push
+    manifests.yml          # Hermetic manifest drift check (runs only when uv.lock or .konflux/ change)
     functional.yml         # Functional tests against live Solr (triggered after ci.yml)
     scorecard.yml          # OpenSSF Scorecard: security posture, weekly + push-to-main
 docs/
@@ -165,7 +166,7 @@ SECURITY.md            # Vulnerability reporting via GitHub Security Advisories
 | Change RPM toolchain deps | `rpms.in.yaml`, `scripts/install-toolchain.sh` | Edit `rpms.in.yaml`, run `make rpm-lock`, update `install-toolchain.sh` if package list changed |
 | Change container install logic | `scripts/container-install.sh`, `Containerfile` | Build venv → wheel → app venv; branches on `BUILD_FROM_SOURCE` and `/cachi2/cachi2.env` |
 | Toggle hermetic build | `.tekton/pull_request.yaml`, `.tekton/push.yaml` | `hermetic` + `prefetch-input` params; pipeline already wires `prefetch-dependencies` |
-| Modify CI/CD workflows | `.github/workflows/` | `ci.yml` (test+container), `functional.yml` (Solr integration), `scorecard.yml` (OpenSSF) |
+| Modify CI/CD workflows | `.github/workflows/` | `ci.yml` (test+container), `manifests.yml` (hermetic drift), `functional.yml` (Solr integration), `scorecard.yml` (OpenSSF) |
 | Solr schema reference | `docs/SOLR_EXPLORATION.md` | Historical: original redhat-okp container schema map |
 
 ## Tekton Pipeline Maintenance
