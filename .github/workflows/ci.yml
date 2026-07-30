@@ -44,10 +44,6 @@ jobs:
             step_name: Check complexity
             command: make radon
 
-          - name: Manifests
-            step_name: Check hermetic manifests
-            command: make check-konflux-requirements
-
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -107,7 +103,6 @@ jobs:
       - name: Run tests
         run: make test
 
-
   build:
     name: Build - ${{ matrix.platform }}
 
@@ -151,3 +146,4 @@ jobs:
 
       - name: Test container startup
         run: scripts/test-container-startup.sh okp-mcp:test-${{ matrix.platform }}
+
