@@ -83,7 +83,7 @@ Wait until you see `Started Solr server on port 8983`. Subsequent starts of the 
 podman run -d --pod okp --name okp-mcp \
   -e MCP_TRANSPORT=streamable-http \
   -e MCP_SOLR_URL=http://localhost:8983 \
-  quay.io/redhat-user-workloads/rhel-lightspeed-tenant/okp-mcp
+  quay.io/redhat-user-workloads/rhel-lightspeed-tenant/rhel-knowledge-bridge
 ```
 
 ### 4. Verify
