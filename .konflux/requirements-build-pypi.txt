@@ -1,8 +1,2 @@
 --index-url https://pypi.org/simple/
 
-flit-core==3.12.0 \
-    --hash=sha256:18f63100d6f94385c6ed57a72073443e1a71a4acb4339491615d0f16d6ff01b2 \
-    --hash=sha256:e7a0304069ea895172e3c7bb703292e992c5d1555dd1233ab7b5621b5b69e62c
-flit-scm==1.7.0 \
-    --hash=sha256:961bd6fb24f31bba75333c234145fff88e6de0a90fc0f7e5e7c79deca69f6bb2 \
-    --hash=sha256:9e864caa8a63f708f5bb2f1b5b53eedcd4da75ec2cc6221a64cea7aa5c9eae1a
