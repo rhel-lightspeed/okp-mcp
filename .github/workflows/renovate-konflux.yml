@@ -33,9 +33,6 @@ jobs:
       - name: Install uv
         # v8.2.0
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
-        with:
-          enable-cache: true
-          prune-cache: false
 
       - name: Regenerate Konflux manifests
         run: make konflux-requirements
