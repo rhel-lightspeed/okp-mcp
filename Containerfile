@@ -1,5 +1,5 @@
 # Stage 1: Builder - Hummingbird Python 3.12 builder (has bash, dnf5, pip).
-FROM registry.access.redhat.com/hi/python:3.12-builder@sha256:1229d5db1d58db60c73725ddc8a40272d821c5d52cfab9af30b4b12f0001f482 AS builder
+FROM registry.access.redhat.com/hi/python:3.12-builder@sha256:41f024c4694007c686276cd592995c60f30b7226f3a0f6d696da837279ffc2bd AS builder
 
 # Builder defaults to non-root (UID 65532); root is needed to create /opt and
 # install packages. This stage is ephemeral — only the venv is copied out.
