@@ -6,7 +6,7 @@ After=okp-solr.service
 Requires=okp-solr.service
 
 [Container]
-Image=quay.io/redhat-user-workloads/rhel-lightspeed-tenant/rhel-knowledge-bridge:latest
+Image=quay.io/redhat-user-workloads/rhel-lightspeed-tenant/rhel-knowledge-bridge:latest@sha256:305e976ac3936bfab0ffba40e90a696a8aede2859cca0c79de1b4abfb2824003
 ContainerName=okp-mcp
 Network=okp.network
 PublishPort=8000:8000
