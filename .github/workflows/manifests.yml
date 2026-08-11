@@ -44,7 +44,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          uv sync --locked
+          uv sync --locked --only-group build
           echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
 
       - name: Check hermetic manifests
