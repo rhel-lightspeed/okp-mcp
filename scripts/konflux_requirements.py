@@ -121,10 +121,7 @@ def export_full_build_tree() -> None:
     (Path.home() / ".cache" / "pybuild-deps").mkdir(parents=True, exist_ok=True)
     subprocess.run(
         [
-            UV_BIN,
-            "tool",
-            "run",
-            "pybuild-deps",
+            shutil.which("pybuild-deps") or "pybuild-deps",
             "compile",
             "--generate-hashes",
             "--no-header",
