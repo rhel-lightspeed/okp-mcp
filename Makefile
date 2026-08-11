@@ -69,8 +69,7 @@ rpm-lock:
 	podman run --rm -v "$$(pwd):/work:z" -w /work \
 	  $(RLP_IMAGE) --image "$$BUILDER" rpms.in.yaml
 
+upgrade:
+	uv lock --upgrade
 
-lock:
-	uv lock
-
-freeze: lock konflux-requirements
+freeze: upgrade konflux-requirements
