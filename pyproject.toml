@@ -43,6 +43,19 @@ dev = [
     "ty>=0.0.39",
 ]
 
+build = [
+    "pybuild-deps",
+]
+
+[tool.uv]
+# pip>=26.2 removed the default for RequirementCommand.make_requirement_preparer()'s
+# allow_editables argument. pip-tools (a pybuild-deps dependency) does not pass it,
+# so resolution crashes with:
+#   TypeError: RequirementCommand.make_requirement_preparer() missing 1 required
+#   keyword-only argument: 'allow_editables'
+# Remove this constraint once pip-tools/pybuild-deps supports pip>=26.2.
+constraint-dependencies = ["pip<26.2"]
+
 [tool.coverage.run]
 branch = true
 data_file = "coverage/.data"
