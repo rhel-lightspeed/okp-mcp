@@ -133,8 +133,8 @@ def export_full_build_tree() -> None:
             str(BUILD_ALL_FILE),
             str(REQ_FILE),
         ],
+        check=True,
         stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
     )
 
 
