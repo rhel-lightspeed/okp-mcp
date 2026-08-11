@@ -28,7 +28,7 @@ uv.lock (single source of truth)
   ├─ scripts/konflux_requirements.py
   │    ├─ uv export ──────────────────→ .konflux/requirements.txt        (runtime deps)
   │    ├─ uv pip compile ─────────────→ .konflux/requirements-build.txt  (hatchling only)
-  │    └─ uvx pybuild-deps compile
+  │    └─ uv run --group build pybuild-deps compile
   │         ├─ uv-build pin (rustc compat) ──→ .konflux/requirements-build-all.txt  (full build tree)
   │         └─ proxy-missing split ──────────→ .konflux/requirements-build-pypi.txt (direct PyPI)
   │
@@ -91,7 +91,7 @@ Containerfile (--network none)
 |------|----------|-----------|
 | `requirements.txt` | Hash-pinned runtime deps | `uv export` |
 | `requirements-build.txt` | Hatchling + transitive deps (prebuilt-wheel path only) | `uv pip compile` |
-| `requirements-build-all.txt` | Full PEP 517 build tree for every sdist (from-source path) | `uvx pybuild-deps compile` |
+| `requirements-build-all.txt` | Full PEP 517 build tree for every sdist (from-source path) | `uv run --group build pybuild-deps compile` |
 | `requirements-build-pypi.txt` | Packages missing from Konflux artifact proxy (direct PyPI) | Split from `requirements-build-all.txt` |
 
 Regenerate after any `uv.lock` or `pyproject.toml` build-system change:
@@ -101,6 +101,8 @@ make konflux-requirements   # regenerates all four .konflux/ files
 make check-konflux-requirements  # CI gate: fails if manifests drifted from uv.lock
 ```
 
+`pybuild-deps` itself lives in the `build` dependency group (`pyproject.toml`), not the default `dev` group, since it's only needed by `konflux_requirements.py`. `uv run --group build` syncs it on demand from `uv.lock`, so no separate `uv sync --group build` step is required locally; CI's `renovate-konflux.yml` syncs it explicitly for speed.
+
 ### Win32-only dep pruning
 
 `uv export` emits Windows-only transitive deps (`pywin32`, `pywin32-ctypes`, `colorama`) with `sys_platform == 'win32'` markers. Hermeto ignores environment markers and fails on packages with no Linux distribution. `konflux_requirements.py` prunes them via `uv export --prune`. If a new win32-only transitive dep appears, add another `--prune <pkg>` flag.
@@ -108,6 +110,10 @@ make check-konflux-requirements  # CI gate: fails if manifests drifted from uv.l
 ### uv-build version pin
 
 `pybuild-deps` resolves the latest `uv-build`, but `uv-build >=0.11.8` requires rustc ≥1.93. The Hummingbird builder image ships rustc 1.92, so `konflux_requirements.py` pins `uv-build==0.11.7` (MSRV 1.92). Remove this pin when the builder image ships rustc ≥1.93.
+
+### pip version pin (pybuild-deps compatibility)
+
+`pip>=26.2` removed the default for an internal `pip-tools` resolver argument (`allow_editables`), which `pybuild-deps`' `pip-tools` dependency does not pass, crashing with `TypeError: RequirementCommand.make_requirement_preparer() missing 1 required keyword-only argument: 'allow_editables'`. `pyproject.toml` pins `pip<26.2` via `[tool.uv] constraint-dependencies` so `uv.lock` (and therefore the `build` group) always resolves a compatible `pip`. Remove this constraint once `pip-tools`/`pybuild-deps` supports newer `pip`.
 
 ### Proxy-missing package split
 

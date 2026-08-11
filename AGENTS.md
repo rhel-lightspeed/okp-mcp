@@ -10,6 +10,7 @@ After any code change, verify that this file is still accurate. Update it in the
 
 ```bash
 uv sync                          # install all deps (including dev)
+uv sync --group build            # also install the build group (pybuild-deps; only needed by scripts/konflux_requirements.py)
 uv run okp-mcp                   # run server (streamable-http, default)
 uv run okp-mcp --transport stdio                        # stdio mode
 uv run okp-mcp --transport streamable-http --port 8000  # explicit HTTP mode
@@ -162,7 +163,7 @@ SECURITY.md            # Vulnerability reporting via GitHub Security Advisories
 | Run locally with systemd | `quadlet/` | Rootless quadlet files: `.container`, `.network`, `.volume`; see `quadlet/README.md` |
 | Modify pre-commit hooks | `.pre-commit-config.yaml` | Runs on every commit: ruff, gitleaks, whitespace, YAML/TOML checks |
 | Update Python dependencies | `pyproject.toml`, `uv.lock`, `.konflux/` | See [docs/UPDATING_REQUIREMENTS.md](docs/UPDATING_REQUIREMENTS.md); `make freeze` is the preferred single command |
-| Change hermetic build deps | `scripts/konflux_requirements.py`, `.konflux/` | Regenerate with `make konflux-requirements` after a `uv.lock`/build-system change; CI gates drift |
+| Change hermetic build deps | `scripts/konflux_requirements.py`, `.konflux/` | Regenerate with `make konflux-requirements` after a `uv.lock`/build-system change; CI gates drift. `pybuild-deps` lives in the `build` dependency group (`pyproject.toml`), pinned in `uv.lock` and installed via `uv run --frozen --group build`, not `uv tool run`, for reproducible resolution. |
 | Change RPM toolchain deps | `rpms.in.yaml`, `scripts/install-toolchain.sh` | Edit `rpms.in.yaml`, run `make rpm-lock`, update `install-toolchain.sh` if package list changed |
 | Change container install logic | `scripts/container-install.sh`, `Containerfile` | Build venv → wheel → app venv; branches on `BUILD_FROM_SOURCE` and `/cachi2/cachi2.env` |
 | Toggle hermetic build | `.tekton/pull_request.yaml`, `.tekton/push.yaml` | `hermetic` + `prefetch-input` params; pipeline already wires `prefetch-dependencies` |
