@@ -31,8 +31,7 @@ konflux-requirements:
 
 # Fail if the committed manifests have drifted from uv.lock. Run in CI so a
 # lock change without a manifest refresh cannot slip through.
-check-konflux-requirements:
-	@scripts/konflux_requirements.py
+check-konflux-requirements: konflux-requirements
 	@test -z "$$(git status --porcelain -- .konflux/)" \
 		|| { echo "FAIL: .konflux manifests are stale. Run 'make konflux-requirements' and commit."; git status --porcelain -- .konflux/; exit 1; }
 
