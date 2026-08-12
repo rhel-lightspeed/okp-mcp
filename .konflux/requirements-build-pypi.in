@@ -1,3 +1,4 @@
 # These packages are missing from the proxy in CI so must come from PyPI.
+# Hermeto, not pip, requires these to be in separate files.
 setuptools-rust
 vcs-versioning
