@@ -55,11 +55,9 @@ fi
 "${UV_PYTHON:-python3}" -m venv "${VENVS}/build"
 if [[ "${BUILD_FROM_SOURCE:-0}" = "1" ]]; then
     # Full build tree: every PEP 517 backend needed to compile every sdist
-    # (maturin, setuptools-rust, etc.). Split across three files because some
-    # packages are not available on the Konflux artifact proxy.
+    # (maturin, setuptools-rust, etc.).
     "${VENVS}/build/bin/pip" install --no-cache-dir "${PIP_BINARY_FLAG}" --require-hashes \
-        -r .konflux/requirements-build-all.txt \
-        -r .konflux/requirements-build-pypi.txt
+        -r .konflux/requirements-build-all.txt
 else
     # Prebuilt-wheel path: only hatchling (our build backend) is needed.
     # Runtime deps install from manylinux wheels, no sdist compilation.

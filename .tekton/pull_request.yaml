@@ -41,7 +41,7 @@ spec:
     # plus the build-toolchain RPMs (rpms.lock.yaml). hermetic builds compile
     # every wheel from source, so the network is fully isolated.
     - name: prefetch-input
-      value: '[{"type": "pip", "path": ".", "requirements_files": [".konflux/requirements.txt"], "requirements_build_files": [".konflux/requirements-build-all.txt", ".konflux/requirements-build-pypi.txt"]}, {"type": "rpm", "path": "."}]'
+      value: '[{"type": "pip", "path": ".", "requirements_files": [".konflux/requirements.txt"], "requirements_build_files": [".konflux/hermeto/build.txt", ".konflux/hermeto/build-pypi.txt"]}, {"type": "rpm", "path": "."}]'
 
     - name: image-expires-after
       value: 5d

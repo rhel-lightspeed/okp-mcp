@@ -53,7 +53,7 @@ hermeto-prefetch:
 	  -w "$$(pwd)" \
 	  $(HERMETO_IMAGE) fetch-deps \
 	  --source . --output ./.hermeto-out \
-	  '[{"type": "pip", "path": ".", "requirements_files": [".konflux/requirements.txt"], "requirements_build_files": [".konflux/requirements-build-all.txt", ".konflux/requirements-build-pypi.txt"]}, {"type": "rpm", "path": "."}]'
+	  '[{"type": "pip", "path": ".", "requirements_files": [".konflux/requirements.txt"], "requirements_build_files": [".konflux/hermeto/build.txt", ".konflux/hermeto/build-pypi.txt"]}, {"type": "rpm", "path": "."}]'
 
 hermeto-clean:
 	rm -rf .hermeto-out/

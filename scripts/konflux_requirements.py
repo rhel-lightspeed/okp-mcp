@@ -3,9 +3,14 @@
 
 The following freeze files are created:
   .konflux/requirements.txt            runtime deps (from uv.lock)
-  .konflux/requirements-build.txt      build requirements for all dependencies (from requirements-build.in)
-  .konflux/requirements-build-pypi.txt packages missing from CI proxy that mush come from PyPI
-  .konflux/requirements-build-all.txt  convenience file that includes both requirements-build* files
+  .konflux/requirements-build.txt      direct build requirements (should match pyproject.toml)
+  .konflux/requirements-build-all.txt  build requirements for this project and indirect dependencies
+  .konflux/hermeto/build.txt           build deps served by the CI proxy
+  .konflux/hermeto/build-pypi.txt      build deps that must come from PyPI
+
+pip reads the .konflux/*.txt files (index resolved from the offline mirror).
+Hermeto reads the .konflux/hermeto/*.txt files, which are flat and split by
+index because Hermeto scopes --index-url per file and ignores nested -r.
 
 The hermetic build (Hermeto type:pip) prefetches these.
 The Containerfile installs from the offline mirror.
@@ -20,6 +25,7 @@ commit the regenerated files. CI verifies they are in sync (see Makefile).
 import shutil
 import subprocess
 
+from itertools import chain
 from pathlib import Path
 
 
@@ -30,11 +36,19 @@ REQ_FILE = KONFLUX_DIR / "requirements.txt"
 BUILD_FILE = KONFLUX_DIR / "requirements-build.txt"
 BUILD_ALL_FILE = KONFLUX_DIR / "requirements-build-all.txt"
 BUILD_PYPI_FILE = KONFLUX_DIR / "requirements-build-pypi.txt"
+HERMETO_DIR = KONFLUX_DIR / "hermeto"
+HERMETO_BUILD_FILE = HERMETO_DIR / "build.txt"
+HERMETO_BUILD_PYPI_FILE = HERMETO_DIR / "build-pypi.txt"
 
 
 def count_packages(path: Path) -> int:
     """Count lines that start with a package name (letter)."""
     return sum(1 for line in path.read_text().splitlines() if line and line[0].isalpha())
+
+
+def clean() -> None:
+    for file in KONFLUX_DIR.rglob("*.txt"):
+        file.unlink()
 
 
 def export_deps() -> None:
@@ -71,16 +85,13 @@ def export_deps() -> None:
 def export_build_deps() -> None:
     """Freeze build requirements: requirements-build.in → requirements-build.txt."""
 
-    # Generate freeze file for all build dependencies.
-    # Exclude files that must come from PyPI listed in requirements-build-pypi.in.
+    # Generate freeze file for direct build dependencies.
     subprocess.run(
         [
             UV_BIN,
             "pip",
             "compile",
             "--generate-hashes",
-            "--excludes",
-            BUILD_PYPI_FILE,
             "--no-header",
             "--no-annotate",
             "--output-file",
@@ -92,9 +103,60 @@ def export_build_deps() -> None:
         text=True,
     )
 
-    # Generate freeze file for dependencies that must com from PyPI and are not
-    # available through the CI proxy. Do not include indirect dependencies (--no-deps)
-    # so that only the minimal number of packages are in this file.
+    # Generate freeze file for direct and indirect build requirements.
+    # Use two requirements files as input since only heremeto needs separate
+    # freeze files.
+    subprocess.run(
+        [
+            UV_BIN,
+            "pip",
+            "compile",
+            "--generate-hashes",
+            "--no-header",
+            "--no-annotate",
+            "--output-file",
+            BUILD_ALL_FILE,
+            BUILD_ALL_FILE.with_suffix(".in"),
+            BUILD_PYPI_FILE.with_suffix(".in"),
+        ],
+        stdout=subprocess.DEVNULL,
+        check=True,
+        text=True,
+    )
+
+
+def export_hermeto_files() -> None:
+    """Freeze Hermeto build requirements into .konflux/hermeto/.
+
+    Hermeto scopes --index-url per file so the build deps are split into two
+    flat files: build.txt for packages served by the CI proxy (default index)
+    and build-pypi.txt for packages that must come from PyPI.
+    """
+
+    # Generate freeze file for build dependencies available through the CI proxy.
+    # Exclude packages listed in requirements-build-pypi.in.
+    subprocess.run(
+        [
+            UV_BIN,
+            "pip",
+            "compile",
+            "--generate-hashes",
+            "--excludes",
+            BUILD_PYPI_FILE.with_suffix(".in"),
+            "--no-header",
+            "--no-annotate",
+            "--output-file",
+            HERMETO_BUILD_FILE,
+            BUILD_ALL_FILE.with_suffix(".in"),
+        ],
+        stdout=subprocess.DEVNULL,
+        check=True,
+        text=True,
+    )
+
+    # Generate freeze file for dependencies that must come from PyPI and are not
+    # available through the CI proxy. Indirect dependencies are skipped (--no-deps)
+    # so that indirect dependencies are not listed in this file.
     subprocess.run(
         [
             UV_BIN,
@@ -105,7 +167,7 @@ def export_build_deps() -> None:
             "--no-header",
             "--no-annotate",
             "--output-file",
-            BUILD_PYPI_FILE,
+            HERMETO_BUILD_PYPI_FILE,
             BUILD_PYPI_FILE.with_suffix(".in"),
         ],
         stdout=subprocess.DEVNULL,
@@ -114,27 +176,29 @@ def export_build_deps() -> None:
     )
 
     # Add PyPI URL to the beginning of the file.
-    with BUILD_PYPI_FILE.open("r+") as f:
+    with HERMETO_BUILD_PYPI_FILE.open("r+") as f:
         content = f.read()
         f.seek(0)
         f.write("--index-url https://pypi.org/simple/\n\n" + content)
-
-    # Create a single requirements file that points to the other two files for convenience.
-    BUILD_ALL_FILE.write_text(f"-r {BUILD_FILE.name}\n-r {BUILD_PYPI_FILE.name}")
 
 
 def main() -> None:
     """Regenerate all .konflux manifests from uv.lock."""
     print("Creating freeze files...")
     KONFLUX_DIR.mkdir(exist_ok=True)
+    HERMETO_DIR.mkdir(exist_ok=True)
 
+    clean()
     export_deps()
     export_build_deps()
+    export_hermeto_files()
 
     print(f"Wrote {REQ_FILE.relative_to(REPO_ROOT)} ({count_packages(REQ_FILE)} packages)")
     print(f"Wrote {BUILD_FILE.relative_to(REPO_ROOT)} ({count_packages(BUILD_FILE)} packages, hatchling only)")
     print(f"Wrote {BUILD_ALL_FILE.relative_to(REPO_ROOT)} ({count_packages(BUILD_ALL_FILE)} packages, full tree)")
-    print(f"Wrote {BUILD_PYPI_FILE.relative_to(REPO_ROOT)} ({count_packages(BUILD_PYPI_FILE)} packages, direct PyPI)")
+    print(f"Wrote {HERMETO_BUILD_FILE.relative_to(REPO_ROOT)} ({count_packages(HERMETO_BUILD_FILE)} packages, proxy)")
+    pypi_count = count_packages(HERMETO_BUILD_PYPI_FILE)
+    print(f"Wrote {HERMETO_BUILD_PYPI_FILE.relative_to(REPO_ROOT)} ({pypi_count} packages, direct PyPI)")
     print("Remember to commit all files.")
 
 
