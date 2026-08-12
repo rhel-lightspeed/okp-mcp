@@ -46,6 +46,8 @@ def export_deps() -> None:
     tries to fetch pywin32 for Linux, finds no distribution, and fails the build.
     The runtime is always Linux/distroless, so these are never installed.
     """
+    prune = ("colorama", "pywin32", "pywin32-ctypes")
+    prune_args = list(chain.from_iterable(("--prune", package) for package in prune))
     subprocess.run(
         [
             UV_BIN,
@@ -57,12 +59,7 @@ def export_deps() -> None:
             "--no-annotate",
             "--format",
             "requirements-txt",
-            "--prune",
-            "colorama",
-            "--prune",
-            "pywin32",
-            "--prune",
-            "pywin32-ctypes",
+            *prune_args,
             "-o",
             str(REQ_FILE),
         ],
