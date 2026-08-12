@@ -1,0 +1,3 @@
+# These packages are missing from the proxy in CI so must come from PyPI.
+setuptools-rust
+vcs-versioning
