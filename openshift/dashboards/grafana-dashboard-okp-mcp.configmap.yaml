@@ -33,14 +33,22 @@ data:
       "panels": [
         {
           "collapsed": false,
-          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 0
+          },
           "id": 1,
           "panels": [],
           "title": "HTTP Performance",
           "type": "row"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "fieldConfig": {
             "defaults": {
               "unit": "reqps",
@@ -50,19 +58,41 @@ data:
                 "lineInterpolation": "linear",
                 "fillOpacity": 10
               },
-              "color": { "mode": "fixed", "fixedColor": "green" }
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "green"
+              }
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 1 },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 0,
+            "y": 1
+          },
           "id": 2,
           "options": {
-            "legend": { "calcs": ["mean", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
-            "tooltip": { "mode": "multi", "sort": "desc" }
+            "legend": {
+              "calcs": [
+                "mean",
+                "lastNotNull"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
           },
           "targets": [
             {
-              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
               "editorMode": "code",
               "expr": "sum(rate(okp_http_requests_total{namespace=\"$namespace\", job=\"okp-mcp\", path!=\"/metrics\", method=\"POST\"}[$__rate_interval]))",
               "legendFormat": "POST",
@@ -74,7 +104,10 @@ data:
           "type": "timeseries"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "fieldConfig": {
             "defaults": {
               "unit": "reqps",
@@ -84,19 +117,41 @@ data:
                 "lineInterpolation": "linear",
                 "fillOpacity": 10
               },
-              "color": { "mode": "shades", "fixedColor": "red" }
+              "color": {
+                "mode": "shades",
+                "fixedColor": "red"
+              }
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 1 },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 8,
+            "y": 1
+          },
           "id": 3,
           "options": {
-            "legend": { "calcs": ["mean", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
-            "tooltip": { "mode": "multi", "sort": "desc" }
+            "legend": {
+              "calcs": [
+                "mean",
+                "lastNotNull"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
           },
           "targets": [
             {
-              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
               "editorMode": "code",
               "expr": "sum(rate(okp_http_requests_total{namespace=\"$namespace\", job=\"okp-mcp\", path!=\"/metrics\", method=\"POST\", status=~\"[45]..\"}[$__rate_interval])) by (status)",
               "legendFormat": "POST {{status}}",
@@ -108,7 +163,10 @@ data:
           "type": "timeseries"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "fieldConfig": {
             "defaults": {
               "unit": "s",
@@ -118,19 +176,41 @@ data:
                 "lineInterpolation": "linear",
                 "fillOpacity": 10
               },
-              "color": { "mode": "fixed", "fixedColor": "yellow" }
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "yellow"
+              }
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 1 },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 16,
+            "y": 1
+          },
           "id": 4,
           "options": {
-            "legend": { "calcs": ["mean", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
-            "tooltip": { "mode": "multi", "sort": "desc" }
+            "legend": {
+              "calcs": [
+                "mean",
+                "lastNotNull"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
           },
           "targets": [
             {
-              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
               "editorMode": "code",
               "expr": "histogram_quantile(0.95, sum(rate(okp_http_request_duration_seconds_bucket{namespace=\"$namespace\", job=\"okp-mcp\", path!=\"/metrics\", method=\"POST\"}[$__rate_interval])) by (le))",
               "legendFormat": "POST",
@@ -143,14 +223,22 @@ data:
         },
         {
           "collapsed": false,
-          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 },
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 9
+          },
           "id": 5,
           "panels": [],
           "title": "MCP Tool Operations",
           "type": "row"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "fieldConfig": {
             "defaults": {
               "unit": "ops",
@@ -160,19 +248,40 @@ data:
                 "lineInterpolation": "linear",
                 "fillOpacity": 10
               },
-              "color": { "mode": "palette-classic" }
+              "color": {
+                "mode": "palette-classic"
+              }
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 10 },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 0,
+            "y": 10
+          },
           "id": 6,
           "options": {
-            "legend": { "calcs": ["mean", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
-            "tooltip": { "mode": "multi", "sort": "desc" }
+            "legend": {
+              "calcs": [
+                "mean",
+                "lastNotNull"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
           },
           "targets": [
             {
-              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
               "editorMode": "code",
               "expr": "sum(rate(okp_tool_calls_total{namespace=\"$namespace\", job=\"okp-mcp\"}[$__rate_interval])) by (tool)",
               "legendFormat": "{{tool}}",
@@ -184,7 +293,10 @@ data:
           "type": "timeseries"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "fieldConfig": {
             "defaults": {
               "unit": "s",
@@ -194,19 +306,40 @@ data:
                 "lineInterpolation": "linear",
                 "fillOpacity": 10
               },
-              "color": { "mode": "palette-classic" }
+              "color": {
+                "mode": "palette-classic"
+              }
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 10 },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 8,
+            "y": 10
+          },
           "id": 7,
           "options": {
-            "legend": { "calcs": ["mean", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
-            "tooltip": { "mode": "multi", "sort": "desc" }
+            "legend": {
+              "calcs": [
+                "mean",
+                "lastNotNull"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
           },
           "targets": [
             {
-              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
               "editorMode": "code",
               "expr": "histogram_quantile(0.50, sum(rate(okp_tool_duration_seconds_bucket{namespace=\"$namespace\", job=\"okp-mcp\"}[$__rate_interval])) by (le, tool))",
               "legendFormat": "{{tool}}",
@@ -218,7 +351,10 @@ data:
           "type": "timeseries"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "fieldConfig": {
             "defaults": {
               "unit": "s",
@@ -228,19 +364,40 @@ data:
                 "lineInterpolation": "linear",
                 "fillOpacity": 10
               },
-              "color": { "mode": "palette-classic" }
+              "color": {
+                "mode": "palette-classic"
+              }
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 10 },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 16,
+            "y": 10
+          },
           "id": 8,
           "options": {
-            "legend": { "calcs": ["mean", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
-            "tooltip": { "mode": "multi", "sort": "desc" }
+            "legend": {
+              "calcs": [
+                "mean",
+                "lastNotNull"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
           },
           "targets": [
             {
-              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
               "editorMode": "code",
               "expr": "histogram_quantile(0.95, sum(rate(okp_tool_duration_seconds_bucket{namespace=\"$namespace\", job=\"okp-mcp\"}[$__rate_interval])) by (le, tool))",
               "legendFormat": "{{tool}}",
@@ -253,14 +410,22 @@ data:
         },
         {
           "collapsed": false,
-          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 },
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 18
+          },
           "id": 9,
           "panels": [],
           "title": "Solr Backend",
           "type": "row"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "fieldConfig": {
             "defaults": {
               "unit": "reqps",
@@ -270,19 +435,41 @@ data:
                 "lineInterpolation": "linear",
                 "fillOpacity": 10
               },
-              "color": { "mode": "shades", "fixedColor": "blue" }
+              "color": {
+                "mode": "shades",
+                "fixedColor": "blue"
+              }
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 19 },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 0,
+            "y": 19
+          },
           "id": 10,
           "options": {
-            "legend": { "calcs": ["mean", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
-            "tooltip": { "mode": "multi", "sort": "desc" }
+            "legend": {
+              "calcs": [
+                "mean",
+                "lastNotNull"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
           },
           "targets": [
             {
-              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
               "editorMode": "code",
               "expr": "sum(rate(okp_solr_queries_total{namespace=\"$namespace\", job=\"okp-mcp\"}[$__rate_interval])) by (status)",
               "legendFormat": "{{status}}",
@@ -294,7 +481,10 @@ data:
           "type": "timeseries"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "fieldConfig": {
             "defaults": {
               "unit": "reqps",
@@ -304,19 +494,41 @@ data:
                 "lineInterpolation": "linear",
                 "fillOpacity": 10
               },
-              "color": { "mode": "fixed", "fixedColor": "red" }
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "red"
+              }
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 19 },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 8,
+            "y": 19
+          },
           "id": 11,
           "options": {
-            "legend": { "calcs": ["mean", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
-            "tooltip": { "mode": "multi", "sort": "desc" }
+            "legend": {
+              "calcs": [
+                "mean",
+                "lastNotNull"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
           },
           "targets": [
             {
-              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
               "editorMode": "code",
               "expr": "sum(rate(okp_solr_queries_total{namespace=\"$namespace\", job=\"okp-mcp\", status=\"error\"}[$__rate_interval]))",
               "legendFormat": "errors",
@@ -328,7 +540,10 @@ data:
           "type": "timeseries"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "fieldConfig": {
             "defaults": {
               "unit": "s",
@@ -338,19 +553,41 @@ data:
                 "lineInterpolation": "linear",
                 "fillOpacity": 10
               },
-              "color": { "mode": "fixed", "fixedColor": "yellow" }
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "yellow"
+              }
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 19 },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 16,
+            "y": 19
+          },
           "id": 12,
           "options": {
-            "legend": { "calcs": ["mean", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
-            "tooltip": { "mode": "multi", "sort": "desc" }
+            "legend": {
+              "calcs": [
+                "mean",
+                "lastNotNull"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
           },
           "targets": [
             {
-              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
               "editorMode": "code",
               "expr": "histogram_quantile(0.95, sum(rate(okp_solr_query_duration_seconds_bucket{namespace=\"$namespace\", job=\"okp-mcp\"}[$__rate_interval])) by (le))",
               "legendFormat": "p95",
@@ -363,34 +600,54 @@ data:
         },
         {
           "collapsed": false,
-          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 27 },
-          "id": 13,
-          "panels": [],
-          "title": "Pod Resources",
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 27
+          },
+          "id": 26,
+          "title": "Quality",
           "type": "row"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "Document IDs that returned zero results from Solr. Should be 0. Non-zero means the LLM passed a bad doc_id or search results are stale.",
           "fieldConfig": {
             "defaults": {
-              "unit": "percent",
-              "decimals": 2,
+              "unit": "short",
+              "decimals": 0,
               "thresholds": {
                 "mode": "absolute",
                 "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "yellow", "value": 70 },
-                  { "color": "red", "value": 90 }
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 1
+                  }
                 ]
               }
             },
             "overrides": []
           },
-          "gridPos": { "h": 4, "w": 12, "x": 0, "y": 28 },
-          "id": 14,
+          "gridPos": {
+            "h": 4,
+            "w": 4,
+            "x": 0,
+            "y": 28
+          },
+          "id": 27,
           "options": {
             "reduceOptions": {
-              "calcs": ["lastNotNull"],
+              "calcs": [
+                "lastNotNull"
+              ],
               "fields": "",
               "values": false
             },
@@ -401,7 +658,758 @@ data:
           },
           "targets": [
             {
-              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "increase(okp_document_not_found_total{namespace=\"$namespace\", job=\"okp-mcp\"}[$__range])",
+              "legendFormat": "Not Found",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Not Found",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "Times the LLM called get_document without a query on a large doc page. Should be 0. Non-zero means the model isn't following system prompt instructions.",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "decimals": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 1
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 4,
+            "x": 4,
+            "y": 28
+          },
+          "id": 28,
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "colorMode": "background",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "increase(okp_document_nudge_total{namespace=\"$namespace\", job=\"okp-mcp\"}[$__range])",
+              "legendFormat": "Nudge",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Nudge",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "Solr highlighting returned nothing; fell back to local BM25 extraction. Occasional hits expected (query terms may not appear in doc), but sustained count means something is broken.",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "decimals": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 1
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 4,
+            "x": 8,
+            "y": 28
+          },
+          "id": 29,
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "colorMode": "background",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "increase(okp_document_highlight_fallback_total{namespace=\"$namespace\", job=\"okp-mcp\"}[$__range])",
+              "legendFormat": "BM25 Fallback",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "BM25 Fallback",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "Search queries that returned no results from Solr. Some are expected (obscure questions), but a spike may indicate an indexing issue.",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "decimals": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 4,
+            "x": 12,
+            "y": 28
+          },
+          "id": 30,
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "colorMode": "background",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "increase(okp_search_zero_results_total{namespace=\"$namespace\", job=\"okp-mcp\"}[$__range])",
+              "legendFormat": "Zero Results",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Zero Results",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "Low-relevance chunks dropped by the score quality filter. This is the filter working as designed, not a failure signal.",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "decimals": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 4,
+            "x": 16,
+            "y": 28
+          },
+          "id": 31,
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "colorMode": "background",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "increase(okp_search_score_filter_dropped_total{namespace=\"$namespace\", job=\"okp-mcp\"}[$__range])",
+              "legendFormat": "Score Filtered",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Score Filtered",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "Search results flagged as containing deprecated product content.",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "decimals": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 4,
+            "x": 20,
+            "y": 28
+          },
+          "id": 32,
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "colorMode": "background",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "increase(okp_search_deprecation_detected_total{namespace=\"$namespace\", job=\"okp-mcp\"}[$__range])",
+              "legendFormat": "Deprecation",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Deprecation",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "Document retrieval failures over time. All three should trend toward zero.",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "spanNulls": true,
+                "gradientMode": "opacity",
+                "lineInterpolation": "linear",
+                "fillOpacity": 10
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Not Found"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "red"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Nudge"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "orange"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "BM25 Fallback"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "yellow"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 0,
+            "y": 32
+          },
+          "id": 33,
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "lastNotNull"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "increase(okp_document_not_found_total{namespace=\"$namespace\", job=\"okp-mcp\"}[$__rate_interval])",
+              "legendFormat": "Not Found",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "increase(okp_document_nudge_total{namespace=\"$namespace\", job=\"okp-mcp\"}[$__rate_interval])",
+              "legendFormat": "Nudge",
+              "range": true,
+              "refId": "B"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "increase(okp_document_highlight_fallback_total{namespace=\"$namespace\", job=\"okp-mcp\"}[$__rate_interval])",
+              "legendFormat": "BM25 Fallback",
+              "range": true,
+              "refId": "C"
+            }
+          ],
+          "title": "Document Retrieval",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "Solr highlighting vs local BM25 fallback. Ideally all retrievals use Solr highlights (green). Fallback (red) means Solr couldn't highlight — degraded but functional.",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "spanNulls": true,
+                "gradientMode": "opacity",
+                "lineInterpolation": "linear",
+                "fillOpacity": 10
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Solr Highlights"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "green"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "BM25 Fallback"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "red"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 8,
+            "y": 32
+          },
+          "id": 34,
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "lastNotNull"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "increase(okp_document_highlight_used_total{namespace=\"$namespace\", job=\"okp-mcp\"}[$__rate_interval])",
+              "legendFormat": "Solr Highlights",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "increase(okp_document_highlight_fallback_total{namespace=\"$namespace\", job=\"okp-mcp\"}[$__rate_interval])",
+              "legendFormat": "BM25 Fallback",
+              "range": true,
+              "refId": "B"
+            }
+          ],
+          "title": "Highlighting Health",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "Search quality signals. Zero Results and Intent No Match may indicate coverage gaps. Score Filtered is the quality filter working as designed. Deprecation flags stale content.",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "spanNulls": true,
+                "gradientMode": "opacity",
+                "lineInterpolation": "linear",
+                "fillOpacity": 10
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Zero Results"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "red"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Score Filtered"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "blue"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Deprecation"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "purple"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Intent No Match"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "orange"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 16,
+            "y": 32
+          },
+          "id": 35,
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "lastNotNull"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "increase(okp_search_zero_results_total{namespace=\"$namespace\", job=\"okp-mcp\"}[$__rate_interval])",
+              "legendFormat": "Zero Results",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "increase(okp_search_score_filter_dropped_total{namespace=\"$namespace\", job=\"okp-mcp\"}[$__rate_interval])",
+              "legendFormat": "Score Filtered",
+              "range": true,
+              "refId": "B"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "increase(okp_search_deprecation_detected_total{namespace=\"$namespace\", job=\"okp-mcp\"}[$__rate_interval])",
+              "legendFormat": "Deprecation",
+              "range": true,
+              "refId": "C"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "sum(increase(okp_intent_no_match_total{namespace=\"$namespace\", job=\"okp-mcp\"}[$__rate_interval]))",
+              "legendFormat": "Intent No Match",
+              "range": true,
+              "refId": "D"
+            }
+          ],
+          "title": "Search Quality",
+          "type": "timeseries"
+        },
+        {
+          "collapsed": false,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 40
+          },
+          "id": 13,
+          "panels": [],
+          "title": "Pod Resources",
+          "type": "row"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "decimals": 2,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 70
+                  },
+                  {
+                    "color": "red",
+                    "value": 90
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 12,
+            "x": 0,
+            "y": 41
+          },
+          "id": 14,
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "colorMode": "background",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
               "editorMode": "code",
               "expr": "sum(node_namespace_pod_container:container_cpu_usage_seconds_total:sum_irate{namespace=\"$namespace\", pod=~\"okp-mcp.*\"}) / clamp_min(sum(kube_pod_container_resource_requests{namespace=\"$namespace\", pod=~\"okp-mcp.*\", resource=\"cpu\"}), 1) * 100",
               "legendFormat": "CPU %",
@@ -413,26 +1421,45 @@ data:
           "type": "stat"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "fieldConfig": {
             "defaults": {
               "unit": "percent",
               "thresholds": {
                 "mode": "absolute",
                 "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "yellow", "value": 70 },
-                  { "color": "red", "value": 90 }
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 70
+                  },
+                  {
+                    "color": "red",
+                    "value": 90
+                  }
                 ]
               }
             },
             "overrides": []
           },
-          "gridPos": { "h": 4, "w": 12, "x": 12, "y": 28 },
+          "gridPos": {
+            "h": 4,
+            "w": 12,
+            "x": 12,
+            "y": 41
+          },
           "id": 15,
           "options": {
             "reduceOptions": {
-              "calcs": ["lastNotNull"],
+              "calcs": [
+                "lastNotNull"
+              ],
               "fields": "",
               "values": false
             },
@@ -443,7 +1470,10 @@ data:
           },
           "targets": [
             {
-              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
               "editorMode": "code",
               "expr": "sum(container_memory_working_set_bytes{namespace=\"$namespace\", container!=\"\", pod=~\"okp-mcp.*\"}) / clamp_min(sum(kube_pod_container_resource_requests{namespace=\"$namespace\", pod=~\"okp-mcp.*\", resource=\"memory\"}), 1) * 100",
               "legendFormat": "Memory %",
@@ -455,10 +1485,15 @@ data:
           "type": "stat"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "fieldConfig": {
             "defaults": {
-              "color": { "mode": "palette-classic-by-name" },
+              "color": {
+                "mode": "palette-classic-by-name"
+              },
               "custom": {
                 "axisBorderShow": false,
                 "axisCenteredZero": false,
@@ -477,7 +1512,9 @@ data:
                   "group": "A",
                   "mode": "normal"
                 },
-                "thresholdsStyle": { "mode": "off" }
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
               },
               "mappings": [],
               "min": 0,
@@ -485,20 +1522,34 @@ data:
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 45
+          },
           "id": 16,
           "options": {
             "legend": {
-              "calcs": ["mean", "lastNotNull"],
+              "calcs": [
+                "mean",
+                "lastNotNull"
+              ],
               "displayMode": "table",
               "placement": "bottom",
               "showLegend": true
             },
-            "tooltip": { "mode": "multi", "sort": "desc" }
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
           },
           "targets": [
             {
-              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
               "editorMode": "code",
               "expr": "sum(node_namespace_pod_container:container_cpu_usage_seconds_total:sum_irate{namespace=\"$namespace\", pod=~\"okp-mcp.*\"}) by (pod)",
               "legendFormat": "{{pod}}",
@@ -510,10 +1561,15 @@ data:
           "type": "timeseries"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "fieldConfig": {
             "defaults": {
-              "color": { "mode": "palette-classic-by-name" },
+              "color": {
+                "mode": "palette-classic-by-name"
+              },
               "custom": {
                 "axisBorderShow": false,
                 "axisCenteredZero": false,
@@ -532,7 +1588,9 @@ data:
                   "group": "A",
                   "mode": "normal"
                 },
-                "thresholdsStyle": { "mode": "off" }
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
               },
               "mappings": [],
               "min": 0,
@@ -540,20 +1598,34 @@ data:
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 45
+          },
           "id": 17,
           "options": {
             "legend": {
-              "calcs": ["mean", "lastNotNull"],
+              "calcs": [
+                "mean",
+                "lastNotNull"
+              ],
               "displayMode": "table",
               "placement": "bottom",
               "showLegend": true
             },
-            "tooltip": { "mode": "multi", "sort": "desc" }
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
           },
           "targets": [
             {
-              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
               "editorMode": "code",
               "expr": "sum(container_memory_working_set_bytes{namespace=\"$namespace\", container!=\"\", pod=~\"okp-mcp.*\"}) by (pod)",
               "legendFormat": "{{pod}}",
@@ -565,10 +1637,15 @@ data:
           "type": "timeseries"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "fieldConfig": {
             "defaults": {
-              "color": { "mode": "palette-classic-by-name" },
+              "color": {
+                "mode": "palette-classic-by-name"
+              },
               "custom": {
                 "axisBorderShow": false,
                 "axisCenteredZero": false,
@@ -587,7 +1664,9 @@ data:
                   "group": "A",
                   "mode": "none"
                 },
-                "thresholdsStyle": { "mode": "off" }
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
               },
               "mappings": [],
               "max": 100,
@@ -596,20 +1675,34 @@ data:
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 40 },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 53
+          },
           "id": 18,
           "options": {
             "legend": {
-              "calcs": ["mean", "lastNotNull"],
+              "calcs": [
+                "mean",
+                "lastNotNull"
+              ],
               "displayMode": "table",
               "placement": "bottom",
               "showLegend": true
             },
-            "tooltip": { "mode": "multi", "sort": "desc" }
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
           },
           "targets": [
             {
-              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
               "editorMode": "code",
               "expr": "sum(node_namespace_pod_container:container_cpu_usage_seconds_total:sum_irate{namespace=\"$namespace\", pod=~\"okp-mcp.*\"}) / clamp_min(sum(kube_pod_container_resource_requests{namespace=\"$namespace\", pod=~\"okp-mcp.*\", resource=\"cpu\"}), 1) * 100",
               "legendFormat": "CPU % of request",
@@ -621,10 +1714,15 @@ data:
           "type": "timeseries"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "fieldConfig": {
             "defaults": {
-              "color": { "mode": "palette-classic-by-name" },
+              "color": {
+                "mode": "palette-classic-by-name"
+              },
               "custom": {
                 "axisBorderShow": false,
                 "axisCenteredZero": false,
@@ -643,7 +1741,9 @@ data:
                   "group": "A",
                   "mode": "none"
                 },
-                "thresholdsStyle": { "mode": "off" }
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
               },
               "mappings": [],
               "max": 100,
@@ -652,20 +1752,34 @@ data:
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 40 },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 53
+          },
           "id": 19,
           "options": {
             "legend": {
-              "calcs": ["mean", "lastNotNull"],
+              "calcs": [
+                "mean",
+                "lastNotNull"
+              ],
               "displayMode": "table",
               "placement": "bottom",
               "showLegend": true
             },
-            "tooltip": { "mode": "multi", "sort": "desc" }
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
           },
           "targets": [
             {
-              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
               "editorMode": "code",
               "expr": "sum(container_memory_working_set_bytes{namespace=\"$namespace\", container!=\"\", pod=~\"okp-mcp.*\"}) / clamp_min(sum(kube_pod_container_resource_requests{namespace=\"$namespace\", pod=~\"okp-mcp.*\", resource=\"memory\"}), 1) * 100",
               "legendFormat": "Memory % of request",
@@ -677,10 +1791,15 @@ data:
           "type": "timeseries"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "fieldConfig": {
             "defaults": {
-              "color": { "mode": "palette-classic-by-name" },
+              "color": {
+                "mode": "palette-classic-by-name"
+              },
               "custom": {
                 "axisBorderShow": false,
                 "axisCenteredZero": false,
@@ -699,7 +1818,9 @@ data:
                   "group": "A",
                   "mode": "none"
                 },
-                "thresholdsStyle": { "mode": "off" }
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
               },
               "mappings": [],
               "min": 0,
@@ -707,20 +1828,34 @@ data:
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 48 },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 61
+          },
           "id": 20,
           "options": {
             "legend": {
-              "calcs": ["mean", "lastNotNull"],
+              "calcs": [
+                "mean",
+                "lastNotNull"
+              ],
               "displayMode": "table",
               "placement": "bottom",
               "showLegend": true
             },
-            "tooltip": { "mode": "multi", "sort": "desc" }
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
           },
           "targets": [
             {
-              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
               "editorMode": "code",
               "expr": "sum(irate(container_network_receive_bytes_total{namespace=\"$namespace\", pod=~\"okp-mcp.*\"}[$__rate_interval]))",
               "legendFormat": "total",
@@ -732,10 +1867,15 @@ data:
           "type": "timeseries"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "fieldConfig": {
             "defaults": {
-              "color": { "mode": "palette-classic-by-name" },
+              "color": {
+                "mode": "palette-classic-by-name"
+              },
               "custom": {
                 "axisBorderShow": false,
                 "axisCenteredZero": false,
@@ -754,7 +1894,9 @@ data:
                   "group": "A",
                   "mode": "none"
                 },
-                "thresholdsStyle": { "mode": "off" }
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
               },
               "mappings": [],
               "min": 0,
@@ -762,20 +1904,34 @@ data:
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 48 },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 61
+          },
           "id": 21,
           "options": {
             "legend": {
-              "calcs": ["mean", "lastNotNull"],
+              "calcs": [
+                "mean",
+                "lastNotNull"
+              ],
               "displayMode": "table",
               "placement": "bottom",
               "showLegend": true
             },
-            "tooltip": { "mode": "multi", "sort": "desc" }
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
           },
           "targets": [
             {
-              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
               "editorMode": "code",
               "expr": "sum(irate(container_network_transmit_bytes_total{namespace=\"$namespace\", pod=~\"okp-mcp.*\"}[$__rate_interval]))",
               "legendFormat": "total",
@@ -787,69 +1943,137 @@ data:
           "type": "timeseries"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "fieldConfig": {
             "defaults": {
               "custom": {
                 "align": "auto",
-                "cellOptions": { "type": "auto" },
+                "cellOptions": {
+                  "type": "auto"
+                },
                 "inspect": false
               },
               "mappings": []
             },
             "overrides": [
               {
-                "matcher": { "id": "byName", "options": "CPU Usage" },
+                "matcher": {
+                  "id": "byName",
+                  "options": "CPU Usage"
+                },
                 "properties": [
-                  { "id": "unit", "value": "short" },
-                  { "id": "decimals", "value": 3 }
+                  {
+                    "id": "unit",
+                    "value": "short"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 3
+                  }
                 ]
               },
               {
-                "matcher": { "id": "byName", "options": "CPU Requests" },
+                "matcher": {
+                  "id": "byName",
+                  "options": "CPU Requests"
+                },
                 "properties": [
-                  { "id": "unit", "value": "short" },
-                  { "id": "decimals", "value": 3 }
+                  {
+                    "id": "unit",
+                    "value": "short"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 3
+                  }
                 ]
               },
               {
-                "matcher": { "id": "byName", "options": "CPU Limits" },
+                "matcher": {
+                  "id": "byName",
+                  "options": "CPU Limits"
+                },
                 "properties": [
-                  { "id": "unit", "value": "short" },
-                  { "id": "decimals", "value": 3 }
+                  {
+                    "id": "unit",
+                    "value": "short"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 3
+                  }
                 ]
               },
               {
-                "matcher": { "id": "byName", "options": "Memory Usage" },
+                "matcher": {
+                  "id": "byName",
+                  "options": "Memory Usage"
+                },
                 "properties": [
-                  { "id": "unit", "value": "bytes" }
+                  {
+                    "id": "unit",
+                    "value": "bytes"
+                  }
                 ]
               },
               {
-                "matcher": { "id": "byName", "options": "Memory Requests" },
+                "matcher": {
+                  "id": "byName",
+                  "options": "Memory Requests"
+                },
                 "properties": [
-                  { "id": "unit", "value": "bytes" }
+                  {
+                    "id": "unit",
+                    "value": "bytes"
+                  }
                 ]
               },
               {
-                "matcher": { "id": "byName", "options": "Memory Limits" },
+                "matcher": {
+                  "id": "byName",
+                  "options": "Memory Limits"
+                },
                 "properties": [
-                  { "id": "unit", "value": "bytes" }
+                  {
+                    "id": "unit",
+                    "value": "bytes"
+                  }
                 ]
               },
               {
-                "matcher": { "id": "byRegexp", "options": "CPU %|Memory %" },
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "CPU %|Memory %"
+                },
                 "properties": [
-                  { "id": "unit", "value": "percentunit" },
-                  { "id": "decimals", "value": 1 },
+                  {
+                    "id": "unit",
+                    "value": "percentunit"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 1
+                  },
                   {
                     "id": "thresholds",
                     "value": {
                       "mode": "absolute",
                       "steps": [
-                        { "color": "green", "value": null },
-                        { "color": "yellow", "value": 0.7 },
-                        { "color": "red", "value": 0.9 }
+                        {
+                          "color": "green",
+                          "value": null
+                        },
+                        {
+                          "color": "yellow",
+                          "value": 0.7
+                        },
+                        {
+                          "color": "red",
+                          "value": 0.9
+                        }
                       ]
                     }
                   },
@@ -864,7 +2088,12 @@ data:
               }
             ]
           },
-          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 56 },
+          "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 69
+          },
           "id": 22,
           "options": {
             "showHeader": true,
@@ -873,12 +2102,18 @@ data:
               "show": false
             },
             "sortBy": [
-              { "desc": true, "displayName": "CPU %" }
+              {
+                "desc": true,
+                "displayName": "CPU %"
+              }
             ]
           },
           "targets": [
             {
-              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
               "editorMode": "code",
               "expr": "sum(node_namespace_pod_container:container_cpu_usage_seconds_total:sum_irate{namespace=\"$namespace\", pod=~\"okp-mcp.*\"}) by (pod)",
               "format": "table",
@@ -887,7 +2122,10 @@ data:
               "refId": "A"
             },
             {
-              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
               "editorMode": "code",
               "expr": "sum(kube_pod_container_resource_requests{namespace=\"$namespace\", pod=~\"okp-mcp.*\", resource=\"cpu\"}) by (pod)",
               "format": "table",
@@ -896,7 +2134,10 @@ data:
               "refId": "B"
             },
             {
-              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
               "editorMode": "code",
               "expr": "sum(kube_pod_container_resource_limits{namespace=\"$namespace\", pod=~\"okp-mcp.*\", resource=\"cpu\"}) by (pod)",
               "format": "table",
@@ -905,7 +2146,10 @@ data:
               "refId": "C"
             },
             {
-              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
               "editorMode": "code",
               "expr": "sum(node_namespace_pod_container:container_cpu_usage_seconds_total:sum_irate{namespace=\"$namespace\", pod=~\"okp-mcp.*\"}) by (pod) / clamp_min(sum(kube_pod_container_resource_requests{namespace=\"$namespace\", pod=~\"okp-mcp.*\", resource=\"cpu\"}) by (pod), 1)",
               "format": "table",
@@ -914,7 +2158,10 @@ data:
               "refId": "D"
             },
             {
-              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
               "editorMode": "code",
               "expr": "sum(container_memory_working_set_bytes{namespace=\"$namespace\", container!=\"\", pod=~\"okp-mcp.*\"}) by (pod)",
               "format": "table",
@@ -923,7 +2170,10 @@ data:
               "refId": "E"
             },
             {
-              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
               "editorMode": "code",
               "expr": "sum(kube_pod_container_resource_requests{namespace=\"$namespace\", pod=~\"okp-mcp.*\", resource=\"memory\"}) by (pod)",
               "format": "table",
@@ -932,7 +2182,10 @@ data:
               "refId": "F"
             },
             {
-              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
               "editorMode": "code",
               "expr": "sum(kube_pod_container_resource_limits{namespace=\"$namespace\", pod=~\"okp-mcp.*\", resource=\"memory\"}) by (pod)",
               "format": "table",
@@ -941,7 +2194,10 @@ data:
               "refId": "G"
             },
             {
-              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
               "editorMode": "code",
               "expr": "sum(container_memory_working_set_bytes{namespace=\"$namespace\", container!=\"\", pod=~\"okp-mcp.*\"}) by (pod) / clamp_min(sum(kube_pod_container_resource_requests{namespace=\"$namespace\", pod=~\"okp-mcp.*\", resource=\"memory\"}) by (pod), 1)",
               "format": "table",
@@ -990,10 +2246,15 @@ data:
           "type": "table"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "fieldConfig": {
             "defaults": {
-              "color": { "mode": "palette-classic-by-name" },
+              "color": {
+                "mode": "palette-classic-by-name"
+              },
               "custom": {
                 "axisBorderShow": false,
                 "axisCenteredZero": false,
@@ -1012,7 +2273,9 @@ data:
                   "group": "A",
                   "mode": "none"
                 },
-                "thresholdsStyle": { "mode": "off" }
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
               },
               "mappings": [],
               "min": 0,
@@ -1020,20 +2283,34 @@ data:
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 64 },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 77
+          },
           "id": 23,
           "options": {
             "legend": {
-              "calcs": ["mean", "lastNotNull"],
+              "calcs": [
+                "mean",
+                "lastNotNull"
+              ],
               "displayMode": "table",
               "placement": "bottom",
               "showLegend": true
             },
-            "tooltip": { "mode": "multi", "sort": "desc" }
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
           },
           "targets": [
             {
-              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
               "editorMode": "code",
               "expr": "topk(5, sum(node_namespace_pod_container:container_cpu_usage_seconds_total:sum_irate{namespace=\"$namespace\", pod=~\"okp-mcp.*\"}) by (pod))",
               "legendFormat": "{{pod}}",
@@ -1045,10 +2322,15 @@ data:
           "type": "timeseries"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "fieldConfig": {
             "defaults": {
-              "color": { "mode": "palette-classic-by-name" },
+              "color": {
+                "mode": "palette-classic-by-name"
+              },
               "custom": {
                 "axisBorderShow": false,
                 "axisCenteredZero": false,
@@ -1067,7 +2349,9 @@ data:
                   "group": "A",
                   "mode": "none"
                 },
-                "thresholdsStyle": { "mode": "off" }
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
               },
               "mappings": [],
               "min": 0,
@@ -1075,20 +2359,34 @@ data:
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 64 },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 77
+          },
           "id": 24,
           "options": {
             "legend": {
-              "calcs": ["mean", "lastNotNull"],
+              "calcs": [
+                "mean",
+                "lastNotNull"
+              ],
               "displayMode": "table",
               "placement": "bottom",
               "showLegend": true
             },
-            "tooltip": { "mode": "multi", "sort": "desc" }
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
           },
           "targets": [
             {
-              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
               "editorMode": "code",
               "expr": "topk(5, sum(container_memory_working_set_bytes{namespace=\"$namespace\", container!=\"\", pod=~\"okp-mcp.*\"}) by (pod))",
               "legendFormat": "{{pod}}",
@@ -1100,34 +2398,57 @@ data:
           "type": "timeseries"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "fieldConfig": {
             "defaults": {
               "custom": {
                 "align": "auto",
-                "cellOptions": { "type": "auto" },
+                "cellOptions": {
+                  "type": "auto"
+                },
                 "inspect": false
               },
               "mappings": []
             },
             "overrides": [
               {
-                "matcher": { "id": "byName", "options": "Uptime" },
+                "matcher": {
+                  "id": "byName",
+                  "options": "Uptime"
+                },
                 "properties": [
-                  { "id": "unit", "value": "dtdurations" }
+                  {
+                    "id": "unit",
+                    "value": "dtdurations"
+                  }
                 ]
               },
               {
-                "matcher": { "id": "byName", "options": "Restarts" },
+                "matcher": {
+                  "id": "byName",
+                  "options": "Restarts"
+                },
                 "properties": [
                   {
                     "id": "thresholds",
                     "value": {
                       "mode": "absolute",
                       "steps": [
-                        { "color": "green", "value": null },
-                        { "color": "yellow", "value": 1 },
-                        { "color": "red", "value": 5 }
+                        {
+                          "color": "green",
+                          "value": null
+                        },
+                        {
+                          "color": "yellow",
+                          "value": 1
+                        },
+                        {
+                          "color": "red",
+                          "value": 5
+                        }
                       ]
                     }
                   },
@@ -1142,12 +2463,20 @@ data:
               }
             ]
           },
-          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 72 },
+          "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 85
+          },
           "id": 25,
           "options": {
             "showHeader": true,
             "sortBy": [
-              { "desc": false, "displayName": "Pod" }
+              {
+                "desc": false,
+                "displayName": "Pod"
+              }
             ],
             "footer": {
               "show": false
@@ -1155,7 +2484,10 @@ data:
           },
           "targets": [
             {
-              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
               "editorMode": "code",
               "expr": "max(time() - kube_pod_start_time{namespace=\"$namespace\", pod=~\"okp-mcp.*\"}) by (pod)",
               "format": "table",
@@ -1163,7 +2495,10 @@ data:
               "refId": "A"
             },
             {
-              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
               "editorMode": "code",
               "expr": "sum(kube_pod_container_status_restarts_total{namespace=\"$namespace\", pod=~\"okp-mcp.*\"}) by (pod)",
               "format": "table",
@@ -1196,7 +2531,9 @@ data:
               "id": "sortBy",
               "options": {
                 "sort": [
-                  { "field": "Pod" }
+                  {
+                    "field": "Pod"
+                  }
                 ]
               }
             }
@@ -1205,7 +2542,9 @@ data:
         }
       ],
       "schemaVersion": 39,
-      "tags": ["rhel-lightspeed"],
+      "tags": [
+        "rhel-lightspeed"
+      ],
       "templating": {
         "list": [
           {
@@ -1255,7 +2594,10 @@ data:
           }
         ]
       },
-      "time": { "from": "now-6h", "to": "now" },
+      "time": {
+        "from": "now-6h",
+        "to": "now"
+      },
       "timepicker": {},
       "timezone": "",
       "title": "OKP MCP",
