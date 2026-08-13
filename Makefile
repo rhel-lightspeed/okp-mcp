@@ -1,3 +1,12 @@
+# Determine container runtime, preferring Docker on macOS
+OS = $(shell uname)
+CONTAINER_RUNTIMES = podman docker
+ifeq ($(OS), Darwin)
+	CONTAINER_RUNTIMES = docker podman
+endif
+
+CONTAINER_RUNTIME ?= $(shell type -P $(CONTAINER_RUNTIMES) | head -n 1)
+
 .PHONY: check-konflux-requirements ci fix format freeze hermeto-clean hermeto-prefetch konflux-requirements lint lock radon rpm-lock setup test typecheck
 
 fix:
@@ -46,8 +55,8 @@ setup:
 # to the main repo, so Hermeto needs both paths visible inside the container.
 HERMETO_IMAGE ?= ghcr.io/hermetoproject/hermeto:0.56.0
 hermeto-prefetch:
-	GIT_COMMON=$$(cd "$$(git rev-parse --git-common-dir)" && pwd -P) && \
-	podman run --rm \
+	@GIT_COMMON=$$(cd "$$(git rev-parse --git-common-dir)" && pwd -P) && \
+	@$(CONTAINER_RUNTIME) run --rm \
 	  -v "$$(pwd):$$(pwd):z" \
 	  -v "$$GIT_COMMON:$$GIT_COMMON:z" \
 	  -w "$$(pwd)" \
@@ -66,7 +75,7 @@ hermeto-clean:
 RLP_IMAGE ?= quay.io/konflux-ci/rpm-lockfile-prototype:latest
 rpm-lock:
 	BUILDER=$$(awk '/^FROM /{print $$2; exit}' Containerfile) && \
-	podman run --rm -v "$$(pwd):/work:z" -w /work \
+	$(CONTAINER_RUNTIME) run --rm -v "$$(pwd):/work:z" -w /work \
 	  $(RLP_IMAGE) --image "$$BUILDER" rpms.in.yaml
 
 upgrade:
