@@ -188,7 +188,8 @@ class SolrStatus(StrEnum):
 async def _solr_query(params: dict, client: httpx.AsyncClient, *, solr_endpoint: str) -> SolrResponse:
     """Execute a SOLR query and return the parsed JSON response."""
     merged = _SOLR_BASE_PARAMS | params
-    logger.info("SOLR query: q=%r, fq=%r", params.get("q"), params.get("fq"))
+    logger.debug("SOLR query: q=%r, fq=%r", params.get("q"), params.get("fq"))
+    logger.info("SOLR query: defType=%s rows=%s", params.get("defType", "edismax"), params.get("rows"))
     _start = time.monotonic()
     _status = SolrStatus.SUCCESS
     result = SolrResponse()

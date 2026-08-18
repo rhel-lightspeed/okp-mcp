@@ -284,7 +284,7 @@ async def get_document(ctx: Context, doc_id: str, query: str = "") -> str:
     _start = time.monotonic()
 
     doc_id = _normalize_doc_id(doc_id)
-    logger.info("get_document: doc_id=%r query=%r", doc_id, query)
+    logger.info("get_document: doc_id=%r has_query=%s", doc_id, bool(query))
     try:
         app = get_app_context(ctx)
         if query:
@@ -301,10 +301,10 @@ async def get_document(ctx: Context, doc_id: str, query: str = "") -> str:
 
         return await _format_document(docs[0], data, doc_id, query, app.max_response_chars)
     except httpx.TimeoutException:
-        logger.warning("get_document timed out for doc_id=%r query=%r", doc_id, query, exc_info=True)
+        logger.warning("get_document timed out for doc_id=%r", doc_id, exc_info=True)
         return f"Unable to fetch document {doc_id} because the request timed out. Please try again."
     except (httpx.HTTPError, ValueError):
-        logger.exception("get_document failed for doc_id=%r query=%r", doc_id, query)
+        logger.exception("get_document failed for doc_id=%r", doc_id)
         return f"Unable to fetch document {doc_id}. The knowledge base may be temporarily unavailable."
     finally:
         TOOL_DURATION.labels(tool="get_document").observe(time.monotonic() - _start)

@@ -583,8 +583,7 @@ async def _run_portal_search(
             SEARCH_DEPRECATION_DETECTED.inc()
 
     logger.info(
-        "Portal search: query=%r main=%d dep=%d merged=%d deduped=%d returned=%d",
-        query,
+        "Portal search: main=%d dep=%d merged=%d deduped=%d returned=%d",
         len(main_chunks),
         len(dep_chunks),
         len(merged),

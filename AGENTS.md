@@ -312,6 +312,12 @@ No circular imports. `types.py`, `bm25.py`, and `formatting.py` have zero intern
       return "user-friendly message"
   ```
 
+### Query Content Logging (CWE-532)
+- **Never log user query content at INFO level or above.** Tool arguments derive from end-user prompts and may contain hostnames, internal IPs, or error messages. Log operational data only: query count, result counts, doc IDs (Red Hat paths), timing, error types.
+- Solr query parameters (`q`, `fq`) are logged at **DEBUG** only, since `q` carries the user's cleaned query for search calls.
+- The `doc_id` parameter (a Red Hat documentation path, not user-supplied PII) is safe to log at INFO.
+- Security audit: RSPEED-3365, CWE-532, FIND-005.
+
 ### Async
 - All MCP tool functions are `async`
 - Use `httpx.AsyncClient` as async context manager for HTTP calls

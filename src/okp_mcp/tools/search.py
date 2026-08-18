@@ -115,7 +115,7 @@ async def search_portal(
         queries = normalized[:_MAX_QUERIES]
 
         max_results = max(1, min(max_results, 20))
-        logger.info("search_portal: queries=%r max_results=%d", queries, max_results)
+        logger.info("search_portal: query_count=%d max_results=%d", len(queries), max_results)
 
         app = get_app_context(ctx)
 
@@ -138,13 +138,13 @@ async def search_portal(
         # Use the first query for the "No results" message and budget selection.
         return _format_portal_results(chunks, has_deprecation, queries[0], app.max_response_chars)
     except httpx.TimeoutException:
-        logger.warning("Search timed out for queries: %r", queries, exc_info=True)
+        logger.warning("Search timed out (query_count=%d)", len(queries), exc_info=True)
         return "The search timed out. Please try again with a simpler query."
     except httpx.HTTPError:
-        logger.exception("Search failed for queries: %r", queries)
+        logger.exception("Search failed (query_count=%d)", len(queries))
         return "The knowledge base search is temporarily unavailable. Please try again shortly."
     except ValueError:
-        logger.exception("Search failed for queries: %r", queries)
+        logger.exception("Search failed (query_count=%d)", len(queries))
         return "The knowledge base search returned an unexpected response. Please try again."
     finally:
         TOOL_DURATION.labels(tool="search_portal").observe(time.monotonic() - _start)
