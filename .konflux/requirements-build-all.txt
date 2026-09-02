@@ -301,9 +301,9 @@ setuptools==84.0.0 \
 setuptools-rust==1.13.0 \
     --hash=sha256:666439c4d90e968bb625bcf87ec0aa02b4f49e599d2f5dc255c633a04e8eca99 \
     --hash=sha256:f2afcf4baeee689910ce49cfa8aad4e08cce72f417449bcc32891b8664fdc726
-setuptools-scm==10.2.1 \
-    --hash=sha256:4fa7dd82cf8c800df59c9a288c90299b1657ff1ecfc3f5cc00287c5dbf5e27a9 \
-    --hash=sha256:b7c82f4102d389ee57dc66ccdb4f9b4bca3c40ba83b43f1f63d68ccd72db2580
+setuptools-scm==10.2.2 \
+    --hash=sha256:36b5dcef6bbeee0bc76b7756d1b574b3762e2138611a4f18e898f22f1aaee462 \
+    --hash=sha256:509585ce0628ede1c64ab1e40e7464481fb880c80a388effce9067bf6b2142fe
 tomlkit==0.15.1 \
     --hash=sha256:177a05aece5a8ca5266fd3c448abb47b8d352f09d477d3ca8332db4d89b24304 \
     --hash=sha256:e25bbf38843005246210a12982776f27f99cb9be67160e14434d0c0d21ee1e97
@@ -333,9 +333,9 @@ uv-build==0.11.7 \
 uv-dynamic-versioning==0.14.1 \
     --hash=sha256:8642db686ce5c50417035e7a257ac73b7e5c3a7a32c33e45bd7e36ba22eeb648 \
     --hash=sha256:f9db710cc2ce9dccf06fab958ad10c45cae43cff70e3eccaa89365b040e98306
-vcs-versioning==2.3.1 \
-    --hash=sha256:806635bd0ea653c96af98a70624be758d408a989f2cd0b390e63474d99f96b63 \
-    --hash=sha256:a11299394e101569a62ab061375260d08bc56cd33d685b7067d85312368f4457
+vcs-versioning==2.3.2 \
+    --hash=sha256:24abddff97aecf44cf3fec727eae8d76d9c6f70f5acb39afc41f824d69f2aac5 \
+    --hash=sha256:df6cdf10eab8fc0cc41c8ab9d1f1ebdacab8489a4c46fbeb1e6e06823b74d31f
 wheel==0.48.0 \
     --hash=sha256:3217dcc807155e45db462d7ef2431f5ddda0d7273b700d05a67b271ceb1287ab \
     --hash=sha256:94800765601e9171bf5d58d066e640662842bcedcbab982b2c90787a2c987322
