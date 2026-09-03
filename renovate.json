@@ -1,7 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["local>rhel-lightspeed/renovate-config"],
-  "ignorePaths": [".konflux/requirements*.txt"],
+  "ignorePaths": [".konflux/requirements*.txt", "quadlet/*.container"],
   "tekton": {
     "enabled": false
   }
