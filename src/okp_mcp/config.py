@@ -4,6 +4,7 @@ import logging
 import sys
 
 from enum import StrEnum
+from urllib.parse import urlsplit
 
 from pydantic import computed_field
 from pydantic import Field
@@ -137,6 +138,13 @@ class ServerConfig(BaseSettings):
         default="http://localhost:8983",
         description="Base URL of the Solr instance",
     )
+    okp_html_url: str = Field(
+        default="",
+        description="Base URL of the OKP HTML mirror, used to read real section anchors for "
+        "get_document outlines. Defaults to the solr_url host on port 8080, which is where the "
+        "OKP appliance serves it. Set to a bare '-' to disable the lookup and fall back to a "
+        "title-only outline.",
+    )
     max_response_chars: int = Field(
         default=30_000,
         ge=1,
@@ -164,6 +172,26 @@ class ServerConfig(BaseSettings):
     def solr_endpoint(self) -> str:
         """Solr select endpoint derived from solr_url."""
         return f"{self.solr_url}/solr/portal/select"
+
+    @computed_field
+    @property
+    def html_mirror_url(self) -> str:
+        """Base URL of the OKP HTML mirror, or empty when the lookup is disabled.
+
+        The OKP appliance serves the rendered documentation over httpd on 8080
+        from the same host as Solr, so the default is derived rather than
+        configured. ``okp_html_url='-'`` opts out, and an unreachable mirror
+        degrades to a title-only outline rather than failing the tool call.
+        """
+        if self.okp_html_url == "-":
+            return ""
+        if self.okp_html_url:
+            return self.okp_html_url.rstrip("/")
+
+        parsed = urlsplit(self.solr_url)
+        if not parsed.hostname:
+            return ""
+        return f"{parsed.scheme or 'http'}://{parsed.hostname}:8080"
 
     @property
     def transport_kwargs(self) -> dict[str, str | int | bool | list[StarletteMiddleware]]:

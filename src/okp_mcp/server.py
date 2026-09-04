@@ -18,6 +18,7 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from okp_mcp.config import CONFIG
+from okp_mcp.outline import OutlineFetcher
 from okp_mcp.request_id import RequestIDContextMiddleware
 
 
@@ -31,6 +32,7 @@ class AppContext:
     http_client: httpx.AsyncClient
     solr_endpoint: str
     max_response_chars: int
+    outline_fetcher: OutlineFetcher | None = None
 
 
 @asynccontextmanager
@@ -38,7 +40,9 @@ async def _app_lifespan(server: FastMCP) -> AsyncIterator[dict[str, AppContext]]
     """Manage app lifecycle resources for tool execution."""
     solr_endpoint = CONFIG.solr_endpoint
     max_response_chars = CONFIG.max_response_chars
+    html_mirror_url = CONFIG.html_mirror_url
     logger.info("SOLR endpoint: %s", solr_endpoint)
+    logger.info("HTML mirror: %s", html_mirror_url or "disabled (outlines will omit section anchors)")
     client = httpx.AsyncClient(timeout=30.0)
     try:
         yield {
@@ -46,6 +50,7 @@ async def _app_lifespan(server: FastMCP) -> AsyncIterator[dict[str, AppContext]]
                 http_client=client,
                 solr_endpoint=solr_endpoint,
                 max_response_chars=max_response_chars,
+                outline_fetcher=OutlineFetcher(html_mirror_url, client) if html_mirror_url else None,
             )
         }
     finally:

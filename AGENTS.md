@@ -98,7 +98,8 @@ src/okp_mcp/
     shared.py    # shared tool constants
   solr.py        # Solr query builder, BM25 paragraph extraction, RHV filtering
   bm25.py        # Pure-Python BM25Plus scorer (drop-in for rank_bm25, no numpy)
-  content.py     # Boilerplate stripping, content truncation, text cleaning
+  content.py     # Boilerplate stripping, content truncation, text cleaning, section outline
+  outline.py     # Section anchors parsed from the OKP HTML mirror (fetch + LRU cache)
   formatting.py  # Result annotation, deprecation/replacement detection, sort keys
   types.py       # Shared TypedDicts: SolrDoc, SolrHighlighting, SolrResponseBody, SolrResponse
 tests/
@@ -145,6 +146,63 @@ quadlet/
 SECURITY.md            # Vulnerability reporting via GitHub Security Advisories
 ```
 
+## Section Anchors (get_document outlines)
+
+`get_document` puts real URL fragments on both documentation paths: without a query it
+returns the page's section outline instead of content, and with a query it labels each
+returned passage with the section it came from. Either way the caller can link straight to
+a section rather than to the whole guide.
+
+The anchors cannot come from Solr. Red Hat assigns them in the AsciiDoc source -- "Kafka
+tuning overview" is published at `#con-config-tuning-intro-str` -- and no indexed field
+carries them; deriving slugs from heading text matched 1 heading in 44 when measured
+against a live guide.
+
+They come from the OKP appliance instead, which serves the rendered HTML over httpd on
+port 8080 alongside Solr on 8983. Solr document ids *are* the mirror's paths, so
+`outline.py` fetches `{html_mirror_url}{id}` and parses the `<section id>` elements.
+Measured on a 250-document sample: all reachable, 236 expose `<section id>`, and the
+remaining 14 are single-topic pages with no subsections. Anchors produced for one guide
+matched the public docs.redhat.com fragments 45 of 45.
+
+- Configure with `MCP_OKP_HTML_URL`; it defaults to the `solr_url` host on port 8080.
+  Set it to `-` to disable the lookup.
+- In-container deployments need no configuration: the mcp container shares the pod
+  network, so the derived `http://<solr-host>:8080` already resolves to the mirror.
+- `podman-compose.yml` publishes the mirror as `8085:8080` for running the server from
+  source on the host; `.mcp.json` sets `MCP_OKP_HTML_URL` to match. Host port 8080 is
+  avoided because it is heavily contended -- pointing the mirror at an unrelated local
+  service yields an outline with no anchors rather than wrong ones, but it is still a
+  wasted request per lookup.
+- Passages are placed by locating their text in the mirror's body via
+  `DocumentOutline.locate()`. Solr's `main_content` cannot be used for this: it leads with
+  the page's table of contents, which repeats most headings, so offsets computed against it
+  attribute passages to whichever heading the ToC listed. Measured over 146 highlight
+  passages from 33 guides: all 104 drawn from real prose were placed correctly and the 42
+  misses were every one a ToC fragment -- so `locate()` returning None means "not body
+  text", and those passages keep a bare `Passage N:` label rather than borrowing a
+  neighbour's anchor. (That also makes an unplaceable passage a reliable ToC detector, if
+  filtering them out is ever wanted.)
+- Passages that `locate()` cannot place are dropped as ToC noise, but only when prose
+  remains: an unavailable mirror makes everything look unplaceable, and a reference manual
+  can legitimately highlight nothing but heading runs. Measured over 39 guide+query pairs,
+  9 (23%) shed a ToC passage for -17% passage characters; 13 returned nothing but ToC and
+  were left alone. Filtering is a subset in Solr's own order, so relevance cannot regress.
+- Do NOT raise `hl.snippets` to compensate for the dropped passages. It was tried:
+  `hl.snippets` re-fragments the field rather than extending the list, and going from 10 to
+  24 pushed the three relevant admission passages out of the top three in favour of the
+  glossary. Aggregate passage and character counts improved while the answer got worse.
+- Anchoring covers Solr highlight passages. The BM25 fallback path
+  (`_extract_relevant_section`) is not anchored yet.
+- Outlines are trimmed to `_MAX_OUTLINE_CHARS` (15K) by dropping the deepest nesting
+  levels, not by truncating the list. Mirror outlines run to a median of 22 sections but
+  a p90 of 181 and a max of 460 (~37KB), and the sections a reader wants are as often in
+  the last chapter as the first -- a flat count cap dropped OpenShift's Chapter 9
+  entirely. The 460-section worst case degrades to its top three levels at ~11KB.
+- Every failure (mirror down, document absent, page without sections) falls back to a
+  title-only outline built from `heading_h1`/`heading_h2`. The lookup must never turn a
+  working `get_document` call into an error.
+
 ## Where to Look
 
 | Task | Location | Notes |
@@ -158,6 +216,8 @@ SECURITY.md            # Vulnerability reporting via GitHub Security Advisories
 | Change document retrieval query | `src/okp_mcp/tools/document.py` | `_fetch_document_with_query()` selects the doc via `q` under `defType=lucene` and passes the caller's query as `hl.q` (highlights only) so `mm` never gates retrieval; `_doc_id_filter()` normalizes ID suffix forms |
 | Modify result formatting | `src/okp_mcp/formatting.py` | `annotate_result()` for deprecation/EOL (used by portal.py) |
 | Change content cleaning | `src/okp_mcp/content.py` | `strip_boilerplate()` regex, `truncate_content()` |
+| Change the section outline | `src/okp_mcp/content.py` | `format_sections()` renders anchors from `outline.py` when present, else falls back to `heading_h1`/`heading_h2` titles. `_fit_to_budget()` trims to `_MAX_OUTLINE_CHARS` by shedding the deepest nesting levels first, never by cutting the tail; `clean_heading()` normalizes the NBSP numbering separators |
+| Change section anchor lookup | `src/okp_mcp/outline.py` | `parse_document()` extracts `<section id>` sections plus locatable body text with stdlib `html.parser`; `DocumentOutline.locate()` maps a passage to its section; `OutlineFetcher` fetches and LRU-caches parses from the HTML mirror. Every failure degrades to `NO_OUTLINE` — never raise |
 | Modify config/CLI args | `src/okp_mcp/config.py` | Add field to `ServerConfig`; auto-generates CLI arg and `MCP_`-prefixed env var |
 | Enable stateless mode | `src/okp_mcp/config.py` | Enabled by default. `--stateless-http false` or `MCP_STATELESS_HTTP=false` to disable |
 | Add functional test case | `tests/functional_cases.py` | Add `FunctionalCase` to `FUNCTIONAL_TEST_CASES` list |
@@ -242,7 +302,7 @@ __init__.py → build_info, config, metrics (side-effect import), request_id, se
 build_info.py → (standalone; reads COMMIT_SHA env var, APP_ROOT/COMMIT_SHA file, or local `git rev-parse`)
 tools/__init__.py → tools/search.py, tools/document.py, tools/run_code.py
 tools/search.py → config, metrics, portal, server
-tools/document.py → content, metrics, server, solr, tools/shared.py, types
+tools/document.py → content, metrics, outline, server, solr, tools/shared.py, types
 tools/run_code.py → config, server
 metrics.py  → server (imports mcp for custom_route)
 request_id.py → fastmcp.server.dependencies, fastmcp.server.middleware, starlette
@@ -251,9 +311,10 @@ portal.py   → config, content, formatting, intent, solr, types
 formatting.py → (standalone)
 solr.py     → bm25, config, metrics, types
 bm25.py     → (standalone)
-server.py   → config
+server.py   → config, outline
 telemetry.py → build_info, config, sentry_sdk
-content.py  → types
+content.py  → outline, types
+outline.py  → (standalone; stdlib html.parser + httpx)
 types.py    → (standalone)
 ```
 

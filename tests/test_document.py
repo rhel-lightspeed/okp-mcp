@@ -11,16 +11,20 @@ from prometheus_client import REGISTRY
 
 from okp_mcp import tools
 from okp_mcp.config import ServerConfig
+from okp_mcp.outline import NO_OUTLINE
+from okp_mcp.outline import parse_document
 from okp_mcp.solr import _clean_query
 from okp_mcp.tools.document import _doc_id_filter
 from okp_mcp.tools.document import _DOCUMENTATION_MAX_CHARS
 from okp_mcp.tools.document import _DOCUMENTATION_MAX_SECTIONS
 from okp_mcp.tools.document import _DOCUMENTATION_PER_SECTION
+from okp_mcp.tools.document import _drop_toc_passages
 from okp_mcp.tools.document import _fetch_document_raw
 from okp_mcp.tools.document import _fetch_document_with_query
 from okp_mcp.tools.document import _format_document_content
 from okp_mcp.tools.document import _format_document_passages
 from okp_mcp.tools.document import _format_metadata
+from okp_mcp.tools.document import _passage_label
 from okp_mcp.tools.document import _uses_document_passages
 from okp_mcp.types import SolrDoc
 from okp_mcp.types import SolrResponse
@@ -541,3 +545,96 @@ async def test_fetch_document_with_query_keeps_caller_query_out_of_q():
     assert params["defType"] == "lucene"
     assert params["hl.q"] == _clean_query("some unrelated question")
     assert "fq" not in params
+
+
+# ---------------------------------------------------------------------------
+# passage anchoring
+# ---------------------------------------------------------------------------
+
+_PASSAGE_HTML = (
+    '<section id="admission-plug-ins"><h1 class="title">Chapter 9. Admission plugins</h1>'
+    "<p>Admission plugins process resource requests to the control plane API.</p>"
+    '<section id="admission-webhooks-about_admission-plug-ins">'
+    '<h2 class="title">9.3. Webhook admission plugins</h2>'
+    "<p>You can implement dynamic admission through webhook admission plugins that "
+    "call webhook servers over HTTP at defined endpoints.</p></section></section>"
+)
+
+
+def test_passage_label_names_the_section_it_came_from():
+    """A passage from real prose is labelled with its anchor and section title."""
+    outline = parse_document(_PASSAGE_HTML)
+    snippet = "dynamic admission through webhook admission plugins that call webhook servers"
+    label = _passage_label(1, snippet, outline)
+    assert label == "Passage 1 [#admission-webhooks-about_admission-plug-ins — 9.3. Webhook admission plugins]:"
+
+
+def test_passage_label_attributes_to_the_innermost_section():
+    """Prose in a chapter's own text is not attributed to a nested subsection."""
+    outline = parse_document(_PASSAGE_HTML)
+    label = _passage_label(1, "process resource requests to the control plane API", outline)
+    assert "#admission-plug-ins " in label
+
+
+def test_passage_label_stays_bare_for_a_toc_fragment():
+    """A ToC run of headings has no home section and must not borrow one."""
+    outline = parse_document(_PASSAGE_HTML)
+    toc = "9.1. About admission plugins 9.2. Default admission plugins 9.4. Types of webhook"
+    assert _passage_label(2, toc, outline) == "Passage 2:"
+
+
+def test_passage_label_without_an_outline():
+    """With no mirror the label is unchanged from before anchors existed."""
+    assert _passage_label(3, "any passage text at all goes here", NO_OUTLINE) == "Passage 3:"
+
+
+def test_format_document_passages_announces_linkable_fragments():
+    """The header tells the caller what to do with the fragments."""
+    outline = parse_document(_PASSAGE_HTML)
+    result = _format_document_passages(
+        ["dynamic admission through webhook admission plugins that call webhook servers"],
+        query="webhooks",
+        max_chars=3000,
+        current_result="",
+        outline=outline,
+    )
+    assert "append a passage's fragment to the URL above" in result
+    assert "#admission-webhooks-about_admission-plug-ins" in result
+
+
+def test_format_document_passages_header_unchanged_without_anchors():
+    """Without a mirror the passage block keeps its original header."""
+    result = _format_document_passages(["some snippet"], query="q", max_chars=3000, current_result="")
+    assert result.startswith("\n\nRelevant passages:\n")
+
+
+# ---------------------------------------------------------------------------
+# ToC passage filtering
+# ---------------------------------------------------------------------------
+
+_TOC = "9.1. About admission plugins 9.2. Default admission plugins 9.4. Types of webhook"
+_PROSE = "dynamic admission through webhook admission plugins that call webhook servers"
+
+
+def test_drop_toc_passages_keeps_prose_only():
+    """A ToC run is dropped while the prose passage survives."""
+    outline = parse_document(_PASSAGE_HTML)
+    assert _drop_toc_passages([_TOC, _PROSE], outline) == [_PROSE]
+
+
+def test_drop_toc_passages_without_a_mirror():
+    """With no outline every passage looks unplaceable, so none may be dropped."""
+    assert _drop_toc_passages([_TOC, _PROSE], NO_OUTLINE) == [_TOC, _PROSE]
+
+
+def test_drop_toc_passages_when_everything_looks_like_toc():
+    """Returning nothing is worse than returning headings, so the list stands."""
+    outline = parse_document(_PASSAGE_HTML)
+    assert _drop_toc_passages([_TOC], outline) == [_TOC]
+
+
+def test_drop_toc_passages_preserves_order():
+    """Relevance order from Solr is not disturbed by filtering."""
+    outline = parse_document(_PASSAGE_HTML)
+    second = "Admission plugins process resource requests to the control plane API"
+    assert _drop_toc_passages([_PROSE, _TOC, second], outline) == [_PROSE, second]

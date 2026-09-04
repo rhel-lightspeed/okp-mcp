@@ -210,3 +210,28 @@ def test_stateless_http_in_transport_kwargs(transport, stateless_http, expected_
     config = ServerConfig(transport=transport, stateless_http=stateless_http)
     kwargs = config.transport_kwargs
     assert ("stateless_http" in kwargs) == expected_in_kwargs
+
+
+# --- html_mirror_url ---
+
+
+def test_html_mirror_url_derived_from_solr_host():
+    """The OKP appliance serves the mirror on 8080 beside Solr, so derive it."""
+    config = ServerConfig(solr_url="http://redhat-okp:8983")
+    assert config.html_mirror_url == "http://redhat-okp:8080"
+
+
+def test_html_mirror_url_explicit_override():
+    """An explicit URL wins over the derived default."""
+    config = ServerConfig(solr_url="http://redhat-okp:8983", okp_html_url="https://mirror.example/docs/")
+    assert config.html_mirror_url == "https://mirror.example/docs"
+
+
+def test_html_mirror_url_opt_out():
+    """'-' disables the lookup so outlines stay title-only."""
+    assert ServerConfig(solr_url="http://redhat-okp:8983", okp_html_url="-").html_mirror_url == ""
+
+
+def test_html_mirror_url_unparseable_solr_url():
+    """A solr_url with no host disables the lookup rather than building junk."""
+    assert ServerConfig(solr_url="not-a-url").html_mirror_url == ""

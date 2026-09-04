@@ -7,6 +7,12 @@ services:
     container_name: redhat-okp
     ports:
       - "8983:8983"
+      # httpd serving the rendered documentation, where get_document reads the
+      # real section anchors. The okp-mcp container below reaches it over the
+      # pod network without this; publishing is for running the server from
+      # source on the host, which then needs MCP_OKP_HTML_URL=http://localhost:8085.
+      # Mapped off 8080 because that port is heavily contended on dev machines.
+      - "8085:8080"
     environment:
       ACCESS_KEY: ${OKP_ACCESS_KEY}
       SOLR_JETTY_HOST: "0.0.0.0"

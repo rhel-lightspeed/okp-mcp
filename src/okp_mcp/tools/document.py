@@ -11,14 +11,18 @@ from fastmcp import Context
 
 from okp_mcp.content import _select_within_budget
 from okp_mcp.content import doc_uri
+from okp_mcp.content import format_sections
 from okp_mcp.content import strip_boilerplate
 from okp_mcp.content import truncate_content
 from okp_mcp.metrics import DOCUMENT_HIGHLIGHT_FALLBACK
 from okp_mcp.metrics import DOCUMENT_HIGHLIGHT_USED
 from okp_mcp.metrics import DOCUMENT_NOT_FOUND
 from okp_mcp.metrics import DOCUMENT_NUDGE
+from okp_mcp.metrics import DOCUMENT_TOC_PASSAGES_DROPPED
 from okp_mcp.metrics import TOOL_CALLS
 from okp_mcp.metrics import TOOL_DURATION
+from okp_mcp.outline import DocumentOutline
+from okp_mcp.outline import NO_OUTLINE
 from okp_mcp.server import get_app_context
 from okp_mcp.server import mcp
 from okp_mcp.solr import _clean_query
@@ -36,6 +40,17 @@ logger = logging.getLogger("okp_mcp.tools.get_document")
 # Tighter budgets here prevent token-heavy responses while still surfacing
 # the most relevant passages via Solr highlights or local BM25 extraction.
 _DOCUMENTATION_MAX_CHARS = 10_000
+
+# Highlights asked of Solr, and the most rendered per document.
+#
+# Asking for more to compensate for the table-of-contents runs that get dropped
+# was tried and rejected: hl.snippets does not return a longer list of the same
+# fragments, it re-fragments the field. Raising the ask from 10 to 24 on
+# "what are webhook admission plugins" pushed the three admission passages out
+# of the top three and filled those slots with the glossary and Ignition
+# instead. Aggregate passage and character counts improved while the answer got
+# worse, so this number stays where Solr's own selection is best.
+_MAX_PASSAGES = 10
 _DOCUMENTATION_MAX_SECTIONS = 3
 _DOCUMENTATION_PER_SECTION = 1000
 
@@ -109,19 +124,77 @@ def _format_metadata(doc: SolrDoc) -> str:
     return result
 
 
-def _format_document_passages(highlight_snippets: list[str], query: str, max_chars: int, current_result: str) -> str:
+def _drop_toc_passages(snippets: list[str], outline: DocumentOutline) -> list[str]:
+    """Drop highlights that are table-of-contents runs rather than prose.
+
+    Solr highlights ``main_content``, which leads with the page's ToC, so a
+    quarter of the passages come back as strings of headings. They are also the
+    long ones -- measured at 26% of passages but 59% of the characters -- so
+    they crowd real prose out of the passage budget rather than merely sitting
+    beside it. Dropping them leaves exactly the prose Solr already chose, in
+    Solr's order, and returns the budget they were occupying.
+
+    Filtering needs the mirror: without it every passage looks unplaceable, so
+    an unavailable mirror must leave the list alone rather than empty it. The
+    same guard covers a page whose passages are all classified as ToC, where
+    returning nothing would be worse than returning the headings.
+    """
+    if not outline.starts:
+        return snippets
+
+    prose = [snippet for snippet in snippets if outline.locate(snippet) is not None]
+    if not prose:
+        return snippets
+
+    DOCUMENT_TOC_PASSAGES_DROPPED.inc(len(snippets) - len(prose))
+    return prose
+
+
+def _passage_label(index: int, snippet: str, outline: DocumentOutline) -> str:
+    """Label a passage, naming the section it came from when that is known.
+
+    A passage with no home section is a table-of-contents fragment: Solr
+    highlights ``main_content``, which leads with the page's ToC, so those
+    runs of headings match no body text. They keep the bare label rather than
+    borrowing a neighbouring section's anchor.
+    """
+    section = outline.locate(snippet)
+    if section is None:
+        return f"Passage {index}:"
+    return f"Passage {index} [#{section.anchor} — {section.title}]:"
+
+
+def _format_document_passages(
+    highlight_snippets: list[str],
+    query: str,
+    max_chars: int,
+    current_result: str,
+    outline: DocumentOutline = NO_OUTLINE,
+) -> str:
     """Format highlight snippets as numbered passages within the remaining budget."""
-    remaining_budget = max_chars - len(current_result) - len("\n\nRelevant passages:\n")
+    header = "\n\nRelevant passages:\n"
+    if outline.starts:
+        header = "\n\nRelevant passages (append a passage's fragment to the URL above to link to its section):\n"
+
+    remaining_budget = max_chars - len(current_result) - len(header)
     if remaining_budget <= 0:
         return ""
 
-    formatted_passages = [f"Passage {index + 1}:\n{snippet}" for index, snippet in enumerate(highlight_snippets)]
+    formatted_passages = [
+        f"{_passage_label(index + 1, snippet, outline)}\n{snippet}" for index, snippet in enumerate(highlight_snippets)
+    ]
     passages = _select_within_budget(formatted_passages, remaining_budget, query)
-    return f"\n\nRelevant passages:\n{passages}"
+    return f"{header}{passages}"
 
 
 def _format_document_content(
-    doc: SolrDoc, data: SolrResponse, doc_id: str, query: str, max_chars: int, current_result: str
+    doc: SolrDoc,
+    data: SolrResponse,
+    doc_id: str,
+    query: str,
+    max_chars: int,
+    current_result: str,
+    outline: DocumentOutline = NO_OUTLINE,
 ) -> str:
     """Build the content section for a fetched document.
 
@@ -137,7 +210,7 @@ def _format_document_content(
         YES
          |
         query provided?
-         +--NO--> metadata + "pass a query" nudge (~500 chars)
+         +--NO--> metadata + section outline + "pass a query" nudge
          |
         YES
          |
@@ -148,10 +221,14 @@ def _format_document_content(
     is_documentation = _uses_document_passages(doc)
 
     # Documentation without a query is almost always useless (first 1500 chars
-    # is typically a table of contents). Nudge the caller to be specific.
+    # is typically a table of contents). Nudge the caller to be specific, and
+    # list the sections so the nudge is actionable: the caller can pick the
+    # section it wants, link straight to it, and phrase the follow-up query
+    # from the real title rather than guessing at what the guide covers.
     if is_documentation and not query:
         DOCUMENT_NUDGE.inc()
-        return (
+        listing = format_sections(doc, outline.sections, url=f"https://access.redhat.com{doc_uri(doc)}")
+        return listing + (
             "\n\nThis is a large documentation page. "
             "Pass a query to get_document to extract the most relevant passages."
         )
@@ -170,7 +247,8 @@ def _format_document_content(
         if highlight_snippets:
             DOCUMENT_HIGHLIGHT_USED.inc()
             doc_budget = min(max_chars, _DOCUMENTATION_MAX_CHARS)
-            return _format_document_passages(highlight_snippets, query, doc_budget, current_result)
+            passages = _drop_toc_passages(highlight_snippets, outline)[:_MAX_PASSAGES]
+            return _format_document_passages(passages, query, doc_budget, current_result, outline)
         DOCUMENT_HIGHLIGHT_FALLBACK.inc()
         extracted = _extract_relevant_section(
             content, query, per_section=_DOCUMENTATION_PER_SECTION, max_sections=_DOCUMENTATION_MAX_SECTIONS
@@ -181,7 +259,9 @@ def _format_document_content(
         DOCUMENT_HIGHLIGHT_FALLBACK.inc()
         return f"\n\nContent:\n{_extract_relevant_section(content, query, max_sections=8)}"
     DOCUMENT_HIGHLIGHT_USED.inc()
-    return f"\n\nContent:\n{' ... '.join(highlight_snippets)}"
+    # Non-documentation kinds render every snippet inline, so they keep the
+    # pre-overfetch count rather than growing with the larger Solr ask.
+    return f"\n\nContent:\n{' ... '.join(highlight_snippets[:_MAX_PASSAGES])}"
 
 
 async def _fetch_document_with_query(
@@ -218,7 +298,7 @@ async def _fetch_document_with_query(
             "hl.qparser": "edismax",
             "fl": DOCUMENT_FL,
             "rows": 1,
-            "hl.snippets": "10",
+            "hl.snippets": str(_MAX_PASSAGES),
             "hl.fragsize": "600",
         },
         client=client,
@@ -261,7 +341,14 @@ async def _fetch_document_raw(
             await client.aclose()
 
 
-async def _format_document(doc: SolrDoc, data: SolrResponse, doc_id: str, query: str, max_chars: int) -> str:
+async def _format_document(
+    doc: SolrDoc,
+    data: SolrResponse,
+    doc_id: str,
+    query: str,
+    max_chars: int,
+    outline: DocumentOutline = NO_OUTLINE,
+) -> str:
     """Format a fetched document into a readable string.
 
     Renders title, type, product/version, URL, synopsis/summary/CVE details,
@@ -269,7 +356,7 @@ async def _format_document(doc: SolrDoc, data: SolrResponse, doc_id: str, query:
     Truncates final output to max_chars as a safety net.
     """
     result = _format_metadata(doc)
-    result += _format_document_content(doc, data, doc_id, query, max_chars, result)
+    result += _format_document_content(doc, data, doc_id, query, max_chars, result, outline)
     return truncate_content(result, max_chars)
 
 
@@ -299,7 +386,15 @@ async def get_document(ctx: Context, doc_id: str, query: str = "") -> str:
             DOCUMENT_NOT_FOUND.inc()
             return f"Document not found: {doc_id}"
 
-        return await _format_document(docs[0], data, doc_id, query, app.max_response_chars)
+        doc = docs[0]
+        # Both documentation paths spend the anchors: the no-query path lists
+        # them, the query path attaches them to passages. Other document kinds
+        # have no mirror page, so they never pay the ~200KB fetch.
+        outline = NO_OUTLINE
+        if _uses_document_passages(doc) and app.outline_fetcher is not None:
+            outline = await app.outline_fetcher.get(doc.id or doc_id)
+
+        return await _format_document(doc, data, doc_id, query, app.max_response_chars, outline)
     except httpx.TimeoutException:
         logger.warning("get_document timed out for doc_id=%r", doc_id, exc_info=True)
         return f"Unable to fetch document {doc_id} because the request timed out. Please try again."

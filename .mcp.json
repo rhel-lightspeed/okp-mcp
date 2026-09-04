@@ -12,7 +12,10 @@
                 "--reload",
                 "--reload-dir",
                 "src/"
-            ]
+            ],
+            "env": {
+                "MCP_OKP_HTML_URL": "http://localhost:8085"
+            }
         }
     }
 }
