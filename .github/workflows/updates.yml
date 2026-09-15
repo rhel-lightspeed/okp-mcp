@@ -51,5 +51,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_TITLE: ${{ matrix.job.pr_title }}
           PR_FILE_CHECK: ${{ matrix.job.pr_file_check }}
-          PR_BRANCH: ${{ matrix.pr_branch }}
+          PR_BRANCH: ${{ matrix.job.pr_branch }}
         run: create-pr
