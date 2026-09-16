@@ -14,6 +14,11 @@ ENV UV_PYTHON=/usr/bin/python3.12
 # Override with --build-arg BUILD_FROM_SOURCE=0 for fast prebuilt-wheel builds.
 ARG BUILD_FROM_SOURCE=1
 
+# Version derived from the git tag by hatch-vcs in task-get-version. Passed here
+# so setuptools-scm can resolve the version without .git during hermetic builds.
+# https://setuptools-scm.readthedocs.io/en/latest/usage/#with-dockerpodman
+ARG PSEUDO_VERSION=0.1.0a
+
 # Copy dependency files first for layer caching. .konflux holds the hash-pinned
 # Python manifests Hermeto prefetches for hermetic builds; they are generated
 # from uv.lock by scripts/konflux_requirements.py. rpms.lock.yaml pins the
@@ -34,7 +39,7 @@ RUN scripts/install-toolchain.sh
 
 # Install dependencies via the shared build script.
 # See scripts/container-install.sh for detailed comments on each step.
-RUN scripts/container-install.sh
+RUN SETUPTOOLS_SCM_PRETEND_VERSION_FOR_OKP_MCP="${PSEUDO_VERSION}" scripts/container-install.sh
 
 # Stage 2: Runtime - Hummingbird Python 3.12 distroless.
 FROM registry.access.redhat.com/hi/python:3.12@sha256:f26250d20dd1bc70539b049d7b9b1a93998d6fd57ba75e6579e47b93bef76fc9 AS runtime
