@@ -1,0 +1,55 @@
+name: Update refs
+
+on:
+  schedule:
+    - cron: "0 6 * * 4"  # Weekly Thursday at 06:00 UTC
+
+  workflow_dispatch:
+
+permissions:
+  pull-requests: write
+  contents: write
+
+jobs:
+  update_refs:
+    name: Update - ${{ matrix.job.name }}
+    runs-on: ubuntu-latest
+    container:
+      image: quay.io/rhel_lightspeed/ci
+
+    strategy:
+      fail-fast: false
+      matrix:
+        job:
+          - name: Base image
+            command: update-image-refs -d
+            pr_title: Update base image
+            pr_file_check: Containerfile
+            pr_branch: update-base-image
+
+          - name: Task refs
+            command: update-task-refs -o -f .tekton/pipeline-build-multiarch.yaml
+            pr_title: Update task references
+            pr_file_check: .tekton/pipeline-build-multiarch.yaml
+            pr_branch: update-task-refs
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Update
+        run: ${{ matrix.job.command }}
+
+      - name: Open a PR if changes were made
+        env:
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: github-actions[bot]@users.noreply.github.com
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_TITLE: ${{ matrix.job.pr_title }}
+          PR_FILE_CHECK: ${{ matrix.job.pr_file_check }}
+          PR_BRANCH: ${{ matrix.job.pr_branch }}
+        run: create-pr
