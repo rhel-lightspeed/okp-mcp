@@ -5,15 +5,18 @@ metadata:
   name: get-version
 
 spec:
-  description: Extract project version from pyproject.toml
+  description: Get version number from VCS tags via hatch-vcs
   params:
     - name: source_artifact
       description: The Trusted Artifact URI pointing to the artifact with the application source code.
       type: string
 
   results:
+    - name: pseudo_version
+      description: Full version including dev suffix (e.g. 1.0.3.dev4+gabcdef)
+
     - name: version
-      description: Project version (also valid as a container tag)
+      description: Clean version valid as a container tag (e.g. 1.0.3.dev4)
 
   volumes:
     - name: workdir
@@ -31,12 +34,28 @@ spec:
         - use
         - $(params.source_artifact)=/var/workdir/source
 
-    - name: extract-version
+    - name: determine-image-tag
       image: registry.redhat.io/ubi10/s2i-base:latest
       workingDir: /var/workdir/source
       script: |
-        #!/usr/bin/env python3
-        import tomllib, pathlib
-        version = tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["version"]
-        pathlib.Path("$(results.version.path)").write_text(version)
-        print(f"version={version}")
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        python3 -V
+        env | sort
+        whoami
+        pwd
+        ls -la
+        git status
+        git tag
+
+        python3 -m venv .venvs/hatch
+
+        export PATH=".venvs/hatch/bin:$PATH"
+        pip install hatch
+
+        pseudo_version="$(hatch version)"
+        version="${pseudo_version%%+*}"
+
+        echo -n "$pseudo_version" | tee "$(results.pseudo_version.path)"
+        echo -n "$version" | tee "$(results.version.path)"

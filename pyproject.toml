@@ -1,6 +1,6 @@
 [project]
 name = "okp-mcp"
-version = "1.0.2"
+dynamic = ["version"]
 description = "MCP server for the Offline Knowledge Portal"
 readme = "README.md"
 authors = [{ name = "Major Hayden", email = "major@redhat.com" }]
@@ -17,8 +17,11 @@ dependencies = [
 okp-mcp = "okp_mcp:main"
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/okp_mcp"]

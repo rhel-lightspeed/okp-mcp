@@ -333,9 +333,9 @@ uv-build==0.11.7 \
 uv-dynamic-versioning==0.14.1 \
     --hash=sha256:8642db686ce5c50417035e7a257ac73b7e5c3a7a32c33e45bd7e36ba22eeb648 \
     --hash=sha256:f9db710cc2ce9dccf06fab958ad10c45cae43cff70e3eccaa89365b040e98306
-vcs-versioning==2.3.4 \
-    --hash=sha256:076afa0e12a42a23faba92bcb62cb016c1ce38051ceee1f302de1e2676a68bbc \
-    --hash=sha256:f3443da15a34a32755b04324e33c6166add300c7661f45902225190c9337f711
+vcs-versioning==2.4.1 \
+    --hash=sha256:b7089ec9bef67b2cad82148366e8eac4d63173f440ec62628282b59eb96bbcb0 \
+    --hash=sha256:d4575de3115ec9434393c87c80ffb0eb98a16056bfe2b11ce0f3a97aff67fe0a
 wheel==0.48.0 \
     --hash=sha256:3217dcc807155e45db462d7ef2431f5ddda0d7273b700d05a67b271ceb1287ab \
     --hash=sha256:94800765601e9171bf5d58d066e640662842bcedcbab982b2c90787a2c987322

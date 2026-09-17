@@ -897,7 +897,6 @@ wheels = [
 
 [[package]]
 name = "okp-mcp"
-version = "1.0.2"
 source = { editable = "." }
 dependencies = [
     { name = "fastmcp" },
