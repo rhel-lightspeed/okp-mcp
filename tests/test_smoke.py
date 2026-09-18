@@ -1,5 +1,7 @@
 """Tests for the MCP server entry point and transport dispatch."""
 
+import logging
+
 from unittest.mock import MagicMock
 from unittest.mock import patch
 
@@ -7,6 +9,7 @@ import pytest
 
 from pydantic import SecretStr
 
+from okp_mcp import _configure_logging
 from okp_mcp.config import ServerConfig
 from okp_mcp.config import Transport
 from okp_mcp.metrics import PrometheusMiddleware
@@ -153,3 +156,21 @@ def test_main_cli_overrides_env_var(_mock_mcp_run):
         main()
 
     _assert_http_run(_mock_mcp_run, transport=Transport.sse, host="0.0.0.0", port=7777)
+
+
+def test_configure_logging_silences_httpx():
+    """httpx logs every request at INFO with the full URL.
+
+    The HTML mirror URL can carry credentials and names an internal host, and
+    okp_mcp.outline is careful never to log it -- which only holds because
+    httpx itself is quietened here.
+    """
+    httpx_logger = logging.getLogger("httpx")
+    previous = httpx_logger.level
+    httpx_logger.setLevel(logging.NOTSET)
+    try:
+        with patch("logging.basicConfig"):
+            _configure_logging("DEBUG")
+        assert httpx_logger.level == logging.WARNING
+    finally:
+        httpx_logger.setLevel(previous)

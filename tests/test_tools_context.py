@@ -387,6 +387,7 @@ async def test_get_document_normalizes_full_url():
     mock_app.http_client = AsyncMock(spec=httpx.AsyncClient)
     mock_app.solr_endpoint = _SOLR_ENDPOINT
     mock_app.max_response_chars = 5000
+    mock_app.outline_fetcher = None
 
     with (
         patch("okp_mcp.tools.document.get_app_context", return_value=mock_app),

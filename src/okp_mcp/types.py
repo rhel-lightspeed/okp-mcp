@@ -12,6 +12,7 @@ class SolrDoc(BaseModel):
     allTitle: str = ""
     title: str = ""
     heading_h1: list[str] = Field(default_factory=list)
+    heading_h2: list[str] = Field(default_factory=list)
     view_uri: str = ""
     url_slug: str = ""
     documentKind: str = ""

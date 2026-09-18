@@ -163,6 +163,15 @@ DOCUMENT_HIGHLIGHT_FALLBACK = Counter(
     "Document retrievals that fell back to BM25 extraction (no highlights)",
 )
 
+# Solr highlights main_content, which leads with the page's table of contents,
+# so some passages are runs of headings rather than prose. They are dropped
+# when the mirror can identify them. A share far from the measured ~26% of
+# passages (~59% of characters) means the highlighter or the mirror changed.
+DOCUMENT_TOC_PASSAGES_DROPPED = Counter(
+    "okp_document_toc_passages_dropped_total",
+    "Highlight passages discarded as table-of-contents fragments",
+)
+
 
 class PrometheusMiddleware:
     """ASGI middleware that records HTTP request count and duration."""

@@ -108,6 +108,27 @@ async def test_app_context_http_client_is_async_client():
 
 
 @pytest.mark.asyncio
+async def test_app_lifespan_does_not_log_the_mirror_url(caplog):
+    """The mirror URL is an internal host and may carry credentials.
+
+    Startup logs at INFO by default, so the URL must not appear there; the
+    status is what an operator needs to see.
+    """
+    config = SimpleNamespace(
+        solr_endpoint="http://localhost:8983/solr/portal/select",
+        max_response_chars=30_000,
+        html_mirror_url="http://user:secret@okp-internal:8080",
+    )
+
+    with patch("okp_mcp.server.CONFIG", config), caplog.at_level(logging.INFO, logger="okp_mcp.server"):
+        async with _app_lifespan(mcp):
+            pass
+
+    assert any("HTML mirror: enabled" in message for message in caplog.messages)
+    assert not any("secret" in message or "okp-internal" in message for message in caplog.messages)
+
+
+@pytest.mark.asyncio
 async def test_app_lifespan_closes_client_on_normal_exit():
     """Lifespan always closes client when context exits normally."""
     mock_client = AsyncMock(spec=httpx.AsyncClient)

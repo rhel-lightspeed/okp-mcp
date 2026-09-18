@@ -4,9 +4,12 @@ import pytest
 
 from okp_mcp.content import _select_within_budget
 from okp_mcp.content import clean_content
+from okp_mcp.content import clean_heading
 from okp_mcp.content import doc_uri
+from okp_mcp.content import format_sections
 from okp_mcp.content import strip_boilerplate
 from okp_mcp.content import truncate_content
+from okp_mcp.outline import Section
 from okp_mcp.types import SolrDoc
 
 
@@ -183,3 +186,147 @@ def test_select_within_budget_first_exceeds_budget_multi():
     assert "Content truncated" in output
     assert len(output) <= 200
     assert "Budget reached" not in output
+
+
+# ---------------------------------------------------------------------------
+# clean_heading / format_sections
+# ---------------------------------------------------------------------------
+
+
+def test_clean_heading_collapses_nbsp():
+    """Solr numbering separators (U+00A0) become ordinary spaces."""
+    assert clean_heading("Chapter\u00a09.\u00a0Admission plugins") == "Chapter 9. Admission plugins"
+
+
+def test_clean_heading_trims_and_collapses_runs():
+    """Surrounding and repeated whitespace collapses to single spaces."""
+    assert clean_heading("  1.1.  About   OpenShift  ") == "1.1. About OpenShift"
+
+
+def test_clean_heading_preserves_unicode_text():
+    """Non-ASCII headings survive normalisation unchanged."""
+    assert clean_heading("インストール概要") == "インストール概要"
+
+
+def test_format_sections_empty():
+    """No headings → empty string."""
+    assert format_sections(SolrDoc()) == ""
+
+
+def test_format_sections_blank_headings_only():
+    """Headings that are only whitespace do not produce an empty outline."""
+    assert format_sections(SolrDoc(heading_h1=["   ", " "])) == ""
+
+
+def test_format_sections_lists_h1_and_h2():
+    """Chapters are listed first, then sections, both normalised."""
+    doc = SolrDoc(
+        heading_h1=["Chapter 1. Overview"],
+        heading_h2=["1.1. Prerequisites", "1.2. Steps"],
+    )
+    result = format_sections(doc)
+    assert "Sections in this document:" in result
+    assert result.index("Chapter 1. Overview") < result.index("1.1. Prerequisites")
+    assert "1.2. Steps" in result
+
+
+def test_format_sections_emits_no_anchor_fragments_without_anchors():
+    """Without anchors from the mirror the outline must not invent #fragment links."""
+    doc = SolrDoc(heading_h1=["About the installation"], heading_h2=["1.1. Prerequisites"])
+    result = format_sections(doc)
+    assert "#about-the-installation" not in result
+    assert "do not invent a #fragment" in result
+
+
+def test_format_sections_deduplicates_across_levels():
+    """A title indexed as both h1 and h2 is listed once."""
+    doc = SolrDoc(heading_h1=["Overview"], heading_h2=["Overview", "Details"])
+    result = format_sections(doc)
+    assert result.count("Overview") == 1
+
+
+def test_format_sections_sheds_h2_before_h1_over_budget():
+    """Over budget, the chapter list survives and the h2 detail is dropped."""
+    doc = SolrDoc(heading_h1=["Chapter A", "Chapter B"], heading_h2=[f"Detail {n}" for n in range(50)])
+    result = format_sections(doc, max_chars=60)
+    assert "Chapter A" in result
+    assert "Chapter B" in result
+    assert "Detail 0" not in result
+    assert "deeper subsections omitted" in result
+
+
+def test_format_sections_reports_the_full_total_when_trimmed():
+    """The note names how many sections the document really has."""
+    doc = SolrDoc(heading_h1=["Chapter A"], heading_h2=[f"Detail {n}" for n in range(9)])
+    result = format_sections(doc, max_chars=100)
+    assert "of 10 sections" in result
+
+
+# ---------------------------------------------------------------------------
+# format_sections with real anchors from the HTML mirror
+# ---------------------------------------------------------------------------
+
+_URL = "https://access.redhat.com/documentation/en-us/guide/index"
+_SECTIONS = [
+    Section("con-config-tuning-intro-str", "Chapter 1. Kafka tuning overview"),
+    Section("mapping_properties_and_values", "1.1. Mapping properties and values"),
+]
+
+
+def test_format_sections_renders_real_anchors():
+    """Anchors from the mirror are rendered as #fragment plus the section title."""
+    result = format_sections(SolrDoc(), _SECTIONS, url=_URL)
+    assert "#con-config-tuning-intro-str — Chapter 1. Kafka tuning overview" in result
+    assert "#mapping_properties_and_values — 1.1. Mapping properties and values" in result
+
+
+def test_format_sections_anchors_show_a_linkable_example():
+    """The guidance line demonstrates a URL the caller can copy."""
+    result = format_sections(SolrDoc(), _SECTIONS, url=_URL)
+    assert f"{_URL}#con-config-tuning-intro-str" in result
+    assert "do not invent" not in result
+
+
+def test_format_sections_anchors_take_precedence_over_headings():
+    """Solr headings are the fallback; real anchors win when both are present."""
+    doc = SolrDoc(heading_h1=["Stale heading from Solr"])
+    result = format_sections(doc, _SECTIONS, url=_URL)
+    assert "Stale heading from Solr" not in result
+
+
+def test_format_sections_falls_back_when_mirror_returns_nothing():
+    """An unreachable mirror still yields the title-only outline."""
+    doc = SolrDoc(heading_h1=["About the installation"])
+    result = format_sections(doc, (), url=_URL)
+    assert "About the installation" in result
+    assert "do not invent a #fragment" in result
+
+
+def test_format_sections_keeps_whole_outline_within_budget():
+    """A guide-sized outline is shown in full, tail chapters included."""
+    sections = [Section("intro", "Chapter 1. Intro", 1)] + [
+        Section(f"sec-{n}", f"9.{n}. Late section", 2) for n in range(12)
+    ]
+    result = format_sections(SolrDoc(), sections, url=_URL)
+    assert "#sec-11" in result
+    assert "showing" not in result
+
+
+def test_format_sections_sheds_deepest_level_first_for_anchors():
+    """Over budget, chapters keep their anchors and subsections are dropped."""
+    sections = [Section(f"ch-{n}", f"Chapter {n}", 1) for n in range(3)] + [
+        Section(f"sub-{n}", f"Subsection {n}", 2) for n in range(40)
+    ]
+    result = format_sections(SolrDoc(), sections, url=_URL, max_chars=150)
+    assert "#ch-0" in result
+    assert "#ch-2" in result
+    assert "#sub-0" not in result
+    assert "deeper subsections omitted" in result
+
+
+def test_format_sections_truncates_when_even_top_level_overflows():
+    """A reference page whose every entry is a chapter still gets capped."""
+    sections = [Section(f"ch-{n}", f"Chapter {n}", 1) for n in range(200)]
+    result = format_sections(SolrDoc(), sections, url=_URL, max_chars=200)
+    assert "of 200 sections" in result
+    assert "#ch-199" not in result
