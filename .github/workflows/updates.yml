@@ -15,7 +15,7 @@ jobs:
     name: Update - ${{ matrix.job.name }}
     runs-on: ubuntu-latest
     container:
-      image: quay.io/rhel_lightspeed/ci
+      image: quay.io/rhel_lightspeed/ci@sha256:18b60f2fcc0608928967baf569b3e08909bb050537e155e8966f15993031774b
 
     strategy:
       fail-fast: false
