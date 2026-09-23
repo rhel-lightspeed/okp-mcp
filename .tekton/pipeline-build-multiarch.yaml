@@ -168,13 +168,30 @@ spec:
         - name: basic-auth
           workspace: git-auth
 
+    - name: generate-konflux-requirements
+      params:
+        - name: SOURCE_ARTIFACT
+          value: $(tasks.clone-repository.results.SOURCE_ARTIFACT)
+
+        - name: oci-storage
+          value: $(params.output-image).source
+
+        - name: oci-artifact-expires-after
+          value: $(params.image-expires-after)
+
+      runAfter:
+        - clone-repository
+
+      taskRef:
+        name: generate-konflux-requirements
+
     - name: prefetch-dependencies
       params:
         - name: input
           value: $(params.prefetch-input)
 
         - name: SOURCE_ARTIFACT
-          value: $(tasks.clone-repository.results.SOURCE_ARTIFACT)
+          value: $(tasks.generate-konflux-requirements.results.SOURCE_ARTIFACT)
 
         - name: ociStorage
           value: $(params.output-image).prefetch
@@ -186,7 +203,7 @@ spec:
           value: "true"
 
       runAfter:
-        - clone-repository
+        - generate-konflux-requirements
 
       taskRef:
         resolver: bundles
