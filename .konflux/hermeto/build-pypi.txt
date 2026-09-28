@@ -3,6 +3,6 @@
 setuptools-rust==1.13.0 \
     --hash=sha256:666439c4d90e968bb625bcf87ec0aa02b4f49e599d2f5dc255c633a04e8eca99 \
     --hash=sha256:f2afcf4baeee689910ce49cfa8aad4e08cce72f417449bcc32891b8664fdc726
-vcs-versioning==2.4.1 \
-    --hash=sha256:b7089ec9bef67b2cad82148366e8eac4d63173f440ec62628282b59eb96bbcb0 \
-    --hash=sha256:d4575de3115ec9434393c87c80ffb0eb98a16056bfe2b11ce0f3a97aff67fe0a
+vcs-versioning==2.5.0 \
+    --hash=sha256:956a796e31f80fe714d219d6d1df15a6bf247d10f6d851bf4b98279d0a42da55 \
+    --hash=sha256:dbf44f6303dc817e5792cb7d0e9cc90e3046ee1e32eaa357b20ad368811313d0
