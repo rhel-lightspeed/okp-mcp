@@ -22,7 +22,9 @@ jobs:
       matrix:
         job:
           - name: Base image
-            command: update-image-refs -d
+            command: |
+              update-image-refs -d
+              make rpm-lock
             pr_title: Update base image
             pr_file_check: Containerfile
             pr_branch: update-base-image
