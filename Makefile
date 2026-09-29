@@ -6,6 +6,7 @@ ifeq ($(OS), Darwin)
 endif
 
 CONTAINER_RUNTIME ?= $(shell type -P $(CONTAINER_RUNTIMES) | head -n 1)
+RLP_VERSION = 0.30.1
 
 .PHONY: check-konflux-requirements ci fix format freeze hermeto-clean hermeto-prefetch konflux-requirements lint lock radon rpm-lock setup test typecheck
 
@@ -56,7 +57,7 @@ setup:
 HERMETO_IMAGE ?= ghcr.io/hermetoproject/hermeto:0.56.0
 hermeto-prefetch:
 	@GIT_COMMON=$$(cd "$$(git rev-parse --git-common-dir)" && pwd -P) && \
-	@$(CONTAINER_RUNTIME) run --rm \
+	$(CONTAINER_RUNTIME) run --rm \
 	  -v "$$(pwd):$$(pwd):z" \
 	  -v "$$GIT_COMMON:$$GIT_COMMON:z" \
 	  -w "$$(pwd)" \
@@ -67,13 +68,15 @@ hermeto-prefetch:
 hermeto-clean:
 	rm -rf .hermeto-out/
 
+rpm-lockfile-prototype-image:
+	@curl -s https://raw.githubusercontent.com/konflux-ci/rpm-lockfile-prototype/refs/tags/v$(RLP_VERSION)/Containerfile \
+	| $(CONTAINER_RUNTIME) build -t rpm-lockfile-prototype:$(RLP_VERSION) -
+
 # Regenerate rpms.lock.yaml from rpms.in.yaml against the builder image.
 # Resolves the build-toolchain RPM tree for every target arch so Hermeto can
-# prefetch them for hermetic builds. Requires podman; the builder image is read
-# straight from the first FROM in Containerfile.
-# RLP_IMAGE defaults to the Konflux tool image (needs `podman login quay.io`).
-RLP_IMAGE ?= quay.io/konflux-ci/rpm-lockfile-prototype:latest
-rpm-lock:
+# prefetch them for hermetic builds.
+RLP_IMAGE ?= rpm-lockfile-prototype:$(RLP_VERSION)
+rpm-lock: rpm-lockfile-prototype-image
 	BUILDER=$$(awk '/^FROM /{print $$2; exit}' Containerfile) && \
 	$(CONTAINER_RUNTIME) run --rm -v "$$(pwd):/work:z" -w /work \
 	  $(RLP_IMAGE) --image "$$BUILDER" rpms.in.yaml
