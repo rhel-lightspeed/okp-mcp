@@ -7,8 +7,12 @@ endif
 
 CONTAINER_RUNTIME ?= $(shell type -P $(CONTAINER_RUNTIMES) | head -n 1)
 RLP_VERSION = 0.30.1
+RLP_IMAGE ?= rpm-lockfile-prototype:$(RLP_VERSION)
+BUILDER ?= $(shell awk '/^FROM /{print $$2; exit}' Containerfile)
 
-.PHONY: check-konflux-requirements ci fix format freeze hermeto-clean hermeto-prefetch konflux-requirements lint lock radon rpm-lock setup test typecheck
+.PHONY: check-konflux-requirements ci fix format freeze hermeto-clean
+.PHONY: hermeto-prefetch konflux-requirements lint lock radon
+.PHONY: rpm-lock rpm-lock-container rpm-lockfile-prototype-image setup test typecheck
 
 fix:
 	uv run --locked ruff check --fix
@@ -75,11 +79,12 @@ rpm-lockfile-prototype-image:
 # Regenerate rpms.lock.yaml from rpms.in.yaml against the builder image.
 # Resolves the build-toolchain RPM tree for every target arch so Hermeto can
 # prefetch them for hermetic builds.
-RLP_IMAGE ?= rpm-lockfile-prototype:$(RLP_VERSION)
-rpm-lock: rpm-lockfile-prototype-image
-	BUILDER=$$(awk '/^FROM /{print $$2; exit}' Containerfile) && \
+rpm-lock-container: rpm-lockfile-prototype-image
 	$(CONTAINER_RUNTIME) run --rm -v "$$(pwd):/work:z" -w /work \
-	  $(RLP_IMAGE) --image "$$BUILDER" rpms.in.yaml
+	  $(RLP_IMAGE) --image $(BUILDER) rpms.in.yaml
+
+rpm-lock:
+	rpm-lockfile-prototype --image $(BUILDER) rpms.in.yaml
 
 upgrade:
 	uv lock --upgrade
