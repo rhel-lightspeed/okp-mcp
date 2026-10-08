@@ -18,48 +18,48 @@ arches:
     name: cargo
     evr: 1.99.0-0.1.hum1
     sourcerpm: rust-1.99.0-0.1.hum1.src.rpm
-  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/aarch64/Packages/c/cpp-16.2.1-3.hum1.aarch64.rpm
+  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/aarch64/Packages/c/cpp-16.2.1-3.1.hum1.aarch64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 14019774
-    checksum: sha256:c99a1363068c272e196d37381e7e3f0478fa04dd20e0ea160dcc1b237cd94873
+    size: 14018630
+    checksum: sha256:f0069633a16b3dd4e8979c04046c502487912f5accc56a2137927441de762560
     name: cpp
-    evr: 16.2.1-3.hum1
-    sourcerpm: gcc-16.2.1-3.hum1.src.rpm
-  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/aarch64/Packages/e/elfutils-debuginfod-client-0.196-1.1.hum1.aarch64.rpm
+    evr: 16.2.1-3.1.hum1
+    sourcerpm: gcc-16.2.1-3.1.hum1.src.rpm
+  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/aarch64/Packages/e/elfutils-debuginfod-client-0.196-1.1.1.hum1.aarch64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 54340
-    checksum: sha256:1753a9d9ea49018bf1e2e1fd51b240038f028a63d9c4112893098774fc30742b
+    size: 54325
+    checksum: sha256:b97c9fe7f550e0e2b27e79d11e0768da4a707f9aa699eabef1dc96990aaf0bff
     name: elfutils-debuginfod-client
-    evr: 0.196-1.1.hum1
-    sourcerpm: elfutils-0.196-1.1.hum1.src.rpm
-  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/aarch64/Packages/e/elfutils-libelf-0.196-1.1.hum1.aarch64.rpm
+    evr: 0.196-1.1.1.hum1
+    sourcerpm: elfutils-0.196-1.1.1.hum1.src.rpm
+  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/aarch64/Packages/e/elfutils-libelf-0.196-1.1.1.hum1.aarch64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 248566
-    checksum: sha256:7bff4ee816ff5e2b87ff881d9f3e4fecd1176d3675c5e48dd094c17bcd21968d
+    size: 248121
+    checksum: sha256:d48b80dc24f9f8ee35936da5b4cc6e82f0bc19f866aae60132dc673cc5f449bb
     name: elfutils-libelf
-    evr: 0.196-1.1.hum1
-    sourcerpm: elfutils-0.196-1.1.hum1.src.rpm
-  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/aarch64/Packages/e/elfutils-libs-0.196-1.1.hum1.aarch64.rpm
+    evr: 0.196-1.1.1.hum1
+    sourcerpm: elfutils-0.196-1.1.1.hum1.src.rpm
+  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/aarch64/Packages/e/elfutils-libs-0.196-1.1.1.hum1.aarch64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 278642
-    checksum: sha256:c1c4fc7a9a16f192c596d209dfc3b918448c5733ef5cf1d3897a4b6ebe864d2f
+    size: 278668
+    checksum: sha256:a447c22f4c68f60d64feb59a22cf8ca015d59b818c508f6c1578af8a3cb52f63
     name: elfutils-libs
-    evr: 0.196-1.1.hum1
-    sourcerpm: elfutils-0.196-1.1.hum1.src.rpm
-  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/aarch64/Packages/g/gcc-16.2.1-3.hum1.aarch64.rpm
+    evr: 0.196-1.1.1.hum1
+    sourcerpm: elfutils-0.196-1.1.1.hum1.src.rpm
+  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/aarch64/Packages/g/gcc-16.2.1-3.1.hum1.aarch64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 41884112
-    checksum: sha256:7c2afcec6984916998589083dfa881ceb0e5e08c84f9822ac36ba9b82ae8ab34
+    size: 41880458
+    checksum: sha256:704ce0f043fd797ea269f3d445206f3fbb1e30eafa193f7179a1bd0e809e12c8
     name: gcc
-    evr: 16.2.1-3.hum1
-    sourcerpm: gcc-16.2.1-3.hum1.src.rpm
-  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/aarch64/Packages/g/gcc-c++-16.2.1-3.hum1.aarch64.rpm
+    evr: 16.2.1-3.1.hum1
+    sourcerpm: gcc-16.2.1-3.1.hum1.src.rpm
+  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/aarch64/Packages/g/gcc-c++-16.2.1-3.1.hum1.aarch64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 16725209
-    checksum: sha256:de189da19bd9ca6cdda231925f167755d96a109f3a55507e441973f1a7de2f7c
+    size: 16732256
+    checksum: sha256:0fccfde0d33abcdbf51b39274d262b4f72f7e85efd73b4aea95ec275bf37b128
     name: gcc-c++
-    evr: 16.2.1-3.hum1
-    sourcerpm: gcc-16.2.1-3.hum1.src.rpm
+    evr: 16.2.1-3.1.hum1
+    sourcerpm: gcc-16.2.1-3.1.hum1.src.rpm
   - url: https://console.redhat.com/api/pulp-content/public-hummingbird/aarch64/Packages/g/glibc-devel-2.43-9.2.hum1.aarch64.rpm
     repoid: public-hummingbird-x86_64-rpms
     size: 667263
@@ -67,13 +67,13 @@ arches:
     name: glibc-devel
     evr: 2.43-9.2.hum1
     sourcerpm: glibc-2.43-9.2.hum1.src.rpm
-  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/aarch64/Packages/g/gmp-6.3.0-6.hum1.aarch64.rpm
+  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/aarch64/Packages/g/gmp-6.3.0-6.1.hum1.aarch64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 284031
-    checksum: sha256:cb18f886fd5b7d83e7e5f03ab2ab4b1f9f88dd09e199ab9b107e4b3609c1265f
+    size: 284089
+    checksum: sha256:0c87f08b6bb2ff6285484176cc9828478efde1f62d5277e5d5a8e49b5b604b68
     name: gmp
-    evr: 1:6.3.0-6.hum1
-    sourcerpm: gmp-6.3.0-6.hum1.src.rpm
+    evr: 1:6.3.0-6.1.hum1
+    sourcerpm: gmp-6.3.0-6.1.hum1.src.rpm
   - url: https://console.redhat.com/api/pulp-content/public-hummingbird/aarch64/Packages/j/jansson-2.14-5.hum1.aarch64.rpm
     repoid: public-hummingbird-x86_64-rpms
     size: 53814
@@ -88,20 +88,20 @@ arches:
     name: kernel-headers
     evr: 7.2.0-61.hum1
     sourcerpm: kernel-headers-7.2.0-61.hum1.src.rpm
-  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/aarch64/Packages/l/libasan-16.2.1-3.hum1.aarch64.rpm
+  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/aarch64/Packages/l/libasan-16.2.1-3.1.hum1.aarch64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 534493
-    checksum: sha256:e69c9e271fb62703bb23ba8ba095a5e4a49dbfdf588b50a57ee2d67b8999d944
+    size: 534509
+    checksum: sha256:b1a413af169da375e9d4a473969c08e46465f74f29379e078c7cb2e87b784e55
     name: libasan
-    evr: 16.2.1-3.hum1
-    sourcerpm: gcc-16.2.1-3.hum1.src.rpm
-  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/aarch64/Packages/l/libatomic-16.2.1-3.hum1.aarch64.rpm
+    evr: 16.2.1-3.1.hum1
+    sourcerpm: gcc-16.2.1-3.1.hum1.src.rpm
+  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/aarch64/Packages/l/libatomic-16.2.1-3.1.hum1.aarch64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 62945
-    checksum: sha256:498bae72cfe53f9c94e1620624f2e60dcfc72914ec867be892b79bd46c96dd50
+    size: 62957
+    checksum: sha256:5a583db2bdb27fd0595089eae43ab184a23b7d5e35276acbe2bcc51c03d4c711
     name: libatomic
-    evr: 16.2.1-3.hum1
-    sourcerpm: gcc-16.2.1-3.hum1.src.rpm
+    evr: 16.2.1-3.1.hum1
+    sourcerpm: gcc-16.2.1-3.1.hum1.src.rpm
   - url: https://console.redhat.com/api/pulp-content/public-hummingbird/aarch64/Packages/l/libedit-3.1-60.20260512cvs.hum1.aarch64.rpm
     repoid: public-hummingbird-x86_64-rpms
     size: 115237
@@ -109,13 +109,20 @@ arches:
     name: libedit
     evr: 3.1-60.20260512cvs.hum1
     sourcerpm: libedit-3.1-60.20260512cvs.hum1.src.rpm
-  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/aarch64/Packages/l/libffi-devel-3.8.0-1.hum1.aarch64.rpm
+  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/aarch64/Packages/l/libffi-devel-3.8.0-1.1.hum1.aarch64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 38441
-    checksum: sha256:036e8c2a010d4405e2e3847b80134351f77dd19459842ae7bfc79a9f9b93d9c1
+    size: 38453
+    checksum: sha256:578ae146c27a1cd2249d2358190c10402694168c55ff0eedbd53c86e1f50286c
     name: libffi-devel
-    evr: 3.8.0-1.hum1
-    sourcerpm: libffi-3.8.0-1.hum1.src.rpm
+    evr: 3.8.0-1.1.hum1
+    sourcerpm: libffi-3.8.0-1.1.hum1.src.rpm
+  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/aarch64/Packages/l/libgcc-16.2.1-3.1.hum1.aarch64.rpm
+    repoid: public-hummingbird-x86_64-rpms
+    size: 127049
+    checksum: sha256:6919f69faa9aff910324da185a08d5a82e5fa5d9111e39e70b32bd0061505e8a
+    name: libgcc
+    evr: 16.2.1-3.1.hum1
+    sourcerpm: gcc-16.2.1-3.1.hum1.src.rpm
   - url: https://console.redhat.com/api/pulp-content/public-hummingbird/aarch64/Packages/l/libgit2_1.9-1.9.7-3.hum1.aarch64.rpm
     repoid: public-hummingbird-x86_64-rpms
     size: 575179
@@ -123,6 +130,13 @@ arches:
     name: libgit2_1.9
     evr: 1.9.7-3.hum1
     sourcerpm: libgit2_1.9-1.9.7-3.hum1.src.rpm
+  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/aarch64/Packages/l/libgomp-16.2.1-3.1.hum1.aarch64.rpm
+    repoid: public-hummingbird-x86_64-rpms
+    size: 395996
+    checksum: sha256:4411bad9b15f3eb4f1881d0b8b55845df52fee87387480c915f17af99d30280c
+    name: libgomp
+    evr: 16.2.1-3.1.hum1
+    sourcerpm: gcc-16.2.1-3.1.hum1.src.rpm
   - url: https://console.redhat.com/api/pulp-content/public-hummingbird/aarch64/Packages/l/libmpc-1.4.1-2.hum1.aarch64.rpm
     repoid: public-hummingbird-x86_64-rpms
     size: 81879
@@ -144,27 +158,34 @@ arches:
     name: libssh2
     evr: 1.11.1-10.4.hum1
     sourcerpm: libssh2-1.11.1-10.4.hum1.src.rpm
-  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/aarch64/Packages/l/libstdc++-devel-16.2.1-3.hum1.aarch64.rpm
+  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/aarch64/Packages/l/libstdc++-16.2.1-3.1.hum1.aarch64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 6157595
-    checksum: sha256:f2a1205d82f79523b0553cc6ac880881da73d6c0a0704d00353bf0cd56c976f9
+    size: 950242
+    checksum: sha256:ef4db16fa7daf47c73673defe6d0413c439430c46bc7f41d1f684425092a7d5c
+    name: libstdc++
+    evr: 16.2.1-3.1.hum1
+    sourcerpm: gcc-16.2.1-3.1.hum1.src.rpm
+  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/aarch64/Packages/l/libstdc++-devel-16.2.1-3.1.hum1.aarch64.rpm
+    repoid: public-hummingbird-x86_64-rpms
+    size: 6157274
+    checksum: sha256:4de78e23be72f0d32d99b67ed9813857a027394a9d4d176e9f87a54136f2fe19
     name: libstdc++-devel
-    evr: 16.2.1-3.hum1
-    sourcerpm: gcc-16.2.1-3.hum1.src.rpm
-  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/aarch64/Packages/l/libubsan-16.2.1-3.hum1.aarch64.rpm
+    evr: 16.2.1-3.1.hum1
+    sourcerpm: gcc-16.2.1-3.1.hum1.src.rpm
+  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/aarch64/Packages/l/libubsan-16.2.1-3.1.hum1.aarch64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 239564
-    checksum: sha256:3f6092d096cec40478e606506f3d7d9f3c135718955d82982f4afaab12aa21a2
+    size: 239856
+    checksum: sha256:1f2e4ed30d9b108bed4c13ab128cf6e920c3919530834a7b205b29f8f2fb30d4
     name: libubsan
-    evr: 16.2.1-3.hum1
-    sourcerpm: gcc-16.2.1-3.hum1.src.rpm
-  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/aarch64/Packages/l/libxcrypt-devel-4.5.2-4.hum1.aarch64.rpm
+    evr: 16.2.1-3.1.hum1
+    sourcerpm: gcc-16.2.1-3.1.hum1.src.rpm
+  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/aarch64/Packages/l/libxcrypt-devel-4.5.2-4.1.hum1.aarch64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 37942
-    checksum: sha256:b660fe4f74c908bfd250ad3f146c3aad0d9ec2fae42da1d03dea4e088f184275
+    size: 37946
+    checksum: sha256:ba449c0f621f4b73b952ffaa8ea9da2844ef6d1705401f08d3eeec3ff3acb628
     name: libxcrypt-devel
-    evr: 4.5.2-4.hum1
-    sourcerpm: libxcrypt-4.5.2-4.hum1.src.rpm
+    evr: 4.5.2-4.1.hum1
+    sourcerpm: libxcrypt-4.5.2-4.1.hum1.src.rpm
   - url: https://console.redhat.com/api/pulp-content/public-hummingbird/aarch64/Packages/l/llhttp-9.4.2-2.hum1.aarch64.rpm
     repoid: public-hummingbird-x86_64-rpms
     size: 43620
@@ -200,13 +221,13 @@ arches:
     name: mpfr
     evr: 4.2.2-4.hum1
     sourcerpm: mpfr-4.2.2-4.hum1.src.rpm
-  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/aarch64/Packages/o/openssl-devel-3.5.9-0.2.hum1.aarch64.rpm
+  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/aarch64/Packages/o/openssl-devel-3.5.9-0.3.hum1.aarch64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 4547639
-    checksum: sha256:692d56dbc7e52ab1e436d92e720da9f94963c4d6866b43004f541ef846d2178d
+    size: 4558447
+    checksum: sha256:f24f02d18d6277598300906ca2ffd6a0937694a66f6888e00b156efc216eed01
     name: openssl-devel
-    evr: 1:3.5.9-0.2.hum1
-    sourcerpm: openssl-3.5.9-0.2.hum1.src.rpm
+    evr: 1:3.5.9-0.3.hum1
+    sourcerpm: openssl-3.5.9-0.3.hum1.src.rpm
   - url: https://console.redhat.com/api/pulp-content/public-hummingbird/aarch64/Packages/p/pkgconf-2.5.1-2.hum1.aarch64.rpm
     repoid: public-hummingbird-x86_64-rpms
     size: 56874
@@ -267,48 +288,48 @@ arches:
     name: cargo
     evr: 1.99.0-0.1.hum1
     sourcerpm: rust-1.99.0-0.1.hum1.src.rpm
-  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/c/cpp-16.2.1-3.hum1.x86_64.rpm
+  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/c/cpp-16.2.1-3.1.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 15369085
-    checksum: sha256:7435f2efc2ed7ca1d5b29c5d1a710c0df095cf9e2675ba1f76c2abffd02b70be
+    size: 15372578
+    checksum: sha256:b6407e196c167d467d18016650e347adbcf0760f9c8ba3b561bd4f53bb14de67
     name: cpp
-    evr: 16.2.1-3.hum1
-    sourcerpm: gcc-16.2.1-3.hum1.src.rpm
-  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/e/elfutils-debuginfod-client-0.196-1.1.hum1.x86_64.rpm
+    evr: 16.2.1-3.1.hum1
+    sourcerpm: gcc-16.2.1-3.1.hum1.src.rpm
+  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/e/elfutils-debuginfod-client-0.196-1.1.1.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 55112
-    checksum: sha256:ebece4e4c26c70cfd4f963743bc0e7ebde3c045e75d0549420ff9e00a229baea
+    size: 55093
+    checksum: sha256:9f30e03e1fc7ed47fd40c2fbc7d462dffd7ab98c5be713d94b249c1167c7ac99
     name: elfutils-debuginfod-client
-    evr: 0.196-1.1.hum1
-    sourcerpm: elfutils-0.196-1.1.hum1.src.rpm
-  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/e/elfutils-libelf-0.196-1.1.hum1.x86_64.rpm
+    evr: 0.196-1.1.1.hum1
+    sourcerpm: elfutils-0.196-1.1.1.hum1.src.rpm
+  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/e/elfutils-libelf-0.196-1.1.1.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 251176
-    checksum: sha256:f9ff1f5734862f57589b5420a0ac732e65f1ff9938b12a474a6ca446dd335f8d
+    size: 251439
+    checksum: sha256:c95f08efe1a8fec6f9f1e79bdcd25b1b68c9386f88da0106ce5bbec36e55837b
     name: elfutils-libelf
-    evr: 0.196-1.1.hum1
-    sourcerpm: elfutils-0.196-1.1.hum1.src.rpm
-  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/e/elfutils-libs-0.196-1.1.hum1.x86_64.rpm
+    evr: 0.196-1.1.1.hum1
+    sourcerpm: elfutils-0.196-1.1.1.hum1.src.rpm
+  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/e/elfutils-libs-0.196-1.1.1.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 298333
-    checksum: sha256:22202f106a84c8c026bfd024de9cb2afd83c85e2ef9de99086d39e94ce9d24fa
+    size: 298388
+    checksum: sha256:919e0c44b9cc745b898e1a430a0e99df7bb4661f9620b91691c89abdff6c9146
     name: elfutils-libs
-    evr: 0.196-1.1.hum1
-    sourcerpm: elfutils-0.196-1.1.hum1.src.rpm
-  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/g/gcc-16.2.1-3.hum1.x86_64.rpm
+    evr: 0.196-1.1.1.hum1
+    sourcerpm: elfutils-0.196-1.1.1.hum1.src.rpm
+  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/g/gcc-16.2.1-3.1.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 45464858
-    checksum: sha256:ff641bcf3a38d4f75127ac0a16a2b1d226bcd90b5d76a503d2b72aea83a88c70
+    size: 45513990
+    checksum: sha256:d634625828fc2166099875b87194f424c4e29a8c7f068ebf8ea7dae749ff7826
     name: gcc
-    evr: 16.2.1-3.hum1
-    sourcerpm: gcc-16.2.1-3.hum1.src.rpm
-  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/g/gcc-c++-16.2.1-3.hum1.x86_64.rpm
+    evr: 16.2.1-3.1.hum1
+    sourcerpm: gcc-16.2.1-3.1.hum1.src.rpm
+  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/g/gcc-c++-16.2.1-3.1.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 18232459
-    checksum: sha256:9aff48204796159c851a36eb2ba76848bd3939882bad3b2138049c68b58d8b6f
+    size: 18229904
+    checksum: sha256:956b87e88b79f52eb579a035f5c246c8ead87bfc1ff306ce258f56e965bd12fb
     name: gcc-c++
-    evr: 16.2.1-3.hum1
-    sourcerpm: gcc-16.2.1-3.hum1.src.rpm
+    evr: 16.2.1-3.1.hum1
+    sourcerpm: gcc-16.2.1-3.1.hum1.src.rpm
   - url: https://console.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/g/glibc-devel-2.43-9.2.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
     size: 675534
@@ -316,13 +337,13 @@ arches:
     name: glibc-devel
     evr: 2.43-9.2.hum1
     sourcerpm: glibc-2.43-9.2.hum1.src.rpm
-  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/g/gmp-6.3.0-6.hum1.x86_64.rpm
+  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/g/gmp-6.3.0-6.1.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 336312
-    checksum: sha256:6566943f8813eb0ced4fa107044729289d3bb8064dbc8252d6cd3853f9cc0d09
+    size: 336393
+    checksum: sha256:f99e0ed90a30d404e1329d1c6501f935bd1ff9f64567a227bb9fe196faec6f8e
     name: gmp
-    evr: 1:6.3.0-6.hum1
-    sourcerpm: gmp-6.3.0-6.hum1.src.rpm
+    evr: 1:6.3.0-6.1.hum1
+    sourcerpm: gmp-6.3.0-6.1.hum1.src.rpm
   - url: https://console.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/j/jansson-2.14-5.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
     size: 54378
@@ -337,13 +358,13 @@ arches:
     name: kernel-headers
     evr: 7.2.0-61.hum1
     sourcerpm: kernel-headers-7.2.0-61.hum1.src.rpm
-  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/l/libatomic-16.2.1-3.hum1.x86_64.rpm
+  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/l/libatomic-16.2.1-3.1.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 63050
-    checksum: sha256:4117a541e7d1c088010bbfafacc5827dfaa7f6a7a396befb9026c9f8963eabb6
+    size: 63058
+    checksum: sha256:295d4980cf7bd84c14937f60d42b635610949acf0f52c84211c825ff3bc70824
     name: libatomic
-    evr: 16.2.1-3.hum1
-    sourcerpm: gcc-16.2.1-3.hum1.src.rpm
+    evr: 16.2.1-3.1.hum1
+    sourcerpm: gcc-16.2.1-3.1.hum1.src.rpm
   - url: https://console.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/l/libedit-3.1-60.20260512cvs.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
     size: 119199
@@ -351,13 +372,20 @@ arches:
     name: libedit
     evr: 3.1-60.20260512cvs.hum1
     sourcerpm: libedit-3.1-60.20260512cvs.hum1.src.rpm
-  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/l/libffi-devel-3.8.0-1.hum1.x86_64.rpm
+  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/l/libffi-devel-3.8.0-1.1.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 39693
-    checksum: sha256:d962e07244351833fbcd79363ee00cc5adfa56fb534aa927989e56d18485009b
+    size: 39705
+    checksum: sha256:f33dfca7eff35246cd1f27bd24bccadf5b3238a46314e93e47feef66cb610d6c
     name: libffi-devel
-    evr: 3.8.0-1.hum1
-    sourcerpm: libffi-3.8.0-1.hum1.src.rpm
+    evr: 3.8.0-1.1.hum1
+    sourcerpm: libffi-3.8.0-1.1.hum1.src.rpm
+  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/l/libgcc-16.2.1-3.1.hum1.x86_64.rpm
+    repoid: public-hummingbird-x86_64-rpms
+    size: 145964
+    checksum: sha256:4bf8e865965d2c8451a0925f29ad1dee062c4c174ee6a8220f5f8a9ad23d8e23
+    name: libgcc
+    evr: 16.2.1-3.1.hum1
+    sourcerpm: gcc-16.2.1-3.1.hum1.src.rpm
   - url: https://console.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/l/libgit2_1.9-1.9.7-3.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
     size: 633591
@@ -365,6 +393,13 @@ arches:
     name: libgit2_1.9
     evr: 1.9.7-3.hum1
     sourcerpm: libgit2_1.9-1.9.7-3.hum1.src.rpm
+  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/l/libgomp-16.2.1-3.1.hum1.x86_64.rpm
+    repoid: public-hummingbird-x86_64-rpms
+    size: 413557
+    checksum: sha256:331708b0acff06a33f9974a91c576c7730b88698661b01b5af11f1a232206a95
+    name: libgomp
+    evr: 16.2.1-3.1.hum1
+    sourcerpm: gcc-16.2.1-3.1.hum1.src.rpm
   - url: https://console.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/l/libmpc-1.4.1-2.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
     size: 83759
@@ -386,20 +421,27 @@ arches:
     name: libssh2
     evr: 1.11.1-10.4.hum1
     sourcerpm: libssh2-1.11.1-10.4.hum1.src.rpm
-  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/l/libstdc++-devel-16.2.1-3.hum1.x86_64.rpm
+  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/l/libstdc++-16.2.1-3.1.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 6339992
-    checksum: sha256:87313313aa90aa3c39b0d0a9e68f3bec0ac9ce9dee12e5dfa60e371bb9095ae9
+    size: 1059149
+    checksum: sha256:c78098a5ff411ee128229dbf1929fa9e1cb5d1c1c6be23e919afa26b36109fd0
+    name: libstdc++
+    evr: 16.2.1-3.1.hum1
+    sourcerpm: gcc-16.2.1-3.1.hum1.src.rpm
+  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/l/libstdc++-devel-16.2.1-3.1.hum1.x86_64.rpm
+    repoid: public-hummingbird-x86_64-rpms
+    size: 6339730
+    checksum: sha256:1a7e5f9cd0c33eeb99bf09275154f5175619308965f0f307e9fbd830cb409cfb
     name: libstdc++-devel
-    evr: 16.2.1-3.hum1
-    sourcerpm: gcc-16.2.1-3.hum1.src.rpm
-  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/l/libxcrypt-devel-4.5.2-4.hum1.x86_64.rpm
+    evr: 16.2.1-3.1.hum1
+    sourcerpm: gcc-16.2.1-3.1.hum1.src.rpm
+  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/l/libxcrypt-devel-4.5.2-4.1.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 37978
-    checksum: sha256:108e3df4ae8469e260a97af98a98593104cbd0f37e11d1ae9ca162823ea330e8
+    size: 37982
+    checksum: sha256:a961da750cdfc3bec2f20def36e5054f40910c87cde991379a1962fd82f7aaf5
     name: libxcrypt-devel
-    evr: 4.5.2-4.hum1
-    sourcerpm: libxcrypt-4.5.2-4.hum1.src.rpm
+    evr: 4.5.2-4.1.hum1
+    sourcerpm: libxcrypt-4.5.2-4.1.hum1.src.rpm
   - url: https://console.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/l/llhttp-9.4.2-2.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
     size: 43692
@@ -435,13 +477,13 @@ arches:
     name: mpfr
     evr: 4.2.2-4.hum1
     sourcerpm: mpfr-4.2.2-4.hum1.src.rpm
-  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/o/openssl-devel-3.5.9-0.2.hum1.x86_64.rpm
+  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/o/openssl-devel-3.5.9-0.3.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 4548392
-    checksum: sha256:cbb2bf3a799eb44102ca2a05d8dae392b06925407936e3b4995f9a83de2c4a0a
+    size: 4559208
+    checksum: sha256:62fe740f97f47b0ebe61d5b9bf82f32ecb251b359ecff73fe2da4550be785516
     name: openssl-devel
-    evr: 1:3.5.9-0.2.hum1
-    sourcerpm: openssl-3.5.9-0.2.hum1.src.rpm
+    evr: 1:3.5.9-0.3.hum1
+    sourcerpm: openssl-3.5.9-0.3.hum1.src.rpm
   - url: https://console.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/pkgconf-2.5.1-2.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
     size: 57411
