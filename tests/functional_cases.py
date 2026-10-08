@@ -575,4 +575,25 @@ FUNCTIONAL_TEST_CASES = [
         ),
         id="RSPEED_1859",
     ),
+    # Verified against live Solr 2026-10-08: FAIL before definition_lookup intent.
+    # A bare "What is dnsconfd?" lookup was drowned out by dnsconfd errata in
+    # the main query and by unrelated JBoss deprecation docs from the side
+    # query.  The intended answer lives in explanatory RHEL documentation.
+    pytest.param(
+        FunctionalCase(
+            question="What is Dnsconfd?",
+            expected_docs=[
+                "securing_networks",
+                "Securing networks",
+            ],
+            expected_content=[
+                "NetworkManager",
+                "encrypted DNS",
+                ("local DNS cache configuration daemon", "DNS cache configuration daemon"),
+                ("DNS over TLS", "DoT"),
+            ],
+            max_position=3,
+        ),
+        id="RSPEED_1171",
+    ),
 ]

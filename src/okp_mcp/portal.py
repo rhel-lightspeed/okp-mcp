@@ -555,16 +555,21 @@ async def _run_portal_search(
     # deprecation notices about the user's ACTUAL topic, not random
     # deprecation content.  Without this, a VM management query gets
     # Eclipse Vert.x and network teaming deprecation results that waste
-    # ~2,000 chars of response budget (see RSPEED_2480).
-    apply_deprecation_boosts(dep_params, query_lower)
+    # ~2,000 chars of response budget (see RSPEED_2480). Some intents mark
+    # the side-query as pure noise; in that case we skip it entirely.
+    run_deprecation_query = apply_deprecation_boosts(dep_params, query_lower)
 
-    main_data, dep_data = await asyncio.gather(
-        _solr_query(main_params, client=client, solr_endpoint=solr_endpoint),
-        _solr_query(dep_params, client=client, solr_endpoint=solr_endpoint),
-    )
+    if run_deprecation_query:
+        main_data, dep_data = await asyncio.gather(
+            _solr_query(main_params, client=client, solr_endpoint=solr_endpoint),
+            _solr_query(dep_params, client=client, solr_endpoint=solr_endpoint),
+        )
+        dep_chunks = _docs_to_chunks(dep_data, query)
+    else:
+        main_data = await _solr_query(main_params, client=client, solr_endpoint=solr_endpoint)
+        dep_chunks = []
 
     main_chunks = _docs_to_chunks(main_data, query)
-    dep_chunks = _docs_to_chunks(dep_data, query)
 
     merged = _reciprocal_rank_fusion(main_chunks, dep_chunks)
     deduped = _deduplicate_by_parent(merged)
