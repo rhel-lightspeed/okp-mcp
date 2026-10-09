@@ -288,6 +288,42 @@ class TestDetectProgrammingLanguageIntent:
         assert _get_rule("programming_language").matches(query) is False
 
 
+class TestDetectDefinitionLookupIntent:
+    """Verify exact one-term "what is X" definition lookup detection.
+
+    These queries need explanatory documentation, not errata/advisory hits and
+    not deprecation noise from unrelated products.  See functional test
+    RSPEED_1171.
+    """
+
+    @pytest.mark.parametrize(
+        "query",
+        [
+            "what is dnsconfd?",
+            "What's rpm-ostree?",
+            "what is libvirt",
+        ],
+        ids=["dnsconfd", "whats-rpm-ostree", "libvirt"],
+    )
+    def test_positive(self, query: str):
+        """Single-token definition lookups trigger the definition intent."""
+        assert _get_rule("definition_lookup").matches(query) is True
+
+    @pytest.mark.parametrize(
+        "query",
+        [
+            "what is the current version of python for RHEL 10",
+            "what is dns over tls",
+            "configure firewall rhel 9",
+            "",
+        ],
+        ids=["multi-token-question", "multiword-term", "not-what-is", "empty"],
+    )
+    def test_negative(self, query: str):
+        """Broader/multi-word questions do not trigger the narrow definition intent."""
+        assert _get_rule("definition_lookup").matches(query) is False
+
+
 # ---------------------------------------------------------------------------
 # Main query builder
 # ---------------------------------------------------------------------------
@@ -498,6 +534,13 @@ class TestApplyMainBoosts:
         apply_main_boosts(params, "when was rhel 9 released", "rhel 9 released")
         assert "hl.q" not in params
 
+    def test_definition_lookup_adds_documentation_boost(self):
+        """Definition lookups boost documentation over errata/advisory noise."""
+        params = _build_main_query("what is dnsconfd")
+        apply_main_boosts(params, "what is dnsconfd?", "dnsconfd")
+        assert params["bq"] == "documentKind:documentation^40"
+        assert "hl.q" not in params
+
     def test_no_intent_leaves_params_unchanged(self):
         """Params are not mutated when no intent is detected."""
         params = _build_main_query("configure firewall rhel 9")
@@ -628,6 +671,18 @@ class TestIntentBoostLogging:
         with caplog.at_level("INFO", logger="okp_mcp"):
             apply_deprecation_boosts(params, query)
         assert not any("Intent boost" in m for m in caplog.messages)
+
+
+class TestDefinitionLookupDeprecationSkip:
+    """Verify definition lookups bypass the deprecation side-query."""
+
+    def test_definition_lookup_leaves_deprecation_query_unchanged(self):
+        """Matching the intent should skip adding any deprecation-specific boosts."""
+        params = _build_deprecation_query("dnsconfd")
+        original = dict(params)
+        should_run = apply_deprecation_boosts(params, "what is dnsconfd?")
+        assert should_run is False
+        assert params == original
 
 
 # ---------------------------------------------------------------------------

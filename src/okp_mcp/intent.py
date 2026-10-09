@@ -96,6 +96,11 @@ class IntentRule:
 #     See functional tests RSPEED_1930, RSPEED_1929, RSPEED_1859.
 #   - ethtool: NIC driver debugging queries need msglvl highlight terms.
 #     See functional test RSPEED_2123.
+#   - definition_lookup: exact one-term "what is X" lookups are usually
+#     explanatory/documentation queries, not requests for errata or
+#     deprecation notices. Boost documentation and skip the deprecation side
+#     query so package advisories do not swamp the answer. See functional test
+#     RSPEED_1171.
 #   - vm: broadest intent, catches all VM/virtualization queries that didn't
 #     match a more specific intent above.  Includes tool names (virt-manager,
 #     virsh, libvirt, cockpit) and hypervisor names (kvm) because LLMs often
@@ -268,6 +273,16 @@ INTENT_RULES: list[IntentRule] = [
         bq='main_content:(msglvl OR ethtool OR "message level")^10',
         highlight_terms='msglvl ethtool "message level" "ethtool -s"',
     ),
+    # Exact one-term definition lookups like "What is dnsconfd?" should favor
+    # explanatory docs over errata/advisories that merely mention the package.
+    # Leave dep_* empty so the deprecation side-query is skipped for this
+    # intent; otherwise unrelated JBoss deprecation documents dominate the
+    # fused result list.
+    IntentRule(
+        name="definition_lookup",
+        pattern=r"^\s*what(?:'s|\s+is)\s+[a-z0-9][\w.-]*\??\s*$",
+        bq="documentKind:documentation^40",
+    ),
     IntentRule(
         name="vm",
         pattern=(
@@ -326,7 +341,7 @@ def apply_main_boosts(params: dict, query_lower: str, cleaned_query: str) -> Non
     INTENT_NO_MATCH.labels(query_path="main").inc()
 
 
-def apply_deprecation_boosts(params: dict, query_lower: str) -> None:
+def apply_deprecation_boosts(params: dict, query_lower: str) -> bool:
     """Add topic-specific boosts to the deprecation query based on detected intent.
 
     Without intent-aware boosts, the deprecation query matches ANY content
@@ -343,6 +358,11 @@ def apply_deprecation_boosts(params: dict, query_lower: str) -> None:
     First matching intent wins (evaluated in INTENT_RULES order).
     Queries that match no intent are left unchanged.
 
+    Returns:
+        True when the caller should execute the deprecation query.
+        False when the matched intent explicitly marks the side-query as
+        non-useful noise and the caller should skip it entirely.
+
     See functional tests RSPEED_2480 (VM management) and RSPEED_2481 (SPICE).
     """
     for rule in INTENT_RULES:
@@ -355,7 +375,7 @@ def apply_deprecation_boosts(params: dict, query_lower: str) -> None:
         # to VM deprecation boosts.
         if not rule.dep_title_terms:
             INTENT_DEPRECATION_SKIPPED.labels(intent=rule.name).inc()
-            return
+            return False
         existing_bq = params.get("bq", "")
         params["bq"] = (
             f"{existing_bq} "
@@ -366,6 +386,7 @@ def apply_deprecation_boosts(params: dict, query_lower: str) -> None:
             "Intent boost: applied '%s' to deprecation query (^%d/^%d)", rule.name, _DEP_TITLE_BOOST, _DEP_CONTENT_BOOST
         )
         INTENT_MATCHED.labels(intent=rule.name, query_path="deprecation").inc()
-        return
+        return True
 
     INTENT_NO_MATCH.labels(query_path="deprecation").inc()
+    return True
