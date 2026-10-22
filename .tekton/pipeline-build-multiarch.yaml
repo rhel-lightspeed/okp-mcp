@@ -267,8 +267,8 @@ spec:
         - name: SOURCE_ARTIFACT
           value: $(tasks.prefetch-dependencies.results.SOURCE_ARTIFACT)
 
-        - name: CACHI2_ARTIFACT
-          value: $(tasks.prefetch-dependencies.results.CACHI2_ARTIFACT)
+        - name: PREFETCH_ARTIFACT
+          value: $(tasks.prefetch-dependencies.results.PREFETCH_ARTIFACT)
 
         - name: IMAGE_APPEND_PLATFORM
           value: "true"
@@ -336,8 +336,8 @@ spec:
         - name: SOURCE_ARTIFACT
           value: $(tasks.prefetch-dependencies.results.SOURCE_ARTIFACT)
 
-        - name: CACHI2_ARTIFACT
-          value: $(tasks.prefetch-dependencies.results.CACHI2_ARTIFACT)
+        - name: PREFETCH_ARTIFACT
+          value: $(tasks.prefetch-dependencies.results.PREFETCH_ARTIFACT)
 
       runAfter:
         - build-image-index
@@ -453,8 +453,8 @@ spec:
         - name: SOURCE_ARTIFACT
           value: $(tasks.prefetch-dependencies.results.SOURCE_ARTIFACT)
 
-        - name: CACHI2_ARTIFACT
-          value: $(tasks.prefetch-dependencies.results.CACHI2_ARTIFACT)
+        - name: PREFETCH_ARTIFACT
+          value: $(tasks.prefetch-dependencies.results.PREFETCH_ARTIFACT)
 
         - name: ARGS
           value: "--project-name=rhel-knowledge-base --report --org=12d05a23-73a7-4a1d-9162-ab12e8c051c4"
@@ -520,8 +520,8 @@ spec:
         - name: SOURCE_ARTIFACT
           value: $(tasks.prefetch-dependencies.results.SOURCE_ARTIFACT)
 
-        - name: CACHI2_ARTIFACT
-          value: $(tasks.prefetch-dependencies.results.CACHI2_ARTIFACT)
+        - name: PREFETCH_ARTIFACT
+          value: $(tasks.prefetch-dependencies.results.PREFETCH_ARTIFACT)
 
       runAfter:
         - build-image-index
@@ -555,8 +555,8 @@ spec:
         - name: SOURCE_ARTIFACT
           value: $(tasks.prefetch-dependencies.results.SOURCE_ARTIFACT)
 
-        - name: CACHI2_ARTIFACT
-          value: $(tasks.prefetch-dependencies.results.CACHI2_ARTIFACT)
+        - name: PREFETCH_ARTIFACT
+          value: $(tasks.prefetch-dependencies.results.PREFETCH_ARTIFACT)
 
       runAfter:
         - build-image-index
