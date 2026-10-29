@@ -228,13 +228,13 @@ arches:
     name: pkgconf-pkg-config
     evr: 2.5.1-2.1.hum1
     sourcerpm: pkgconf-2.5.1-2.1.hum1.src.rpm
-  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/aarch64/Packages/p/python3.12-devel-3.12.15-1.1.hum1.aarch64.rpm
+  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/aarch64/Packages/p/python3.12-devel-3.12.16-1.hum1.aarch64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 338496
-    checksum: sha256:c4bcffcdab806a06d83904289249374ab78470b479216337fec03a98982dcbf8
+    size: 338773
+    checksum: sha256:149dc690cb166db6f5839eb0fa86e08275dedabb1388819d4e1c570253c12770
     name: python3.12-devel
-    evr: 3.12.15-1.1.hum1
-    sourcerpm: python3.12-3.12.15-1.1.hum1.src.rpm
+    evr: 3.12.16-1.hum1
+    sourcerpm: python3.12-3.12.16-1.hum1.src.rpm
   - url: https://console.redhat.com/api/pulp-content/public-hummingbird/aarch64/Packages/r/rust-1.99.1-2.hum1.aarch64.rpm
     repoid: public-hummingbird-x86_64-rpms
     size: 30411789
@@ -463,13 +463,13 @@ arches:
     name: pkgconf-pkg-config
     evr: 2.5.1-2.1.hum1
     sourcerpm: pkgconf-2.5.1-2.1.hum1.src.rpm
-  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/python3.12-devel-3.12.15-1.1.hum1.x86_64.rpm
+  - url: https://console.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/p/python3.12-devel-3.12.16-1.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
-    size: 338569
-    checksum: sha256:e0a3b998bc54a5aa4fe7f587c7749a8f2a6db1ceaa17fe3d9e5e3e9c1f6a6304
+    size: 338816
+    checksum: sha256:d0d106d30e8976b4f62d34e19e93a59f67bdba0503d215a2255d972b8c5528a7
     name: python3.12-devel
-    evr: 3.12.15-1.1.hum1
-    sourcerpm: python3.12-3.12.15-1.1.hum1.src.rpm
+    evr: 3.12.16-1.hum1
+    sourcerpm: python3.12-3.12.16-1.hum1.src.rpm
   - url: https://console.redhat.com/api/pulp-content/public-hummingbird/x86_64/Packages/r/rust-1.99.1-2.hum1.x86_64.rpm
     repoid: public-hummingbird-x86_64-rpms
     size: 32472706
