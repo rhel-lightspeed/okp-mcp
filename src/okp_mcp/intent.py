@@ -69,6 +69,10 @@ class IntentRule:
 # First match wins for both main-query and deprecation-query boosts.
 #
 # Priority rationale:
+#   - identifier_lookup: queries naming a CVE / advisory ID.  Their
+#     deprecation side query ('<query> deprecated removed') matched unrelated
+#     JBoss deprecation articles that outscored the record, and the score
+#     filter then dropped it.  See functional test bare_cve_id.
 #   - release_date: very specific query type, no overlap with other intents.
 #   - eus: specific product lifecycle concept, rarely co-occurs with VM/SPICE.
 #   - lifecycle: broader than EUS but still specific to support duration/phase
@@ -107,6 +111,13 @@ class IntentRule:
 #     reduce user questions to bare tool names (e.g. "virt-manager RHEL 9")
 #     that miss the generic "virtual machine" / "virtualization" terms.
 INTENT_RULES: list[IntentRule] = [
+    # A CVE / RHSA / RHBA / RHEA identifier anywhere in the query.  No bq:
+    # the main query already ranks the exact record well.  dep_* are empty so
+    # the deprecation side query is skipped.
+    IntentRule(
+        name="identifier_lookup",
+        pattern=r"\b(?:cve-\d{4}-\d{4,}|rh[sbe]a-\d{4}:\d{4,})\b",
+    ),
     IntentRule(
         name="release_date",
         pattern=r"\b(?:release dates?|released|when was|general availability)\b",

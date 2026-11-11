@@ -288,6 +288,37 @@ class TestDetectProgrammingLanguageIntent:
         assert _get_rule("programming_language").matches(query) is False
 
 
+class TestDetectIdentifierLookupIntent:
+    """Verify detection of queries that name a CVE / advisory ID."""
+
+    @pytest.mark.parametrize(
+        "query",
+        [
+            "CVE-2024-6387",
+            "cve-2026-111760",
+            "RHSA-2024:4312",
+            "RHBA-2024:4341",
+            "RHEA-2024:10001",
+            "CVE-2024-6387, RHSA-2024:4312",
+            "What is the CVE-2024-6387?",
+            "Is RHEL 9 affected by CVE-2024-6387?",
+        ],
+        ids=["cve", "cve-lower-5-digit", "rhsa", "rhba", "rhea", "id-list", "what-is-the", "question-around-id"],
+    )
+    def test_positive(self, query: str):
+        """A query that names a CVE or advisory ID triggers the identifier intent."""
+        assert _get_rule("identifier_lookup").matches(query) is True
+
+    @pytest.mark.parametrize(
+        "query",
+        ["RHSA-2024", "RHXA-2024:4312", "XCVE-2024-6387", "CVE-2024-6387extra", "What is regreSSHion?"],
+        ids=["incomplete-id", "unknown-prefix", "embedded-in-word", "trailing-chars", "named-vuln-no-id"],
+    )
+    def test_negative(self, query: str):
+        """Malformed or absent IDs keep the normal pipeline, deprecation query included."""
+        assert _get_rule("identifier_lookup").matches(query) is False
+
+
 class TestDetectDefinitionLookupIntent:
     """Verify exact one-term "what is X" definition lookup detection.
 
@@ -681,6 +712,19 @@ class TestDefinitionLookupDeprecationSkip:
         params = _build_deprecation_query("dnsconfd")
         original = dict(params)
         should_run = apply_deprecation_boosts(params, "what is dnsconfd?")
+        assert should_run is False
+        assert params == original
+
+
+class TestIdentifierLookupDeprecationSkip:
+    """Verify ID-bearing queries bypass the deprecation side-query."""
+
+    @pytest.mark.parametrize("query", ["rhsa-2024:4312", "what is the cve-2024-6387?"], ids=["bare-id", "sentence"])
+    def test_identifier_lookup_skips_deprecation_query(self, query: str):
+        """A query naming an ID, bare or in a sentence, must not run the deprecation side query."""
+        params = _build_deprecation_query(query)
+        original = dict(params)
+        should_run = apply_deprecation_boosts(params, query)
         assert should_run is False
         assert params == original
 
