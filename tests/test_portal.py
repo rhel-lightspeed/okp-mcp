@@ -572,6 +572,18 @@ class TestApplyMainBoosts:
         assert params["bq"] == "documentKind:documentation^40"
         assert "hl.q" not in params
 
+    def test_identifier_lookup_blocks_definition_boost(self):
+        """A matched rule without bq stops the search, so "what is <ID>" gets no documentation boost.
+
+        definition_lookup also matches "what is CVE-2024-6387?", and its
+        documentation^40 bq ranked release notes that merely list the CVE
+        above the CVE record.  See functional test what_is_cve_id.
+        """
+        params = _build_main_query("What is CVE-2024-6387?")
+        before = dict(params)
+        apply_main_boosts(params, "what is cve-2024-6387?", '"CVE-2024-6387"')
+        assert params == before
+
     def test_no_intent_leaves_params_unchanged(self):
         """Params are not mutated when no intent is detected."""
         params = _build_main_query("configure firewall rhel 9")

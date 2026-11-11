@@ -618,6 +618,17 @@ FUNCTIONAL_TEST_CASES = [
         ),
         id="bare_errata_id",
     ),
+    # Verified against live Solr 2026-11-11: FAIL on main.  definition_lookup's
+    # documentation boost ranked OCP Logging release notes above the record (position 5).
+    pytest.param(
+        FunctionalCase(
+            question="What is CVE-2024-6387?",
+            expected_docs=["/security/cve/CVE-2024-6387/"],
+            expected_content=["OpenSSH"],
+            max_position=1,
+        ),
+        id="what_is_cve_id",
+    ),
     # Verified against live Solr 2026-11-11: FAIL on main.  An ID inside a sentence fails
     # like the bare ID: JBoss deprecation articles, record dropped.
     pytest.param(

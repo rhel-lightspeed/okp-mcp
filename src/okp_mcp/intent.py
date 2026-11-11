@@ -72,7 +72,10 @@ class IntentRule:
 #   - identifier_lookup: queries naming a CVE / advisory ID.  Their
 #     deprecation side query ('<query> deprecated removed') matched unrelated
 #     JBoss deprecation articles that outscored the record, and the score
-#     filter then dropped it.  See functional test bare_cve_id.
+#     filter then dropped it.  First so that "what is <ID>?" does not fall
+#     through to definition_lookup, whose documentation boost ranks release
+#     notes listing the CVE above the record.  See functional tests
+#     bare_cve_id and what_is_cve_id.
 #   - release_date: very specific query type, no overlap with other intents.
 #   - eus: specific product lifecycle concept, rarely co-occurs with VM/SPICE.
 #   - lifecycle: broader than EUS but still specific to support duration/phase
@@ -340,6 +343,12 @@ def apply_main_boosts(params: dict, query_lower: str, cleaned_query: str) -> Non
     to most generic, so SPICE matches before VM, EUS before VM, etc.
     """
     for rule in INTENT_RULES:
+        # First match wins even without a bq: identifier_lookup adds no boost
+        # on purpose and must not fall through to definition_lookup's.
+        if rule.matches(query_lower) and not rule.bq:
+            logger.info("Intent boost: matched '%s', no main-query boost", rule.name)
+            INTENT_MATCHED.labels(intent=rule.name, query_path="main").inc()
+            return
         if rule.matches(query_lower) and rule.bq:
             params["bq"] = rule.bq
             if rule.highlight_terms:
