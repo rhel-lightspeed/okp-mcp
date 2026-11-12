@@ -596,4 +596,71 @@ FUNCTIONAL_TEST_CASES = [
         ),
         id="RSPEED_1171",
     ),
+    # Verified against live Solr 2026-11-11: FAIL on main.  The deprecation side query
+    # matched JBoss deprecation articles (~157) and the score filter dropped the record (~42).
+    pytest.param(
+        FunctionalCase(
+            question="CVE-2024-6387",
+            expected_docs=["/security/cve/CVE-2024-6387/"],
+            expected_content=["OpenSSH"],
+            max_position=1,
+        ),
+        id="bare_cve_id",
+    ),
+    # Verified against live Solr 2026-11-11: FAIL on main.  Same failure as bare_cve_id
+    # for an advisory ID.
+    pytest.param(
+        FunctionalCase(
+            question="RHSA-2024:4312",
+            expected_docs=["RHSA-2024:4312"],
+            expected_content=["openssh"],
+            max_position=1,
+        ),
+        id="bare_errata_id",
+    ),
+    # Verified against live Solr 2026-11-11: FAIL on main.  definition_lookup's
+    # documentation boost ranked OCP Logging release notes above the record (position 5).
+    pytest.param(
+        FunctionalCase(
+            question="What is CVE-2024-6387?",
+            expected_docs=["/security/cve/CVE-2024-6387/"],
+            expected_content=["OpenSSH"],
+            max_position=1,
+        ),
+        id="what_is_cve_id",
+    ),
+    # Verified against live Solr 2026-11-11: FAIL on main.  An ID inside a sentence fails
+    # like the bare ID: JBoss deprecation articles, record dropped.
+    pytest.param(
+        FunctionalCase(
+            question="What is the CVE-2024-6387?",
+            expected_docs=["/security/cve/CVE-2024-6387/"],
+            expected_content=["OpenSSH"],
+            max_position=1,
+        ),
+        id="what_is_the_cve_id",
+    ),
+    # Verified against live Solr 2026-11-11: FAIL on main.  Unrelated deprecation notices,
+    # erratum dropped.
+    pytest.param(
+        FunctionalCase(
+            question="What does RHSA-2024:4312 fix?",
+            expected_docs=["RHSA-2024:4312"],
+            expected_content=["openssh"],
+            max_position=1,
+        ),
+        id="what_does_errata_fix",
+    ),
+    # Guard, verified against live Solr 2026-11-11: passes on main too.  A real question
+    # about an ID keeps its answer, the regreSSHion affectedness solution, when the side
+    # query is skipped.
+    pytest.param(
+        FunctionalCase(
+            question="Is RHEL 9 affected by CVE-2024-6387?",
+            expected_docs=["/solutions/7077309/"],
+            expected_content=["Red Hat Enterprise Linux 9"],
+            max_position=1,
+        ),
+        id="is_rhel_affected_by_cve",
+    ),
 ]
