@@ -39,6 +39,8 @@ objects:
           app: "${NAME}"
       template:
         metadata:
+          annotations:
+            deployment-version: "${DEPLOYMENT_VERSION}"
           labels:
             service: rhel-lightspeed
             app: "${NAME}"
@@ -157,3 +159,10 @@ parameters:
       configured; error reporting is disabled at the application
       level when the DSN value is blank.
     value: okp-mcp-glitchtip
+  - name: DEPLOYMENT_VERSION
+    displayName: Deployment Version
+    description: >-
+      Increment to force a pod rollout without changing config or
+      image tag. Changing this value modifies the pod template
+      annotation, triggering a new rollout.
+    value: "1"
